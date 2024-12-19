@@ -1,2 +1,2 @@
-#define WIFI_SSID "";
-#define WIFI_PASS "";
+#define WIFI_SSID "путін хуйло";
+#define WIFI_PASS "28021981";
