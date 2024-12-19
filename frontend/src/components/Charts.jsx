@@ -1,97 +1,161 @@
 import { Line } from 'react-chartjs-2';
 import { useState, useEffect } from 'react';
-import { Chart, registerables, CategoryScale } from 'chart.js';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+import zoomPlugin from 'chartjs-plugin-zoom';
 import { socket } from '../websocket';
-import { generateCSV } from '../csvGenerator';
 
-// Register all necessary components, including scales
-Chart.register(...registerables, CategoryScale);
+// Register ChartJS components and plugins
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  zoomPlugin
+);
 
-const createChartData = (label, data) => ({
-  labels: data.map((_, index) => index),
-  datasets: [
-    {
-      label,
-      data,
-      fill: false,
-      borderColor: 'rgba(75,192,192,1)',
-      tension: 0.1,
+const chartOptions = {
+  responsive: true,
+  plugins: {
+    zoom: {
+      zoom: {
+        wheel: { enabled: true },
+        pinch: { enabled: true },
+        mode: 'xy',
+      },
+      pan: {
+        enabled: true,
+        mode: 'xy',
+      },
     },
-  ],
-});
+    legend: {
+      position: 'top',
+    },
+  },
+  scales: {
+    y: {
+      beginAtZero: true
+    }
+  }
+};
 
 export const PressureChart = () => {
-  const [pressureData1, setPressureData1] = useState([]);
-  const [pressureData2, setPressureData2] = useState([]);
+  const [data, setData] = useState({
+    labels: [],
+    datasets: [
+      {
+        label: 'Pressure 1',
+        data: [],
+        borderColor: 'rgb(75, 192, 192)',
+        tension: 0.1
+      },
+      {
+        label: 'Pressure 2',
+        data: [],
+        borderColor: 'rgb(255, 99, 132)',
+        tension: 0.1
+      }
+    ]
+  });
 
   useEffect(() => {
-    const handleSocketMessage = (event) => {
+    const handleMessage = (event) => {
       const message = JSON.parse(event.data);
-      if (message.type === 'pressure') {
-        setPressureData1((prev) => [...prev, message.p1]);
-        setPressureData2((prev) => [...prev, message.p2]);
-      } else if (message.type === 'end') {
-        generateCSV(pressureData1, 'pressure.csv');
+      if (message.type === 'test_data') {
+        setData(prev => ({
+          labels: [...prev.labels, message.timestamp],
+          datasets: [
+            {
+              ...prev.datasets[0],
+              data: [...prev.datasets[0].data, message.pressure1]
+            },
+            {
+              ...prev.datasets[1],
+              data: [...prev.datasets[1].data, message.pressure2]
+            }
+          ]
+        }));
       }
     };
 
-    socket.addEventListener('message', handleSocketMessage);
+    socket.addEventListener('message', handleMessage);
+    return () => socket.removeEventListener('message', handleMessage);
+  }, []);
 
-    return () => {
-      socket.removeEventListener('message', handleSocketMessage);
+  return <Line options={chartOptions} data={data} />;
+};
+
+export const LoadCellChart = () => {
+  const [data, setData] = useState({
+    labels: [],
+    datasets: [{
+      label: 'Load Cell',
+      data: [],
+      borderColor: 'rgb(153, 102, 255)',
+      tension: 0.1
+    }]
+  });
+
+  useEffect(() => {
+    const handleMessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'test_data') {
+        setData(prev => ({
+          labels: [...prev.labels, message.timestamp],
+          datasets: [{
+            ...prev.datasets[0],
+            data: [...prev.datasets[0].data, message.load]
+          }]
+        }));
+      }
     };
-  }, [pressureData1]);
 
-  return (
-    <div>
-      <Line data={createChartData('Pressure Sensor 1', pressureData1)} />
-      <Line data={createChartData('Pressure Sensor 2', pressureData2)} />
-    </div>
-  );
+    socket.addEventListener('message', handleMessage);
+    return () => socket.removeEventListener('message', handleMessage);
+  }, []);
+
+  return <Line options={chartOptions} data={data} />;
 };
 
 export const TemperatureChart = () => {
-  const [temperatureData, setTemperatureData] = useState([]);
+  const [data, setData] = useState({
+    labels: [],
+    datasets: [{
+      label: 'Temperature',
+      data: [],
+      borderColor: 'rgb(255, 159, 64)',
+      tension: 0.1
+    }]
+  });
 
   useEffect(() => {
-    const handleSocketMessage = (event) => {
+    const handleMessage = (event) => {
       const message = JSON.parse(event.data);
-      if (message.type === 'temperature') {
-        setTemperatureData((prev) => [...prev, message.temp]);
-      } else if (message.type === 'end') {
-        generateCSV(temperatureData, 'temperature.csv');
+      if (message.type === 'test_data') {
+        setData(prev => ({
+          labels: [...prev.labels, message.timestamp],
+          datasets: [{
+            ...prev.datasets[0],
+            data: [...prev.datasets[0].data, message.temp]
+          }]
+        }));
       }
     };
 
-    socket.addEventListener('message', handleSocketMessage);
+    socket.addEventListener('message', handleMessage);
+    return () => socket.removeEventListener('message', handleMessage);
+  }, []);
 
-    return () => {
-      socket.removeEventListener('message', handleSocketMessage);
-    };
-  }, [temperatureData]);
-
-  return <Line data={createChartData('Temperature', temperatureData)} />;
-};
-
-export const ThrustChart = () => {
-  const [thrustData, setThrustData] = useState([]);
-
-  useEffect(() => {
-    const handleSocketMessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === 'thrust') {
-        setThrustData((prev) => [...prev, message.thrust]);
-      } else if (message.type === 'end') {
-        generateCSV(thrustData, 'thrust.csv');
-      }
-    };
-
-    socket.addEventListener('message', handleSocketMessage);
-
-    return () => {
-      socket.removeEventListener('message', handleSocketMessage);
-    };
-  }, [thrustData]);
-
-  return <Line data={createChartData('Thrust', thrustData)} />;
+  return <Line options={chartOptions} data={data} />;
 };

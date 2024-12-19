@@ -7,16 +7,18 @@
 #include <Wire.h>
 #include <Adafruit_ADS1X15.h>
 #include "secret.h"
-#include <ESPmDNS.h>
 
 // Network credentials (secret.h)
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASS;
-const char* hostname = "esp32-rockettester";
 
 // Web server and WebSocket setup
 AsyncWebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
+
+// ADS1115 setup
+Adafruit_ADS1115 ads;
+const uint8_t ADS_I2C_ADDRESS = 0x48;
 
 // Pin definitions
 const int ENGINE_OUT_PIN = 26;  // Wire detection output
@@ -52,6 +54,15 @@ void IRAM_ATTR engineStartISR() {
     }
 }
 
+void setupADS1115() {
+    if (!ads.begin(ADS_I2C_ADDRESS)) {
+        Serial.println("Failed to initialize ADS1115!");
+        return;
+    }
+    ads.setGain(GAIN_ONE);  // ±4.096V range
+    ads.setDataRate(RATE_ADS1115_860SPS);  // Maximum 860 samples per second
+}
+
 void sensorTask(void *parameter) {
     SensorData data;
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -61,11 +72,19 @@ void sensorTask(void *parameter) {
         if (isReading) {
             data.timestamp = micros();
             
-            // Simulate sensor readings
-            data.loadCell = random(0, 1000) / 10.0; // Simulate load cell in kg
-            data.pressure1 = random(0, 1000) / 10.0; // Simulate pressure1 in bar
-            data.pressure2 = random(0, 1000) / 10.0; // Simulate pressure2 in bar
-            data.temperature = random(0, 1000) / 10.0; // Simulate temperature in °C
+            // Read all sensors
+            data.loadCell = ads.computeVolts(ads.readADC_SingleEnded(0));
+            data.pressure1 = ads.computeVolts(ads.readADC_SingleEnded(1));
+            data.pressure2 = ads.computeVolts(ads.readADC_SingleEnded(2));
+            data.temperature = ads.computeVolts(ads.readADC_SingleEnded(3));
+
+            // Convert sensor readings
+            data.loadCell = map(data.loadCell * 1000, 0, 3300, 0, 1000); // Map to kg
+            // With 200Ω resistor:
+            // 4mA = 0.8V = 800mV
+            // 20mA = 4V = 4000mV
+            data.pressure1 = map(data.pressure1 * 1000, 800, 4000, 0, 1000); // Map to bar
+            data.pressure2 = map(data.pressure2 * 1000, 800, 4000, 0, 1000); // Map to bar
 
             // Send data via WebSocket
             StaticJsonDocument<200> doc;
@@ -103,7 +122,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 
                 // Trigger pyro charge
                 digitalWrite(PYRO_PIN, HIGH);
-
+                delay(100);
+                digitalWrite(PYRO_PIN, LOW);
             }
             else if (message == "end_test") {
                 isReading = false;
@@ -145,6 +165,10 @@ void setup() {
     // Attach engine start detection interrupt
     attachInterrupt(digitalPinToInterrupt(ENGINE_IN_PIN), engineStartISR, FALLING);
 
+    // Initialize I2C and ADS1115
+    Wire.begin();
+    setupADS1115();
+
     // Connect to WiFi
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
@@ -152,15 +176,6 @@ void setup() {
         Serial.println("Connecting to WiFi...");
     }
     Serial.println(WiFi.localIP());
-
-      // Initialize mDNS in AP mode (note: mDNS might not work well in AP mode)
-    if (!MDNS.begin(hostname)) {
-        Serial.println("Error setting up MDNS responder in AP mode!");
-    } else {
-        Serial.println("mDNS responder started in AP mode");
-        MDNS.addService("http", "tcp", 80);
-    }
-    
 
     // Setup web server
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){

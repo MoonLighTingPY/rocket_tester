@@ -1,13 +1,3 @@
-export const socket = new WebSocket('ws://your-esp32-ip-address');
+const socket = new WebSocket(`ws://esp32-rockettester.local:81/ws`);
 
-socket.onopen = () => {
-  console.log('WebSocket connection established');
-};
-
-socket.onclose = () => {
-  console.log('WebSocket connection closed');
-};
-
-socket.onerror = (error) => {
-  console.error('WebSocket error:', error);
-};
+export { socket };
