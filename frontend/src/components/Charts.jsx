@@ -1,5 +1,6 @@
+// src/components/Charts.jsx
 import { Line } from 'react-chartjs-2';
-import { useState, useEffect } from 'react';
+import { useDataManager } from '../hooks/useDataManager';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -8,12 +9,11 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
 } from 'chart.js';
 import zoomPlugin from 'chartjs-plugin-zoom';
-import { socket } from '../websocket';
 
-// Register ChartJS components and plugins
+// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -27,6 +27,7 @@ ChartJS.register(
 
 const chartOptions = {
   responsive: true,
+  animation: false, // Disable animation for better performance
   plugins: {
     zoom: {
       zoom: {
@@ -44,6 +45,13 @@ const chartOptions = {
     },
   },
   scales: {
+    x: {
+      type: 'linear',
+      title: {
+        display: true,
+        text: 'Time (s)'
+      }
+    },
     y: {
       beginAtZero: true
     }
@@ -51,111 +59,87 @@ const chartOptions = {
 };
 
 export const PressureChart = () => {
-  const [data, setData] = useState({
-    labels: [],
+  const { testData } = useDataManager();
+  
+  const data = {
     datasets: [
       {
         label: 'Pressure 1',
-        data: [],
+        data: testData.map(point => ({
+          x: point.t / 1000000, // Convert microseconds to seconds
+          y: point.p1
+        })),
         borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1
+        pointRadius: 0 // Hide points for better performance
       },
       {
         label: 'Pressure 2',
-        data: [],
+        data: testData.map(point => ({
+          x: point.t / 1000000,
+          y: point.p2
+        })),
         borderColor: 'rgb(255, 99, 132)',
-        tension: 0.1
+        pointRadius: 0
       }
     ]
-  });
-
-  useEffect(() => {
-    const handleMessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === 'test_data') {
-        setData(prev => ({
-          labels: [...prev.labels, message.timestamp],
-          datasets: [
-            {
-              ...prev.datasets[0],
-              data: [...prev.datasets[0].data, message.pressure1]
-            },
-            {
-              ...prev.datasets[1],
-              data: [...prev.datasets[1].data, message.pressure2]
-            }
-          ]
-        }));
-      }
-    };
-
-    socket.addEventListener('message', handleMessage);
-    return () => socket.removeEventListener('message', handleMessage);
-  }, []);
+  };
 
   return <Line options={chartOptions} data={data} />;
 };
 
 export const LoadCellChart = () => {
-  const [data, setData] = useState({
-    labels: [],
+  const { testData } = useDataManager();
+  
+  const data = {
     datasets: [{
       label: 'Load Cell',
-      data: [],
+      data: testData.map(point => ({
+        x: point.t / 1000000,
+        y: point.l
+      })),
       borderColor: 'rgb(153, 102, 255)',
-      tension: 0.1
+      pointRadius: 0
     }]
-  });
-
-  useEffect(() => {
-    const handleMessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === 'test_data') {
-        setData(prev => ({
-          labels: [...prev.labels, message.timestamp],
-          datasets: [{
-            ...prev.datasets[0],
-            data: [...prev.datasets[0].data, message.load]
-          }]
-        }));
-      }
-    };
-
-    socket.addEventListener('message', handleMessage);
-    return () => socket.removeEventListener('message', handleMessage);
-  }, []);
+  };
 
   return <Line options={chartOptions} data={data} />;
 };
 
 export const TemperatureChart = () => {
-  const [data, setData] = useState({
-    labels: [],
+  const { testData } = useDataManager();
+  
+  const data = {
     datasets: [{
       label: 'Temperature',
-      data: [],
+      data: testData.map(point => ({
+        x: point.t / 1000000,
+        y: point.tp
+      })),
       borderColor: 'rgb(255, 159, 64)',
-      tension: 0.1
+      pointRadius: 0
     }]
-  });
-
-  useEffect(() => {
-    const handleMessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === 'test_data') {
-        setData(prev => ({
-          labels: [...prev.labels, message.timestamp],
-          datasets: [{
-            ...prev.datasets[0],
-            data: [...prev.datasets[0].data, message.temp]
-          }]
-        }));
-      }
-    };
-
-    socket.addEventListener('message', handleMessage);
-    return () => socket.removeEventListener('message', handleMessage);
-  }, []);
+  };
 
   return <Line options={chartOptions} data={data} />;
+};
+
+export const ChartControls = () => {
+  const { exportToCsv, clearData, isRecording } = useDataManager();
+  
+  return (
+    <div className="charts-controls">
+      <button 
+        onClick={exportToCsv}
+        disabled={isRecording}
+      >
+        Export to CSV
+      </button>
+      <button 
+        onClick={clearData}
+        disabled={isRecording}
+      >
+        Clear Data
+      </button>
+    </div>
+  );
 };
