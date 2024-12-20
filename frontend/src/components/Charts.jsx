@@ -1,7 +1,7 @@
 // src/components/Charts.jsx
 import { Line } from 'react-chartjs-2';
-import { useDataManager } from '../hooks/useDataManager';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useContext } from 'react';
+import DataContext from '../hooks/DataContext';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -62,7 +62,7 @@ const chartOptions = {
 };
 
 export const PressureChart = () => {
-  const { testData } = useDataManager();
+  const { testData } = useContext(DataContext);
   const chartRef = useRef();
   
   const data = {
@@ -99,7 +99,7 @@ export const PressureChart = () => {
 };
 
 export const LoadCellChart = () => {
-  const { testData } = useDataManager();
+  const { testData } = useContext(DataContext);
   const chartRef = useRef();
   
   const data = {
@@ -124,7 +124,7 @@ export const LoadCellChart = () => {
 };
 
 export const TemperatureChart = () => {
-  const { testData } = useDataManager();
+  const { testData } = useContext(DataContext);
   const chartRef = useRef();
   
   const data = {
@@ -149,15 +149,18 @@ export const TemperatureChart = () => {
 };
 
 export const ChartControls = () => {
-  const { exportToCsv, clearCsvData, isRecording } = useDataManager();
+  const { testData, exportToCsv, clearCsvData, clearTestData, csvData, } = useContext(DataContext);
 
   return (
     <div className="charts-controls">
-      <button onClick={exportToCsv} disabled={isRecording}>
-        Export to CSV
-      </button>
-      <button onClick={clearCsvData} disabled={isRecording}>
+      <button onClick={exportToCsv} disabled={csvData.length === 0}>
+      Export to CSV
+    </button>
+      <button onClick={clearCsvData} disabled={csvData.length === 0}>
         Clear CSV Data
+      </button>
+      <button onClick={clearTestData} disabled={testData.length === 0}>
+        Clear Chart Data
       </button>
     </div>
   );

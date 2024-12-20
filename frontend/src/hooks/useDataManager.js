@@ -14,8 +14,7 @@ const processSensorData = (data, testStartTime) => {
 // src/hooks/useDataManager.js
 export const useDataManager = () => {
   const [testData, setTestData] = useState([]);
-  const [testStartTime, setTestStartTime] = useState(null);
-  const [isRecording, setIsRecording] = useState(false);
+  const [testStartTime] = useState(null);
   const [csvData, setCsvData] = useState([]); // Separate state for CSV data
 
   useEffect(() => {
@@ -31,9 +30,8 @@ export const useDataManager = () => {
           ...prevData,
           ...message.data.map(data => processSensorData(data, testStartTime))
         ]);
-      } else if (message.type === 'start_test') {
-        setTestStartTime(Date.now());
-      }
+
+      } 
     };
 
     socket.addEventListener('message', handleMessage);
@@ -58,13 +56,16 @@ export const useDataManager = () => {
     setCsvData([]);
   };
 
+  const clearTestData = () => {
+    setTestData([]); // Clear the chart data only
+  };
 
   return {
     testData,
     testStartTime,
-    isRecording,
-    setIsRecording,
+    csvData,
     exportToCsv,
     clearCsvData,  // For clearing CSV data
+    clearTestData  // For clearing chart data
   };
 };
