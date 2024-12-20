@@ -42,7 +42,7 @@ struct SensorData {
     unsigned long timestamp;
 };
 
-// Create a circular buffer to store 5000 readings
+// Create a circular buffer to store 2000 readings
 #define BUFFER_SIZE 2000
 CircularBuffer<SensorData, BUFFER_SIZE> dataBuffer;
 

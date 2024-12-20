@@ -4,12 +4,9 @@ import { socket } from '../websocket';
 const SAMPLE_RATE = 1 / 860; // example ~1.16ms per sample
 
 function processSensorData(raw, testStart, offset) {
-  const { t: originalT} = raw;
-
-  // Convert raw sample index to seconds
+  const { t: originalT } = raw;
   const timeInSeconds = originalT * SAMPLE_RATE;
 
-  // If we haven't ignited yet, just return raw time
   if (testStart === null) {
     return {
       ...raw,
@@ -21,9 +18,12 @@ function processSensorData(raw, testStart, offset) {
   // Time relative to the ignition index
   let adjustedTime = (originalT - testStart) * SAMPLE_RATE;
 
-  // Apply engine offset if we have it (and only for >= 0)
-  if (offset && adjustedTime >= 0) {
-    adjustedTime -= offset / 1e6;
+  // Apply engine offset smoothly around zero
+  if (offset) {
+    const offsetInSeconds = offset / 1e6;
+    // Use a smooth transition function
+    const transitionFactor = 1 / (1 + Math.exp(-adjustedTime * 20)); // sigmoid function
+    adjustedTime -= offsetInSeconds * transitionFactor;
   }
 
   return {
