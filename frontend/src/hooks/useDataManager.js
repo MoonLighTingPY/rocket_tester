@@ -1,40 +1,37 @@
-// src/hooks/useDataManager.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { socket } from '../websocket';
 
-const processSensorData = (data, testStartTime, engineTimeOffset) => {
-  const SAMPLE_PERIOD = 1 / 860; // ~1.16ms per sample
-  
-  // Calculate the base timestamp in seconds
-  const timestampInSeconds = data.t * SAMPLE_PERIOD;
-  
-  if (!testStartTime) {
-    // Before ignition, just return the original timestamp
+const SAMPLE_RATE = 1 / 860; // example ~1.16ms per sample
+
+function processSensorData(raw, testStart, offset) {
+  const { t: originalT} = raw;
+
+  // Convert raw sample index to seconds
+  const timeInSeconds = originalT * SAMPLE_RATE;
+
+  // If we haven't ignited yet, just return raw time
+  if (testStart === null) {
     return {
-      ...data,
-      t: timestampInSeconds,
-      originalTimestamp: data.t // Store original for later reprocessing
+      ...raw,
+      t: timeInSeconds,
+      originalTimestamp: originalT
     };
   }
 
-  // Calculate time relative to ignition point
-  let adjustedTime = (data.t - testStartTime) * SAMPLE_PERIOD;
-  
-  // If we have received the engine start offset, apply it
-  if (engineTimeOffset) {
-    // Only adjust timestamps after ignition
-    if (adjustedTime >= 0) {
-      // Convert engineTimeOffset from microseconds to seconds and apply
-      adjustedTime -= (engineTimeOffset / 1000000);
-    }
+  // Time relative to the ignition index
+  let adjustedTime = (originalT - testStart) * SAMPLE_RATE;
+
+  // Apply engine offset if we have it (and only for >= 0)
+  if (offset && adjustedTime >= 0) {
+    adjustedTime -= offset / 1e6;
   }
 
   return {
-    ...data,
+    ...raw,
     t: adjustedTime,
-    originalTimestamp: data.t // Store original for later reprocessing
+    originalTimestamp: originalT
   };
-};
+}
 
 export const useDataManager = () => {
   const [testData, setTestData] = useState([]);
@@ -43,34 +40,29 @@ export const useDataManager = () => {
   const [csvData, setCsvData] = useState([]);
   const [latestTimestamp, setLatestTimestamp] = useState(null);
 
+  // Keep all raw data so we can fully reprocess when offset changes
+  const rawDataRef = useRef([]);
 
   useEffect(() => {
     const handleMessage = (event) => {
       const message = JSON.parse(event.data);
-      
+
       if (message.type === 'test_data') {
-        
         if (message.data.length > 0) {
           setLatestTimestamp(message.data[message.data.length - 1].t);
         }
+        // Add incoming raw data to our ref
+        rawDataRef.current = [...rawDataRef.current, ...message.data];
 
-        const newData = message.data.map(data => 
-          processSensorData(data, testStartTime, engineTimeOffset)
+        // Process new data
+        const newData = message.data.map(d =>
+          processSensorData(d, testStartTime, engineTimeOffset)
         );
-
-        setTestData(prevData => [...prevData, ...newData]);
-        setCsvData(prevData => [...prevData, ...newData]);
-      }
-      else if (message.type === 'time_difference') {
-        // Update the engine time offset and reprocess all CSV data
+        setTestData(prev => [...prev, ...newData]);
+        setCsvData(prev => [...prev, ...newData]);
+      } else if (message.type === 'time_difference') {
+        // Update offset and reprocess everything from raw
         setEngineTimeOffset(message.value);
-        setCsvData(prevData => 
-          prevData.map(data => processSensorData(
-            { t: data.originalTimestamp, l: data.l, p1: data.p1, p2: data.p2, tp: data.tp }, 
-            testStartTime,
-            message.value
-          ))
-        );
       }
     };
 
@@ -78,18 +70,27 @@ export const useDataManager = () => {
     return () => socket.removeEventListener('message', handleMessage);
   }, [testStartTime, engineTimeOffset]);
 
+  // Whenever offset changes, reprocess from raw data
+  useEffect(() => {
+    if (rawDataRef.current.length > 0) {
+      const reprocessed = rawDataRef.current.map(d =>
+        processSensorData(d, testStartTime, engineTimeOffset)
+      );
+      setTestData(reprocessed);
+      setCsvData(reprocessed);
+    }
+  }, [engineTimeOffset, testStartTime]);
+
   const handleStartTest = () => {
-    // When Ignite is clicked, use the latest received timestamp
+    // This sets ignition to the latest sample index
     setTestStartTime(latestTimestamp);
   };
 
-
   const exportToCsv = () => {
     const headers = ['Timestamp (s),Load (kg),Pressure1 (bar),Pressure2 (bar),Temperature (°C)'];
-    const data = csvData.map(point => {
-      return `${point.t.toFixed(6)},${point.l},${point.p1},${point.p2},${point.tp}`;
-    });
-
+    const data = csvData.map(
+      point => `${point.t.toFixed(6)},${point.l},${point.p1},${point.p2},${point.tp}`
+    );
     const csvContent = headers.concat(data).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -98,21 +99,15 @@ export const useDataManager = () => {
     link.click();
   };
 
-  const clearCsvData = () => {
-    setCsvData([]);
-  };
-
-  const clearTestData = () => {
-    setTestData([]); // Clear the chart data only
-  };
+  const clearCsvData = () => setCsvData([]);
+  const clearTestData = () => setTestData([]);
 
   return {
     testData,
-    testStartTime,
     csvData,
+    handleStartTest,
     exportToCsv,
-    clearCsvData,  // For clearing CSV data
-    clearTestData,  // For clearing chart data
-    handleStartTest
+    clearCsvData,
+    clearTestData
   };
 };
