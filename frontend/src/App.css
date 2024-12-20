@@ -1,14 +1,15 @@
 .app {
   padding: 20px;
-  max-width: 1200px;
   margin: 0 auto;
+  max-width: 1200px;
+  width: 100%;
 }
 
 .controls {
   margin: 20px 0;
   display: flex;
   gap: 10px;
-  justify-content: center; /* Center the buttons */
+  justify-content: center;
 }
 
 .controls button {
@@ -27,7 +28,6 @@
   padding: 20px;
   border: 1px solid #ccc;
   border-radius: 8px;
-
 }
 
 .chart h2 {
@@ -35,52 +35,59 @@
   margin-bottom: 20px;
 }
 
-/* src/App.css */
 .charts-container {
   padding: 20px;
 }
 
-.charts-controls {
-  margin-bottom: 20px;
-  display: flex;
-  gap: 10px;
-}
+/* Media queries for mobile devices */
+@media (max-width: 768px) {
+  .app {
+    padding: 10px;
+    max-width: fit-content;
+  }
 
-.charts-controls button {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  cursor: pointer;
-}
+  .controls {
+    flex-direction: column;
+    gap: 5px;
+  }
 
-.charts-controls button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+  .controls button {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+  }
 
-.chart {
-  margin-bottom: 30px;
-  padding: 20px;
-  border: 1px solid #eee;
-  border-radius: 8px;
-}
-
-/* Media queries for larger screens */
-@media (min-width: 768px) {
   .charts {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: space-between;
+    gap: 20px;
   }
 
   .chart {
-    flex: 1 1 calc(50% - 20px); /* Two charts per row with some gap */
-    margin-bottom: 20px;
+    padding: 15px;
+  }
+
+  .chart h2 {
+    font-size: 18px;
+    margin-bottom: 15px;
   }
 }
 
-@media (min-width: 1200px) {
+/* Media queries for very small devices */
+@media (max-width: 480px) {
+  .app {
+    padding: 5px;
+  }
+
+  .controls button {
+    padding: 8px;
+    font-size: 12px;
+  }
+
   .chart {
-    flex: 1 1 calc(33.33% - 20px); /* Three charts per row with some gap */
+    padding: 10px;
+  }
+
+  .chart h2 {
+    font-size: 16px;
+    margin-bottom: 10px;
   }
 }
