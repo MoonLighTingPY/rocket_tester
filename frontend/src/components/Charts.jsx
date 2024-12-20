@@ -95,7 +95,7 @@ export const PressureChart = () => {
   }, [testData]);
 
   // Add key prop to force re-render when data changes
-  return <Line key={testData.length} options={chartOptions} data={data} />;
+  return <Line ref={chartRef} options={chartOptions} data={data} />;
 };
 
 export const LoadCellChart = () => {
@@ -120,7 +120,7 @@ export const LoadCellChart = () => {
     }
   }, [testData]);
 
-  return <Line key={testData.length} options={chartOptions} data={data} />;
+  return <Line ref={chartRef} options={chartOptions} data={data} />;
 };
 
 export const TemperatureChart = () => {
@@ -145,7 +145,7 @@ export const TemperatureChart = () => {
     }
   }, [testData]);
 
-  return <Line key={testData.length} options={chartOptions} data={data} />;
+  return <Line ref={chartRef} options={chartOptions} data={data} />;
 };
 
 export const ChartControls = () => {
