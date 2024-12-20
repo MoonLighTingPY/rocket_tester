@@ -126,7 +126,8 @@ void webSocketTask(void *parameter) {
         }
 
         // Imitate engine start 100 milliseconds after test start
-        if (testStarted && !engineStarted && (micros() - testStartTime >= 100000)) {
+        if (testStarted && !engineStarted && (micros() - testStartTime >= 100)) {
+            Serial.println("Engine started");
             engineStartTime = micros();
             engineStarted = true;
         }
@@ -143,6 +144,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             
         case WStype_TEXT: {
             String message = String((char*)payload);
+            Serial.printf("Received message: %s\n", message.c_str());
             
             if (message == "start_readings") {
                 isReading = true;
@@ -152,9 +154,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             }
             else if (message == "start_test") {
                 testStarted = true;
-                testStartTime = micros();
                 engineStarted = false;
-                
+                testStartTime = micros();
                 digitalWrite(PYRO_PIN, HIGH);
 
             }
@@ -165,15 +166,16 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 dataCounter = 0;
                 sampleCounter = 0;
                 clearBuffer(); // Clear the buffer when stopping the readings
-            }
-
-            if (engineStarted && !testStarted) {
                 DynamicJsonDocument doc(200);
                 doc["type"] = "time_difference";
                 doc["value"] = engineStartTime - testStartTime;
                 String jsonString;
                 serializeJson(doc, jsonString);
                 webSocket.broadcastTXT(jsonString);
+            }
+
+            if (engineStarted) {
+                // do nothing
             }
             break;
         }
