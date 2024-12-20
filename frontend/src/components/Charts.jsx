@@ -1,6 +1,7 @@
 // src/components/Charts.jsx
 import { Line } from 'react-chartjs-2';
 import { useDataManager } from '../hooks/useDataManager';
+import { useRef, useEffect } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,7 +14,6 @@ import {
 } from 'chart.js';
 import zoomPlugin from 'chartjs-plugin-zoom';
 
-// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -27,7 +27,7 @@ ChartJS.register(
 
 const chartOptions = {
   responsive: true,
-  animation: false, // Disable animation for better performance
+  animation: false,
   plugins: {
     zoom: {
       zoom: {
@@ -50,6 +50,9 @@ const chartOptions = {
       title: {
         display: true,
         text: 'Time (s)'
+      },
+      ticks: {
+        callback: (value) => value.toFixed(3) // Format ticks to 3 decimal places
       }
     },
     y: {
@@ -60,22 +63,23 @@ const chartOptions = {
 
 export const PressureChart = () => {
   const { testData } = useDataManager();
+  const chartRef = useRef();
   
   const data = {
     datasets: [
       {
         label: 'Pressure 1',
         data: testData.map(point => ({
-          x: point.t / 1000000, // Convert microseconds to seconds
+          x: point.t,
           y: point.p1
         })),
         borderColor: 'rgb(75, 192, 192)',
-        pointRadius: 0 // Hide points for better performance
+        pointRadius: 0
       },
       {
         label: 'Pressure 2',
         data: testData.map(point => ({
-          x: point.t / 1000000,
+          x: point.t,
           y: point.p2
         })),
         borderColor: 'rgb(255, 99, 132)',
@@ -84,17 +88,25 @@ export const PressureChart = () => {
     ]
   };
 
-  return <Line options={chartOptions} data={data} />;
+  useEffect(() => {
+    if (chartRef.current) {
+      chartRef.current.update(); // Updates the chart when testData changes
+    }
+  }, [testData]);
+
+  // Add key prop to force re-render when data changes
+  return <Line key={testData.length} options={chartOptions} data={data} />;
 };
 
 export const LoadCellChart = () => {
   const { testData } = useDataManager();
+  const chartRef = useRef();
   
   const data = {
     datasets: [{
       label: 'Load Cell',
       data: testData.map(point => ({
-        x: point.t / 1000000,
+        x: point.t,
         y: point.l
       })),
       borderColor: 'rgb(153, 102, 255)',
@@ -102,17 +114,24 @@ export const LoadCellChart = () => {
     }]
   };
 
-  return <Line options={chartOptions} data={data} />;
+  useEffect(() => {
+    if (chartRef.current) {
+      chartRef.current.update(); // Updates the chart when testData changes
+    }
+  }, [testData]);
+
+  return <Line key={testData.length} options={chartOptions} data={data} />;
 };
 
 export const TemperatureChart = () => {
   const { testData } = useDataManager();
+  const chartRef = useRef();
   
   const data = {
     datasets: [{
       label: 'Temperature',
       data: testData.map(point => ({
-        x: point.t / 1000000,
+        x: point.t,
         y: point.tp
       })),
       borderColor: 'rgb(255, 159, 64)',
@@ -120,25 +139,25 @@ export const TemperatureChart = () => {
     }]
   };
 
-  return <Line options={chartOptions} data={data} />;
+  useEffect(() => {
+    if (chartRef.current) {
+      chartRef.current.update(); // Updates the chart when testData changes
+    }
+  }, [testData]);
+
+  return <Line key={testData.length} options={chartOptions} data={data} />;
 };
 
 export const ChartControls = () => {
-  const { exportToCsv, clearData, isRecording } = useDataManager();
-  
+  const { exportToCsv, clearCsvData, isRecording } = useDataManager();
+
   return (
     <div className="charts-controls">
-      <button 
-        onClick={exportToCsv}
-        disabled={isRecording}
-      >
+      <button onClick={exportToCsv} disabled={isRecording}>
         Export to CSV
       </button>
-      <button 
-        onClick={clearData}
-        disabled={isRecording}
-      >
-        Clear Data
+      <button onClick={clearCsvData} disabled={isRecording}>
+        Clear CSV Data
       </button>
     </div>
   );

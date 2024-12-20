@@ -62,6 +62,13 @@ void IRAM_ATTR engineStartISR() {
     }
 }
 
+// Function to clear the buffer
+void clearBuffer() {
+    portENTER_CRITICAL(&bufferMux);
+    dataBuffer.clear();
+    portEXIT_CRITICAL(&bufferMux);
+}
+
 // High-speed sensor reading task
 void sensorTask(void *parameter) {
     SensorData data;
@@ -72,8 +79,8 @@ void sensorTask(void *parameter) {
         if (isReading) {
             data.timestamp = sampleCounter;  // Just store the counter
             data.loadCell = dataCounter++;   // Simulated sensor data
-            data.pressure1 = dataCounter;    // Simulated sensor data
-            data.pressure2 = dataCounter;    // Simulated sensor data
+            data.pressure1 = random(0, 100);    // Simulated sensor data
+            data.pressure2 = random(0, 100); // Simulated sensor data
             data.temperature = dataCounter;  // Simulated sensor data
             sampleCounter++;
 
@@ -122,14 +129,6 @@ void webSocketTask(void *parameter) {
         if (testStarted && !engineStarted && (micros() - testStartTime >= 100000)) {
             engineStartTime = micros();
             engineStarted = true;
-            DynamicJsonDocument doc(200);
-            doc["type"] = "time_difference";
-            doc["value"] = engineStartTime - testStartTime;
-            String jsonString;
-            serializeJson(doc, jsonString);
-            webSocket.broadcastTXT(jsonString);
-            Serial.print("Engine started at: ");
-            Serial.println(engineStartTime);
         }
 
         delay(20); // 50Hz WebSocket updates
@@ -165,9 +164,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 engineStarted = false;
                 dataCounter = 0;
                 sampleCounter = 0;
+                clearBuffer(); // Clear the buffer when stopping the readings
             }
 
-            if (engineStarted) {
+            if (engineStarted && !testStarted) {
                 DynamicJsonDocument doc(200);
                 doc["type"] = "time_difference";
                 doc["value"] = engineStartTime - testStartTime;
