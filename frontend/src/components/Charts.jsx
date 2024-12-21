@@ -70,7 +70,7 @@ export const PressureChart = () => {
       {
         label: 'Pressure 1',
         data: testData.map(point => ({
-          x: point.t,
+          x: point.readingsT,
           y: point.p1
         })),
         borderColor: 'rgb(75, 192, 192)',
@@ -79,7 +79,7 @@ export const PressureChart = () => {
       {
         label: 'Pressure 2',
         data: testData.map(point => ({
-          x: point.t,
+          x: point.readingsT,
           y: point.p2
         })),
         borderColor: 'rgb(255, 99, 132)',
@@ -106,7 +106,7 @@ export const LoadCellChart = () => {
     datasets: [{
       label: 'Load Cell',
       data: testData.map(point => ({
-        x: point.t,
+        x: point.readingsT,
         y: point.l
       })),
       borderColor: 'rgb(153, 102, 255)',
@@ -131,7 +131,7 @@ export const TemperatureChart = () => {
     datasets: [{
       label: 'Temperature',
       data: testData.map(point => ({
-        x: point.t,
+        x: point.readingsT,
         y: point.tp
       })),
       borderColor: 'rgb(255, 159, 64)',

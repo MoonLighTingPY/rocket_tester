@@ -4,7 +4,7 @@ import { socket } from '../websocket';
 import DataContext from '../hooks/DataContext';
 
 const Controls = () => {
-  const { clearTestData, handleStartTest } = useContext(DataContext);
+  const { clearTestData } = useContext(DataContext);
   const [isSocketConnected, setIsSocketConnected] = useState(socket.readyState === WebSocket.OPEN);
 
   useEffect(() => {
@@ -32,8 +32,8 @@ const Controls = () => {
   };
 
   const handleIgnite = () => {
-    socket.send('start_test');
-    handleStartTest();
+    socket.send('start_ignition');
+ 
   };
 
   const handleEndTest = () => {

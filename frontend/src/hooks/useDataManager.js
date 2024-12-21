@@ -1,96 +1,58 @@
 import { useState, useEffect, useRef } from 'react';
 import { socket } from '../websocket';
 
-const SAMPLE_RATE = 1 / 860; // example ~1.16ms per sample
 
-function processSensorData(raw, testStart, offset) {
-  const { t: originalT } = raw;
-  const timeInSeconds = originalT * SAMPLE_RATE;
+function processSensorData(raw) {
+  const { t1: readingsTime, t2: ignitionTime } = raw;
+  
+  // Convert microseconds to seconds
+  const readingsTimeInSeconds = readingsTime / 1e6;
+  const ingitionTimeInSeconds = ignitionTime / 1e6;
 
-  if (testStart === null) {
+  // If ignition haven't happen yet (ignitionTime is 0), calculate negative time until ignition
+  const ignitionTimestamp = ignitionTime === 0 ? -readingsTimeInSeconds : ingitionTimeInSeconds;
+
     return {
       ...raw,
-      t: timeInSeconds,
-      originalTimestamp: originalT
+      ignitionT: ignitionTimestamp,  // Ignition timestamp (will be 0 before ignition)
+      readingsT: readingsTimeInSeconds, // Reading timestamp (always counting)
     };
-  }
-
-  // Time relative to the ignition index
-  let adjustedTime = (originalT - testStart) * SAMPLE_RATE;
-
-  // Apply engine offset smoothly around zero
-  if (offset) {
-    const offsetInSeconds = offset / 1e6;
-    // Use a smooth transition function
-    const transitionFactor = 1 / (1 + Math.exp(-adjustedTime * 20)); // sigmoid function
-    adjustedTime -= offsetInSeconds * transitionFactor;
-  }
-
-  return {
-    ...raw,
-    t: adjustedTime,
-    originalTimestamp: originalT
-  };
 }
 
 export const useDataManager = () => {
   const [testData, setTestData] = useState([]);
-  const [testStartTime, setTestStartTime] = useState(null);
-  const [engineTimeOffset, setEngineTimeOffset] = useState(0);
   const [csvData, setCsvData] = useState([]);
-  const [latestTimestamp, setLatestTimestamp] = useState(null);
-
-  // Keep all raw data so we can fully reprocess when offset changes
   const rawDataRef = useRef([]);
+
 
   useEffect(() => {
     const handleMessage = (event) => {
       const message = JSON.parse(event.data);
 
       if (message.type === 'test_data') {
-        if (message.data.length > 0) {
-          setLatestTimestamp(message.data[message.data.length - 1].t);
-        }
-        // Add incoming raw data to our ref
-        rawDataRef.current = [...rawDataRef.current, ...message.data];
-
         // Process new data
-        const newData = message.data.map(d =>
-          processSensorData(d, testStartTime, engineTimeOffset)
-        );
+        const newData = message.data.map(d => processSensorData(d));
         setTestData(prev => [...prev, ...newData]);
         setCsvData(prev => [...prev, ...newData]);
-      } else if (message.type === 'time_difference') {
-        // Update offset and reprocess everything from raw
-        setEngineTimeOffset(message.value);
+        rawDataRef.current = [...rawDataRef.current, ...message.data];
       }
     };
 
     socket.addEventListener('message', handleMessage);
     return () => socket.removeEventListener('message', handleMessage);
-  }, [testStartTime, engineTimeOffset]);
+  }, []);
 
-  // Whenever offset changes, reprocess from raw data
-  useEffect(() => {
-    if (rawDataRef.current.length > 0) {
-      const reprocessed = rawDataRef.current.map(d =>
-        processSensorData(d, testStartTime, engineTimeOffset)
-      );
-      setTestData(reprocessed);
-      setCsvData(reprocessed);
-    }
-  }, [engineTimeOffset, testStartTime]);
-
-  const handleStartTest = () => {
-    // This sets ignition to the latest sample index
-    setTestStartTime(latestTimestamp);
-  };
 
   const exportToCsv = () => {
-    const headers = ['Timestamp (s),Load (kg),Pressure1 (bar),Pressure2 (bar),Temperature (°C)'];
-    const data = csvData.map(
-      point => `${point.t.toFixed(6)},${point.l},${point.p1},${point.p2},${point.tp}`
-    );
+    const headers = ['Readings Timestamp (s),Ignition Timestamp (s),Load (kg),Pressure1 (bar),Pressure2 (bar),Temperature (°C)'];
+  
+    const data = csvData.map(point => {
+      // Sort ignitionT values only, keep others untouched
+      const sortedIgnitionT = [...csvData.map(d => d.ignitionT)].sort((a, b) => a - b);
+      const sortedIndex = csvData.indexOf(point);
+      return `${point.readingsT.toFixed(6)},${sortedIgnitionT[sortedIndex].toFixed(6)},${point.l},${point.p1},${point.p2},${point.tp}`;
+    });
+  
     const csvContent = headers.concat(data).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -98,6 +60,7 @@ export const useDataManager = () => {
     link.download = `rocket_test_${new Date().toISOString()}.csv`;
     link.click();
   };
+  
 
   const clearCsvData = () => setCsvData([]);
   const clearTestData = () => setTestData([]);
@@ -105,7 +68,6 @@ export const useDataManager = () => {
   return {
     testData,
     csvData,
-    handleStartTest,
     exportToCsv,
     clearCsvData,
     clearTestData

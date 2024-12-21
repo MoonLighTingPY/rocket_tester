@@ -26,20 +26,21 @@ const int PYRO_PIN = 25;
 
 // Global variables
 bool isReading = false;
-bool testStarted = false;
+bool ingitedWire = false;
 bool engineStarted = false;
-unsigned long testStartTime = 0;
 unsigned long readingsStartTime = 0;
+unsigned long ingitionStartTime = 0;
 unsigned long engineStartTime = 0;
 unsigned long dataCounter = 0;
-unsigned long sampleCounter = 0;  // Counts samples from start of readings
 const float SAMPLE_PERIOD = 1.0/860.0;  // ~1.16ms per sample at 860Hz
 struct SensorData {
     float loadCell;
     float pressure1;
     float pressure2;
     float temperature;
-    unsigned long timestamp;
+    unsigned long readingsTimestamp;
+    unsigned long ingitionTimestamp;
+    unsigned long engineTimestamp;
 };
 
 // Create a circular buffer to store 2000 readings
@@ -54,7 +55,7 @@ TaskHandle_t webSocketTaskHandle = NULL;
 portMUX_TYPE bufferMux = portMUX_INITIALIZER_UNLOCKED;
 
 void IRAM_ATTR engineStartISR() {
-    if (testStarted && !engineStarted) {
+    if (ingitedWire && !engineStarted) {
         if (digitalRead(ENGINE_IN_PIN) == LOW) {
             engineStartTime = micros();
             engineStarted = true;
@@ -77,12 +78,18 @@ void sensorTask(void *parameter) {
 
     while (true) {
         if (isReading) {
-            data.timestamp = sampleCounter;  // Just store the counter
+            data.readingsTimestamp = micros() - readingsStartTime;
+
+            // Send timestamp as 0 if not ignited yet to prevent trash data
+            if (ingitedWire) {
+                data.ingitionTimestamp = micros() - ingitionStartTime;
+            } else {
+                data.ingitionTimestamp = 0;
+            }
             data.loadCell = dataCounter++;   // Simulated sensor data
-            data.pressure1 = random(0, 100);    // Simulated sensor data
+            data.pressure1 = random(0, 100); // Simulated sensor data
             data.pressure2 = random(0, 100); // Simulated sensor data
             data.temperature = dataCounter;  // Simulated sensor data
-            sampleCounter++;
 
             portENTER_CRITICAL(&bufferMux);
             if (!dataBuffer.isFull()) {
@@ -108,7 +115,8 @@ void webSocketTask(void *parameter) {
             while (!dataBuffer.isEmpty() && count < 20) {
                 SensorData data = dataBuffer.shift();
                 JsonObject reading = array.add<JsonObject>();
-                reading["t"] = data.timestamp;
+                reading["t1"] = data.readingsTimestamp;
+                reading["t2"] = data.ingitionTimestamp;
                 reading["l"] = data.loadCell;
                 reading["p1"] = data.pressure1;
                 reading["p2"] = data.pressure2;
@@ -126,7 +134,7 @@ void webSocketTask(void *parameter) {
         }
 
         // Imitate engine start 100 milliseconds after test start
-        if (testStarted && !engineStarted && (micros() - testStartTime >= 100)) {
+        if (ingitedWire && !engineStarted && (micros() - ingitionStartTime >= 100000)) {
             Serial.println("Engine started");
             engineStartTime = micros();
             engineStarted = true;
@@ -149,34 +157,30 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             if (message == "start_readings") {
                 isReading = true;
                 dataCounter = 0;
-                sampleCounter = 0;
                 readingsStartTime = micros();
             }
-            else if (message == "start_test") {
-                testStarted = true;
+            else if (message == "start_ignition") {
+                ingitedWire = true;
                 engineStarted = false;
-                testStartTime = micros();
+                ingitionStartTime = micros();
                 digitalWrite(PYRO_PIN, HIGH);
+
 
             }
             else if (message == "end_test") {
                 isReading = false;
-                testStarted = false;
+                ingitedWire = false;
                 engineStarted = false;
                 dataCounter = 0;
-                sampleCounter = 0;
-                clearBuffer(); // Clear the buffer when stopping the readings
+                clearBuffer(); // Clear the buffer when stopping the readings so that the next test starts with an empty buffer and no old data lmaooo
                 DynamicJsonDocument doc(200);
                 doc["type"] = "time_difference";
-                doc["value"] = engineStartTime - testStartTime;
+                doc["value"] = engineStartTime - ingitionStartTime;
                 String jsonString;
                 serializeJson(doc, jsonString);
                 webSocket.broadcastTXT(jsonString);
             }
 
-            if (engineStarted) {
-                // do nothing
-            }
             break;
         }
     }
@@ -208,6 +212,9 @@ void setup() {
 
     if (!MDNS.begin(hostname)) {
         Serial.println("Error setting up MDNS responder!");
+    } else {
+        Serial.println("mDNS responder started");
+        Serial.println("http://" + String(hostname) + ".local");
     }
 
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
