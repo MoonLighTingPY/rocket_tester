@@ -133,8 +133,8 @@ void webSocketTask(void *parameter) {
             }
         }
 
-        // Imitate engine start 100 milliseconds after test start
-        if (ingitedWire && !engineStarted && (micros() - ingitionStartTime >= 100000)) {
+        // Imitate engine start 150 milliseconds after test start
+        if (ingitedWire && !engineStarted && (micros() - ingitionStartTime >= 150000)) {
             Serial.println("Engine started");
             engineStartTime = micros();
             engineStarted = true;

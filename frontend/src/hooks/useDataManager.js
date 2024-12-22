@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { socket } from '../websocket';
 
-
 function processSensorData(raw) {
   const { t1: readingsTime, t2: ignitionTime } = raw;
   
@@ -12,18 +11,18 @@ function processSensorData(raw) {
   // If ignition haven't happen yet (ignitionTime is 0), calculate negative time until ignition
   const ignitionTimestamp = ignitionTime === 0 ? -readingsTimeInSeconds : ingitionTimeInSeconds;
 
-    return {
-      ...raw,
-      ignitionT: ignitionTimestamp,  // Ignition timestamp (will be 0 before ignition)
-      readingsT: readingsTimeInSeconds, // Reading timestamp (always counting)
-    };
+  return {
+    ...raw,
+    ignitionT: ignitionTimestamp,  // Ignition timestamp (will be 0 before ignition)
+    readingsT: readingsTimeInSeconds, // Reading timestamp (always counting)
+  };
 }
 
 export const useDataManager = () => {
   const [testData, setTestData] = useState([]);
   const [csvData, setCsvData] = useState([]);
+  const [ignitionDelay, setIgnitionDelay] = useState(null);
   const rawDataRef = useRef([]);
-
 
   useEffect(() => {
     const handleMessage = (event) => {
@@ -36,12 +35,16 @@ export const useDataManager = () => {
         setCsvData(prev => [...prev, ...newData]);
         rawDataRef.current = [...rawDataRef.current, ...message.data];
       }
+      if (message.type === 'time_difference') {
+        const delay = message.value / 1e6;
+        setIgnitionDelay(delay);
+        console.log(`Ignition delay: ${delay} seconds`);
+      }
     };
 
     socket.addEventListener('message', handleMessage);
     return () => socket.removeEventListener('message', handleMessage);
   }, []);
-
 
   const exportToCsv = () => {
     const headers = ['Readings Timestamp (s),Ignition Timestamp (s),Load (kg),Pressure1 (bar),Pressure2 (bar),Temperature (°C)'];
@@ -56,11 +59,20 @@ export const useDataManager = () => {
     const csvContent = headers.concat(data).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
+    
+    // Get the current date and time in the local timezone
+    const now = new Date();
+    const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' }).replace(' ', '_').replace(':', '-');
+    
+    // Include ignition delay in the filename if available
+    const filename = ignitionDelay !== null 
+      ? `rocket_test_${localDateTime}_ignition_delay_${ignitionDelay.toFixed(6)}.csv`
+      : `rocket_test_${localDateTime}.csv`;
+    
     link.href = URL.createObjectURL(blob);
-    link.download = `rocket_test_${new Date().toISOString()}.csv`;
+    link.download = filename;
     link.click();
   };
-  
 
   const clearCsvData = () => setCsvData([]);
   const clearTestData = () => setTestData([]);
@@ -68,6 +80,7 @@ export const useDataManager = () => {
   return {
     testData,
     csvData,
+    ignitionDelay, // Ensure ignitionDelay is returned
     exportToCsv,
     clearCsvData,
     clearTestData
