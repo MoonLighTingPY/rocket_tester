@@ -74,53 +74,63 @@ void clearBuffer() {
 void sensorTask(void *parameter) {
     SensorData data;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(1); // ~860Hz max for ADS1115
-
+    // Use exact frequency for ADS1115 max rate
+    const TickType_t xFrequency = pdMS_TO_TICKS(1); // 860Hz max
+    
     while (true) {
+        // Precise timing for sensor reads
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        
         if (isReading) {
-            data.readingsTimestamp = micros() - readingsStartTime;
-
-            // Send timestamp as 0 if not ignited yet to prevent trash data
-            if (ingitedWire) {
-                data.ingitionTimestamp = micros() - ingitionStartTime;
-            } else {
-                data.ingitionTimestamp = 0;
-            }
-            data.loadCell = dataCounter++;   // Simulated sensor data
-            data.pressure1 = random(0, 100); // Simulated sensor data
-            data.pressure2 = random(0, 100); // Simulated sensor data
-            data.temperature = dataCounter;  // Simulated sensor data
-
             portENTER_CRITICAL(&bufferMux);
+            uint32_t currentTime = micros();
+            data.readingsTimestamp = currentTime - readingsStartTime;
+            data.ingitionTimestamp = ingitedWire ? (currentTime - ingitionStartTime) : 0;
+            
+            // Read sensors here with precise timing
+            data.loadCell = dataCounter++;
+            data.pressure1 = random(0, 100);
+            data.pressure2 = random(0, 100); 
+            data.temperature = dataCounter;
+            
             if (!dataBuffer.isFull()) {
                 dataBuffer.push(data);
             }
             portEXIT_CRITICAL(&bufferMux);
         }
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
 
 // WebSocket communication task
+// WebSocket communication task
 void webSocketTask(void *parameter) {
     const size_t BATCH_SIZE = 20;
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(20); // Fixed 50Hz rate for websocket updates
+    
     while (true) {
+        // Use vTaskDelayUntil for precise timing
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        
         webSocket.loop();
         
         if (isReading && !dataBuffer.isEmpty()) {
-           JsonDocument doc;
+            JsonDocument doc;
             doc.clear();
             JsonArray array = doc["data"].to<JsonArray>();
             
+            // Use critical section for buffer access
             portENTER_CRITICAL(&bufferMux);
             int count = 0;
             while (!dataBuffer.isEmpty() && count < BATCH_SIZE) {
                 SensorData data = dataBuffer.shift();
                 JsonObject reading = array.add<JsonObject>();
+                
+                // Add high-precision timestamps
                 reading["t1"] = data.readingsTimestamp;
                 reading["t2"] = data.ingitionTimestamp;
                 reading["l"] = data.loadCell;
-                reading["p1"] = data.pressure1;
+                reading["p1"] = data.pressure1; 
                 reading["p2"] = data.pressure2;
                 reading["tp"] = data.temperature;
                 count++;
@@ -135,14 +145,17 @@ void webSocketTask(void *parameter) {
             }
         }
 
-        // Imitate engine start 150 milliseconds after test start
-        if (ingitedWire && !engineStarted && (micros() - ingitionStartTime >= 150000)) {
-            Serial.println("Engine started");
-            engineStartTime = micros();
-            engineStarted = true;
+        // Check for engine start with precise timing
+        if (ingitedWire && !engineStarted) {
+            uint32_t currentTime = micros();
+            if ((currentTime - ingitionStartTime) >= 150000) {
+                portENTER_CRITICAL(&bufferMux);
+                Serial.println("Engine started");
+                engineStartTime = currentTime; // Capture precise time
+                engineStarted = true;
+                portEXIT_CRITICAL(&bufferMux);
+            }
         }
-
-        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
@@ -235,9 +248,9 @@ void setup() {
         "SensorTask",
         10000,
         NULL,
-        2,  // Higher priority
+        configMAX_PRIORITIES - 1,  // Highest priority for sensor readings
         &sensorTaskHandle,
-        0   // Core 0
+        0  // Core 0
     );
 
     xTaskCreatePinnedToCore(
@@ -245,9 +258,9 @@ void setup() {
         "WebSocketTask",
         10000,
         NULL,
-        1,  // Lower priority
+        configMAX_PRIORITIES - 2,  // High but lower than sensor task
         &webSocketTaskHandle,
-        1   // Core 1
+        1  // Core 1
     );
 }
 
