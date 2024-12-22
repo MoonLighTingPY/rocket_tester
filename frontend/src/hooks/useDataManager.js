@@ -3,7 +3,7 @@ import { socket } from '../websocket';
 
 function processSensorData(raw, testData) {
   const { t1: readingsTime, t2: ignitionTime } = raw;
-  
+
   // Convert microseconds to seconds
   const readingsTimeInSeconds = readingsTime / 1e6;
   const ignitionTimeInSeconds = ignitionTime / 1e6;
@@ -28,9 +28,10 @@ function processSensorData(raw, testData) {
   // Add the new data point to the testData array
   const updatedTestData = [...testData, processedData];
 
-  // Sort the ignition timestamps within the testData array
-  updatedTestData.forEach(data => {
-    data.ignitionT = data.readingsT - ignitionTimeInSeconds;
+  // Sort only the `ignitionT` timestamps while preserving the rest of the data
+  const ignitionTValues = updatedTestData.map(data => data.ignitionT).sort((a, b) => a - b);
+  updatedTestData.forEach((data, index) => {
+    data.ignitionT = ignitionTValues[index];
   });
 
   return updatedTestData;
