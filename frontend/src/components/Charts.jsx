@@ -36,7 +36,7 @@ export const PressureChart = () => {
       {
         label: 'Pressure 1',
         data: testData.map(point => ({
-          x: ignitionDelay !== null ? point.ignitionT : point.readingsT,
+          x: point.ignitionT,
           y: point.p1
         })),
         borderColor: 'rgb(75, 192, 192)',
@@ -45,7 +45,7 @@ export const PressureChart = () => {
       {
         label: 'Pressure 2',
         data: testData.map(point => ({
-          x: ignitionDelay !== null ? point.ignitionT : point.readingsT,
+          x: point.ignitionT,
           y: point.p2
         })),
         borderColor: 'rgb(255, 99, 132)',

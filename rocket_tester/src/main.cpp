@@ -220,6 +220,7 @@ void setup() {
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send(SPIFFS, "/index.html", "text/html");
     });
+    server.serveStatic("/assets", SPIFFS, "/assets");
     server.begin();
 
     webSocket.begin();
