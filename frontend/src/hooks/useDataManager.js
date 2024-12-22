@@ -1,21 +1,39 @@
 import { useState, useEffect, useRef } from 'react';
 import { socket } from '../websocket';
 
-function processSensorData(raw) {
+function processSensorData(raw, testData) {
   const { t1: readingsTime, t2: ignitionTime } = raw;
   
   // Convert microseconds to seconds
   const readingsTimeInSeconds = readingsTime / 1e6;
-  const ingitionTimeInSeconds = ignitionTime / 1e6;
+  const ignitionTimeInSeconds = ignitionTime / 1e6;
 
-  // If ignition haven't happen yet (ignitionTime is 0), calculate negative time until ignition
-  const ignitionTimestamp = ignitionTime === 0 ? -readingsTimeInSeconds : ingitionTimeInSeconds;
+  // Calculate ignition timestamp relative to zero
+  let ignitionTimestamp;
+  if (ignitionTime === 0) {
+    // Before ignition, use negative time relative to readingsTime
+    ignitionTimestamp = -readingsTimeInSeconds;
+  } else {
+    // After ignition, calculate time relative to ignition
+    ignitionTimestamp = ignitionTimeInSeconds;
+  }
 
-  return {
+  // Create the processed data point
+  const processedData = {
     ...raw,
-    ignitionT: ignitionTimestamp,  // Ignition timestamp (will be 0 before ignition)
-    readingsT: readingsTimeInSeconds, // Reading timestamp (always counting)
+    ignitionT: ignitionTimestamp,  // Time relative to ignition point (negative before, positive after)
+    readingsT: readingsTimeInSeconds, // Absolute reading timestamp
   };
+
+  // Add the new data point to the testData array
+  const updatedTestData = [...testData, processedData];
+
+  // Sort the ignition timestamps within the testData array
+  updatedTestData.forEach(data => {
+    data.ignitionT = data.readingsT - ignitionTimeInSeconds;
+  });
+
+  return updatedTestData;
 }
 
 export const useDataManager = () => {
@@ -30,9 +48,9 @@ export const useDataManager = () => {
 
       if (message.type === 'test_data') {
         // Process new data
-        const newData = message.data.map(d => processSensorData(d));
-        setTestData(prev => [...prev, ...newData]);
-        setCsvData(prev => [...prev, ...newData]);
+        const newData = message.data.reduce((acc, d) => processSensorData(d, acc), testData);
+        setTestData(newData);
+        setCsvData(newData);
         rawDataRef.current = [...rawDataRef.current, ...message.data];
       }
       if (message.type === 'time_difference') {
@@ -44,16 +62,13 @@ export const useDataManager = () => {
 
     socket.addEventListener('message', handleMessage);
     return () => socket.removeEventListener('message', handleMessage);
-  }, []);
+  }, [testData]);
 
   const exportToCsv = () => {
     const headers = ['Readings Timestamp (s),Ignition Timestamp (s),Load (kg),Pressure1 (bar),Pressure2 (bar),Temperature (°C)'];
   
     const data = csvData.map(point => {
-      // Sort ignitionT values only, keep others untouched
-      const sortedIgnitionT = [...csvData.map(d => d.ignitionT)].sort((a, b) => a - b);
-      const sortedIndex = csvData.indexOf(point);
-      return `${point.readingsT.toFixed(6)},${sortedIgnitionT[sortedIndex].toFixed(6)},${point.l},${point.p1},${point.p2},${point.tp}`;
+      return `${point.readingsT.toFixed(6)},${point.ignitionT.toFixed(6)},${point.l},${point.p1},${point.p2},${point.tp}`;
     });
   
     const csvContent = headers.concat(data).join('\n');
