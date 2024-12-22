@@ -1,6 +1,18 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { Line } from 'react-chartjs-2';
+import {
+  Box,
+  Heading,
+  Select,
+  Button,
+  Text,
+  SimpleGrid,
+  GridItem,
+  VStack,
+} from '@chakra-ui/react';
+import { FormLabel, FormControl } from '@chakra-ui/form-control';
+import { NumberInput, NumberInputField } from '@chakra-ui/number-input';
 import { applyKalmanFilter, applyGaussianFilter } from '../utils/filters';
 import { chartOptions } from './ChartOptions';
 import './ImportPage.css';
@@ -16,9 +28,8 @@ const ImportPage = () => {
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     const filename = file.name;
-
-    // Parse ignition delay from filename
     const delayMatch = filename.match(/ignition_delay_([\d.]+)\.csv$/);
+    
     if (delayMatch) {
       setIgnitionDelay(parseFloat(delayMatch[1]));
     } else {
@@ -35,157 +46,158 @@ const ImportPage = () => {
     });
   };
 
-  const handleFilterChange = (event) => {
-    const filter = event.target.value;
-    setFilterType(filter);
-  };
+  const handleFilterChange = (event) => setFilterType(event.target.value);
 
   const applyFilter = () => {
     let data = importedData;
-
     if (filterType === 'kalman') {
       data = applyKalmanFilter(importedData, kalmanSettings);
     } else if (filterType === 'gaussian') {
       data = applyGaussianFilter(importedData, gaussianSettings);
     }
-
     setFilteredData(data);
   };
 
-  const handleKalmanSettingsChange = (event) => {
-    const { name, value } = event.target;
-    setKalmanSettings((prevSettings) => ({
-      ...prevSettings,
-      [name]: parseFloat(value),
-    }));
-  };
-
-  const handleGaussianSettingsChange = (event) => {
-    const { name, value } = event.target;
-    setGaussianSettings((prevSettings) => ({
-      ...prevSettings,
-      [name]: parseInt(value, 10),
-    }));
-  };
-
-  const pressureData = {
-    datasets: [
-      {
-        label: 'Pressure 1',
-        data: filteredData.map((point) => ({
-          x: ignitionDelay !== null ? point['Ignition Timestamp (s)'] : point['Readings Timestamp (s)'],
-          y: point['Pressure1 (bar)'],
-        })),
-        borderColor: 'rgb(75, 192, 192)',
-        pointRadius: 0,
-      },
-      {
-        label: 'Pressure 2',
-        data: filteredData.map((point) => ({
-          x: ignitionDelay !== null ? point['Ignition Timestamp (s)'] : point['Readings Timestamp (s)'],
-          y: point['Pressure2 (bar)'],
-        })),
-        borderColor: 'rgb(255, 99, 132)',
-        pointRadius: 0,
-      },
-    ],
-  };
-
-  const loadCellData = {
-    datasets: [
-      {
+  const charts = {
+    pressure: {
+      datasets: [
+        {
+          label: 'Pressure 1',
+          data: filteredData.map((point) => ({
+            x: point['Ignition Timestamp (s)'],
+            y: point['Pressure1 (bar)'],
+          })),
+          borderColor: 'rgb(75, 192, 192)',
+          pointRadius: 0,
+        },
+        {
+          label: 'Pressure 2',
+          data: filteredData.map((point) => ({
+            x: point['Ignition Timestamp (s)'],
+            y: point['Pressure2 (bar)'],
+          })),
+          borderColor: 'rgb(255, 99, 132)',
+          pointRadius: 0,
+        },
+      ],
+    },
+    loadCell: {
+      datasets: [{
         label: 'Load Cell',
         data: filteredData.map((point) => ({
-          x: ignitionDelay !== null ? point['Ignition Timestamp (s)'] : point['Readings Timestamp (s)'],
+          x: point['Ignition Timestamp (s)'],
           y: point['Load (kg)'],
         })),
         borderColor: 'rgb(153, 102, 255)',
         pointRadius: 0,
-      },
-    ],
-  };
-
-  const temperatureData = {
-    datasets: [
-      {
+      }],
+    },
+    temperature: {
+      datasets: [{
         label: 'Temperature',
         data: filteredData.map((point) => ({
-          x: ignitionDelay !== null ? point['Ignition Timestamp (s)'] : point['Readings Timestamp (s)'],
+          x: point['Ignition Timestamp (s)'],
           y: point['Temperature (°C)'],
         })),
         borderColor: 'rgb(255, 159, 64)',
         pointRadius: 0,
-      },
-    ],
+      }],
+    },
   };
 
   return (
-    <div className="import-page">
-      <h1>Import CSV and Apply Filters</h1>
-      <input type="file" accept=".csv" onChange={handleFileUpload} />
-      <select value={filterType} onChange={handleFilterChange}>
-        <option value="none">None</option>
-        <option value="kalman">Kalman Filter</option>
-        <option value="gaussian">Gaussian Filter</option>
-      </select>
+    <Box className="import-page" p={8} w="full">
+      <Heading>Import CSV and Apply Filters</Heading>
+      
+      <FormControl>
+        <FormLabel>Upload CSV File</FormLabel>
+        <input type="file" accept=".csv" onChange={handleFileUpload} />
+      </FormControl>
+
+      <FormControl>
+        <FormLabel>Filter Type</FormLabel>
+        <Select value={filterType} onChange={handleFilterChange}>
+          <option value="none">None</option>
+          <option value="kalman">Kalman Filter</option>
+          <option value="gaussian">Gaussian Filter</option>
+        </Select>
+      </FormControl>
+
       {filterType === 'kalman' && (
-        <div className="filter-settings">
-          <label>
-            Q:
-            <input
-              type="number"
-              name="Q"
-              value={kalmanSettings.Q}
-              onChange={handleKalmanSettingsChange}
-              step="0.0001"
-            />
-          </label>
-          <label>
-            R:
-            <input
-              type="number"
-              name="R"
-              value={kalmanSettings.R}
-              onChange={handleKalmanSettingsChange}
-              step="0.01"
-            />
-          </label>
-        </div>
+        <VStack spacing={4}>
+          <FormControl>
+            <FormLabel>Q Value</FormLabel>
+            <NumberInput step={0.0001} min={0} value={kalmanSettings.Q}>
+              <NumberInputField
+                value={kalmanSettings.Q}
+                onChange={(e) => setKalmanSettings(prev => ({
+                  ...prev,
+                  Q: parseFloat(e.target.value)
+                }))}
+              />
+            </NumberInput>
+          </FormControl>
+          <FormControl>
+            <FormLabel>R Value</FormLabel>
+            <NumberInput step={0.01} min={0} value={kalmanSettings.R}>
+              <NumberInputField
+                value={kalmanSettings.R}
+                onChange={(e) => setKalmanSettings(prev => ({
+                  ...prev,
+                  R: parseFloat(e.target.value)
+                }))}
+              />
+            </NumberInput>
+          </FormControl>
+        </VStack>
       )}
+
       {filterType === 'gaussian' && (
-        <div className="filter-settings">
-          <label>
-            Kernel Size:
-            <input
-              type="number"
-              name="kernelSize"
+        <FormControl>
+          <FormLabel>Kernel Size</FormLabel>
+          <NumberInput step={2} min={3} value={gaussianSettings.kernelSize}>
+            <NumberInputField
               value={gaussianSettings.kernelSize}
-              onChange={handleGaussianSettingsChange}
-              step="1"
-              min="1"
+              onChange={(e) => setGaussianSettings(prev => ({
+                ...prev,
+                kernelSize: parseInt(e.target.value)
+              }))}
             />
-          </label>
-        </div>
+          </NumberInput>
+        </FormControl>
       )}
+
+      <Button colorScheme="blue" onClick={applyFilter}>
+        Apply Filter
+      </Button>
+
       {ignitionDelay !== null && (
-        <div className="ignition-delay">
-          <p>Ignition Delay: {ignitionDelay.toFixed(6)} seconds</p>
-        </div>
+        <Text fontSize="xl" fontWeight="bold">
+          Ignition Delay: {ignitionDelay.toFixed(6)} seconds
+        </Text>
       )}
-      <button onClick={applyFilter}>Apply</button>
-      <div className="chart">
-        <h2>Pressure Sensors</h2>
-        <Line options={chartOptions(ignitionDelay)} data={pressureData} />
-      </div>
-      <div className="chart">
-        <h2>Load Cell</h2>
-        <Line options={chartOptions(ignitionDelay)} data={loadCellData} />
-      </div>
-      <div className="chart">
-        <h2>Temperature</h2>
-        <Line options={chartOptions(ignitionDelay)} data={temperatureData} />
-      </div>
-    </div>
+
+      <SimpleGrid columns={[1, null, 2]} spacing={8} w="full">
+        <GridItem>
+          <Box p={6} bg="white" shadow="md" rounded="lg">
+            <Heading size="md" mb={4}>Pressure Sensors</Heading>
+            <Line options={chartOptions(ignitionDelay)} data={charts.pressure} />
+          </Box>
+        </GridItem>
+        <GridItem>
+          <Box p={6} bg="white" shadow="md" rounded="lg">
+            <Heading size="md" mb={4}>Load Cell</Heading>
+            <Line options={chartOptions(ignitionDelay)} data={charts.loadCell} />
+          </Box>
+        </GridItem>
+        <GridItem>
+          <Box p={6} bg="white" shadow="md" rounded="lg">
+            <Heading size="md" mb={4}>Temperature</Heading>
+            <Line options={chartOptions(ignitionDelay)} data={charts.temperature} />
+          </Box>
+        </GridItem>
+      </SimpleGrid>
+    </Box>
   );
 };
 

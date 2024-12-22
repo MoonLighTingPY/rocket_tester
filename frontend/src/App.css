@@ -1,21 +1,23 @@
 .app {
   padding: 20px;
   margin: 0 auto;
-  max-width: 1200px;
+  max-width: 100%; /* Use the whole screen width for PC */
   width: 100%;
 }
+
 nav {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
 }
+
 nav a {
   padding: 10px 20px;
-  background-color: #1a1a1a;
   color: white;
   text-decoration: none;
   border-radius: 8px;
 }
+
 nav a:hover {
   background-color: #646cff;
 }
@@ -65,26 +67,21 @@ nav a:hover {
     padding: 10px;
     max-width: fit-content;
   }
-
   .controls {
     flex-direction: column;
     gap: 5px;
   }
-
   .controls button {
     width: 100%;
     padding: 10px;
     font-size: 14px;
   }
-
   .charts {
     gap: 20px;
   }
-
   .chart {
     padding: 15px;
   }
-
   .chart h2 {
     font-size: 18px;
     margin-bottom: 15px;
@@ -96,18 +93,32 @@ nav a:hover {
   .app {
     padding: 5px;
   }
-
   .controls button {
     padding: 8px;
     font-size: 12px;
   }
-
   .chart {
     padding: 10px;
   }
-
   .chart h2 {
     font-size: 16px;
     margin-bottom: 10px;
+  }
+}
+
+/* Media queries for larger screens */
+@media (min-width: 1024px) {
+  .app {
+    max-width: 100%; /* Ensure the app uses the full width of the screen */
+    padding: 40px; /* Add more padding for larger screens */
+  }
+  .charts {
+    flex-direction: row; /* Display charts in a row on larger screens */
+    flex-wrap: wrap; /* Allow charts to wrap to the next line */
+    gap: 20px;
+  }
+  .chart {
+    flex: 1 1 calc(50% - 20px); /* Ensure charts take up half the width with some gap */
+    padding: 20px;
   }
 }

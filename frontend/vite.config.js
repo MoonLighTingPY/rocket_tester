@@ -7,6 +7,8 @@ export default defineConfig({
     react(),
     viteCompression({
       algorithm: 'gzip',
+      ext: '.gz', // Ensure the extension is set to .gz
+      include: /\.(js|css|html|svg)$/, // Include CSS files for compression
     }),
   ],
   build: {

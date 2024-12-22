@@ -1,5 +1,8 @@
 import { Line } from 'react-chartjs-2';
 import { useRef, useEffect, useContext } from 'react';
+import { HStack, Button } from '@chakra-ui/react';
+import { useToast } from '@chakra-ui/toast';
+
 import DataContext from '../hooks/DataContext';
 import {
   Chart as ChartJS,
@@ -114,19 +117,41 @@ export const TemperatureChart = () => {
 };
 
 export const ChartControls = () => {
-  const { testData, exportToCsv, clearCsvData, clearTestData, csvData, } = useContext(DataContext);
+  const { exportToCsv, clearCsvData, clearTestData, csvData, testData } = useContext(DataContext);
+  const toast = useToast();
+
+  const handleExport = () => {
+    exportToCsv();
+    toast({
+      title: 'CSV Exported',
+      status: 'success',
+      duration: 2000,
+    });
+  };
 
   return (
-    <div className="charts-controls">
-      <button onClick={exportToCsv} disabled={csvData.length === 0}>
-        Export to CSV
-      </button>
-      <button onClick={clearCsvData} disabled={csvData.length === 0}>
+    <HStack spacing={4}>
+      <Button
+        colorScheme="blue"
+        onClick={handleExport}
+        isDisabled={csvData.length === 0}
+      >
+        Export CSV
+      </Button>
+      <Button
+        colorScheme="yellow"
+        onClick={clearCsvData}
+        isDisabled={csvData.length === 0}
+      >
         Clear CSV Data
-      </button>
-      <button onClick={clearTestData} disabled={testData.length === 0}>
+      </Button>
+      <Button
+        colorScheme="red"
+        onClick={clearTestData}
+        isDisabled={testData.length === 0}
+      >
         Clear Chart Data
-      </button>
-    </div>
+      </Button>
+    </HStack>
   );
 };
