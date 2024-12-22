@@ -1,16 +1,14 @@
 import { ChakraProvider, ColorModeProvider, CSSReset } from '@chakra-ui/react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Box, VStack, Heading, Flex, Button, SimpleGrid, GridItem, Text } from '@chakra-ui/react';
+import { Box, VStack, Flex, Button } from '@chakra-ui/react';
 import { useDataManager } from './hooks/useDataManager';
 import DataContext from './hooks/DataContext';
-import { ChartControls, PressureChart, LoadCellChart, TemperatureChart } from './components/Charts';
-import Controls from './components/Controls';
+import HomePage from './components/HomePage';
 import ImportPage from './components/ImportPage';
 import "./App.css"
 
 function App() {
   const dataManager = useDataManager();
-
   return (
     <ChakraProvider>
       <ColorModeProvider>
@@ -29,38 +27,7 @@ function App() {
                 </Flex>
                 
                 <Routes>
-                  <Route path="/" element={
-                    <VStack spacing={6} w="full">
-                      <Heading>Rocket Test Dashboard</Heading>
-                      <Controls />
-                      {dataManager.ignitionDelay !== null && (
-                        <Text fontSize="xl" fontWeight="bold">
-                          Ignition Delay: {dataManager.ignitionDelay.toFixed(6)} seconds
-                        </Text>
-                      )}
-                      <ChartControls />
-                      <SimpleGrid columns={[1, null, 2]} spacing={8} w="full">
-                        <GridItem>
-                          <Box p={6} bg="white" shadow="md" rounded="lg">
-                            <Heading size="md" mb={4}>Pressure Sensors</Heading>
-                            <PressureChart />
-                          </Box>
-                        </GridItem>
-                        <GridItem>
-                          <Box p={6} bg="white" shadow="md" rounded="lg">
-                            <Heading size="md" mb={4}>Load Cell</Heading>
-                            <LoadCellChart />
-                          </Box>
-                        </GridItem>
-                        <GridItem>
-                          <Box p={6} bg="white" shadow="md" rounded="lg">
-                            <Heading size="md" mb={4}>Temperature</Heading>
-                            <TemperatureChart />
-                          </Box>
-                        </GridItem>
-                      </SimpleGrid>
-                    </VStack>
-                  } />
+                  <Route path="/" element={<HomePage />} />
                   <Route path="/import" element={<ImportPage />} />
                 </Routes>
               </VStack>

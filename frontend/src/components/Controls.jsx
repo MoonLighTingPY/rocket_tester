@@ -1,17 +1,21 @@
 import { useContext, useState, useEffect } from 'react';
-import { HStack, Button} from '@chakra-ui/react';
+import { HStack, VStack, Button } from '@chakra-ui/react';
 import { useToast } from '@chakra-ui/toast';
 import { socket } from '../websocket';
 import DataContext from '../hooks/DataContext';
 
 const Controls = () => {
-  const { clearTestData } = useContext(DataContext);
+  const { clearTestData, exportToCsv, clearCsvData, csvData } = useContext(DataContext);
   const [isSocketConnected, setIsSocketConnected] = useState(socket.readyState === WebSocket.OPEN);
+  const [isReading, setIsReading] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
     const handleOpen = () => setIsSocketConnected(true);
-    const handleClose = () => setIsSocketConnected(false);
+    const handleClose = () => {
+      setIsSocketConnected(false);
+      setIsReading(false); // Reset reading state when connection is lost
+    };
 
     socket.addEventListener('open', handleOpen);
     socket.addEventListener('close', handleClose);
@@ -24,6 +28,7 @@ const Controls = () => {
 
   const handleStartReadings = () => {
     socket.send('start_readings');
+    setIsReading(true);
     clearTestData();
     toast({
       title: 'Started readings',
@@ -43,6 +48,7 @@ const Controls = () => {
 
   const handleEndTest = () => {
     socket.send('end_test');
+    setIsReading(false);
     toast({
       title: 'Test ended',
       status: 'info',
@@ -50,30 +56,57 @@ const Controls = () => {
     });
   };
 
+  const handleExport = () => {
+    exportToCsv();
+    toast({
+      title: 'CSV Exported',
+      status: 'success',
+      duration: 2000,
+    });
+  };
+
   return (
-    <HStack spacing={4}>
-      <Button
-        colorScheme="green"
-        onClick={handleStartReadings}
-        isDisabled={!isSocketConnected}
-      >
-        Start
-      </Button>
-      <Button
-        colorScheme="orange"
-        onClick={handleIgnite}
-        isDisabled={!isSocketConnected}
-      >
-        Ignite
-      </Button>
-      <Button
-        colorScheme="red"
-        onClick={handleEndTest}
-        isDisabled={!isSocketConnected}
-      >
-        End
-      </Button>
-    </HStack>
+    <VStack spacing={4}>
+      <HStack spacing={4}>
+        <Button
+          colorScheme="green"
+          onClick={handleStartReadings}
+          isDisabled={!isSocketConnected || isReading}
+        >
+          Start
+        </Button>
+        <Button
+          colorScheme="orange"
+          onClick={handleIgnite}
+          isDisabled={!isSocketConnected || !isReading}
+        >
+          Ignite
+        </Button>
+        <Button
+          colorScheme="red"
+          onClick={handleEndTest}
+          isDisabled={!isSocketConnected || !isReading}
+        >
+          End
+        </Button>
+      </HStack>
+      <HStack spacing={4}>
+        <Button
+          colorScheme="blue"
+          onClick={handleExport}
+          isDisabled={csvData.length === 0}
+        >
+          Export CSV
+        </Button>
+        <Button
+          colorScheme="yellow"
+          onClick={clearCsvData}
+          isDisabled={csvData.length === 0}
+        >
+          Clear CSV Data
+        </Button>
+      </HStack>
+    </VStack>
   );
 };
 

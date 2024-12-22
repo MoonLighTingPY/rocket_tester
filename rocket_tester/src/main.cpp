@@ -7,7 +7,7 @@
 #include <Wire.h>
 #include <Adafruit_ADS1X15.h>
 #include "secret.h"
-#include <CircularBuffer.h>
+#include <CircularBuffer.hpp>
 #include <ESPmDNS.h>
 
 // Network credentials
@@ -104,12 +104,12 @@ void sensorTask(void *parameter) {
 // WebSocket communication task
 void webSocketTask(void *parameter) {
     const size_t BATCH_SIZE = 20;
-    const size_t JSON_DOC_SIZE = 110 * BATCH_SIZE * 1.1; // 110 bytes per reading, 10% extra for overhead
     while (true) {
         webSocket.loop();
         
         if (isReading && !dataBuffer.isEmpty()) {
-            DynamicJsonDocument doc(JSON_DOC_SIZE);
+           JsonDocument doc;
+            doc.clear();
             JsonArray array = doc["data"].to<JsonArray>();
             
             portENTER_CRITICAL(&bufferMux);
@@ -175,7 +175,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 engineStarted = false;
                 dataCounter = 0;
                 clearBuffer(); // Clear the buffer when stopping the readings so that the next test starts with an empty buffer and no old data lmaooo
-                DynamicJsonDocument doc(200);
+                JsonDocument doc;
+                doc.clear(); // Good practice to clear the document before reuse
                 doc["type"] = "time_difference";
                 doc["value"] = engineStartTime - ingitionStartTime;
                 String jsonString;

@@ -14,15 +14,15 @@ import {
 import { FormLabel, FormControl } from '@chakra-ui/form-control';
 import { NumberInput, NumberInputField } from '@chakra-ui/number-input';
 import { applyKalmanFilter, applyGaussianFilter } from '../utils/filters';
-import { chartOptions } from './ChartOptions';
+import { chartOptions } from '../config/chartConfig';
 import './ImportPage.css';
 
 const ImportPage = () => {
   const [importedData, setImportedData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [filterType, setFilterType] = useState('none');
-  const [kalmanSettings, setKalmanSettings] = useState({ Q: 0.0001, R: 0.01 });
-  const [gaussianSettings, setGaussianSettings] = useState({ kernelSize: 5 });
+  const [kalmanSettings, setKalmanSettings] = useState({ Q: '0.0001', R: '0.01' });
+  const [gaussianSettings, setGaussianSettings] = useState({ kernelSize: '5' });
   const [ignitionDelay, setIgnitionDelay] = useState(null);
 
   const handleFileUpload = (event) => {
@@ -51,11 +51,29 @@ const ImportPage = () => {
   const applyFilter = () => {
     let data = importedData;
     if (filterType === 'kalman') {
-      data = applyKalmanFilter(importedData, kalmanSettings);
+      data = applyKalmanFilter(importedData, { Q: parseFloat(kalmanSettings.Q), R: parseFloat(kalmanSettings.R) });
     } else if (filterType === 'gaussian') {
-      data = applyGaussianFilter(importedData, gaussianSettings);
+      data = applyGaussianFilter(importedData, { kernelSize: parseInt(gaussianSettings.kernelSize) });
     }
     setFilteredData(data);
+  };
+
+  const handleKalmanChange = (field, value) => {
+    if (value === '' || !isNaN(value)) {
+      setKalmanSettings(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
+  };
+
+  const handleGaussianChange = (value) => {
+    if (value === '' || !isNaN(value)) {
+      setGaussianSettings(prev => ({
+        ...prev,
+        kernelSize: value
+      }));
+    }
   };
 
   const charts = {
@@ -130,10 +148,7 @@ const ImportPage = () => {
             <NumberInput step={0.0001} min={0} value={kalmanSettings.Q}>
               <NumberInputField
                 value={kalmanSettings.Q}
-                onChange={(e) => setKalmanSettings(prev => ({
-                  ...prev,
-                  Q: parseFloat(e.target.value)
-                }))}
+                onChange={(e) => handleKalmanChange('Q', e.target.value)}
               />
             </NumberInput>
           </FormControl>
@@ -142,10 +157,7 @@ const ImportPage = () => {
             <NumberInput step={0.01} min={0} value={kalmanSettings.R}>
               <NumberInputField
                 value={kalmanSettings.R}
-                onChange={(e) => setKalmanSettings(prev => ({
-                  ...prev,
-                  R: parseFloat(e.target.value)
-                }))}
+                onChange={(e) => handleKalmanChange('R', e.target.value)}
               />
             </NumberInput>
           </FormControl>
@@ -158,10 +170,7 @@ const ImportPage = () => {
           <NumberInput step={2} min={3} value={gaussianSettings.kernelSize}>
             <NumberInputField
               value={gaussianSettings.kernelSize}
-              onChange={(e) => setGaussianSettings(prev => ({
-                ...prev,
-                kernelSize: parseInt(e.target.value)
-              }))}
+              onChange={(e) => handleGaussianChange(e.target.value)}
             />
           </NumberInput>
         </FormControl>
@@ -181,19 +190,19 @@ const ImportPage = () => {
         <GridItem>
           <Box p={6} bg="white" shadow="md" rounded="lg">
             <Heading size="md" mb={4}>Pressure Sensors</Heading>
-            <Line options={chartOptions(ignitionDelay)} data={charts.pressure} />
+            <Line options={chartOptions("Pressure Sensors", ignitionDelay)} data={charts.pressure} />
           </Box>
         </GridItem>
         <GridItem>
           <Box p={6} bg="white" shadow="md" rounded="lg">
             <Heading size="md" mb={4}>Load Cell</Heading>
-            <Line options={chartOptions(ignitionDelay)} data={charts.loadCell} />
+            <Line options={chartOptions("Load Sensor", ignitionDelay)} data={charts.loadCell} />
           </Box>
         </GridItem>
         <GridItem>
           <Box p={6} bg="white" shadow="md" rounded="lg">
             <Heading size="md" mb={4}>Temperature</Heading>
-            <Line options={chartOptions(ignitionDelay)} data={charts.temperature} />
+            <Line options={chartOptions("Temperature Sensor", ignitionDelay)} data={charts.temperature} />
           </Box>
         </GridItem>
       </SimpleGrid>
