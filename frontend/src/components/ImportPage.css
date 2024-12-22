@@ -1,0 +1,45 @@
+.import-page {
+    padding: 20px;
+    margin: 0 auto;
+    max-width: 1200px;
+    width: 100%;
+  }
+  
+  .import-page h1 {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .import-page input[type="file"] {
+    display: block;
+    margin: 0 auto 20px auto;
+  }
+  
+  .import-page select,
+  .import-page input[type="number"] {
+    display: block;
+    margin: 10px auto;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+  
+  .filter-settings {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .filter-settings label {
+    display: block;
+    margin: 10px 0;
+  }
+  
+  .chart {
+    margin-bottom: 30px;
+  }
+  
+  .ignition-delay {
+    text-align: center;
+    margin-bottom: 20px;
+  }

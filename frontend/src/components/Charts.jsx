@@ -1,4 +1,3 @@
-// src/components/Charts.jsx
 import { Line } from 'react-chartjs-2';
 import { useRef, useEffect, useContext } from 'react';
 import DataContext from '../hooks/DataContext';
@@ -13,7 +12,8 @@ import {
   Legend,
 } from 'chart.js';
 import zoomPlugin from 'chartjs-plugin-zoom';
-import { chartOptions } from './chartOptions';
+import annotationPlugin from 'chartjs-plugin-annotation';
+import { chartOptions } from './ChartOptions';
 
 ChartJS.register(
   CategoryScale,
@@ -23,11 +23,12 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  zoomPlugin
+  zoomPlugin,
+  annotationPlugin
 );
 
 export const PressureChart = () => {
-  const { testData } = useContext(DataContext);
+  const { testData, ignitionDelay } = useContext(DataContext);
   const chartRef = useRef();
   
   const data = {
@@ -59,11 +60,11 @@ export const PressureChart = () => {
     }
   }, [testData]);
 
-  return <Line ref={chartRef} options={chartOptions} data={data} />;
+  return <Line ref={chartRef} options={chartOptions(ignitionDelay)} data={data} />;
 };
 
 export const LoadCellChart = () => {
-  const { testData } = useContext(DataContext);
+  const { testData, ignitionDelay } = useContext(DataContext);
   const chartRef = useRef();
   
   const data = {
@@ -84,11 +85,11 @@ export const LoadCellChart = () => {
     }
   }, [testData]);
 
-  return <Line ref={chartRef} options={chartOptions} data={data} />;
+  return <Line ref={chartRef} options={chartOptions(ignitionDelay)} data={data} />;
 };
 
 export const TemperatureChart = () => {
-  const { testData } = useContext(DataContext);
+  const { testData, ignitionDelay } = useContext(DataContext);
   const chartRef = useRef();
   
   const data = {
@@ -109,7 +110,7 @@ export const TemperatureChart = () => {
     }
   }, [testData]);
 
-  return <Line ref={chartRef} options={chartOptions} data={data} />;
+  return <Line ref={chartRef} options={chartOptions(ignitionDelay)} data={data} />;
 };
 
 export const ChartControls = () => {
@@ -118,8 +119,8 @@ export const ChartControls = () => {
   return (
     <div className="charts-controls">
       <button onClick={exportToCsv} disabled={csvData.length === 0}>
-      Export to CSV
-    </button>
+        Export to CSV
+      </button>
       <button onClick={clearCsvData} disabled={csvData.length === 0}>
         Clear CSV Data
       </button>

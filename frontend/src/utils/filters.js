@@ -1,7 +1,6 @@
 // Kalman filter implementation
-export const applyKalmanFilter = (data) => {
-    const Q = 0.0001; // Process noise covariance
-    const R = 0.01;   // Measurement noise covariance
+export const applyKalmanFilter = (data, settings) => {
+    const { Q, R } = settings;
     let P = 1;        // Estimation error covariance
     let K = 0;        // Kalman gain
     let X = data[0]['Pressure1 (bar)']; // Initial estimate
@@ -42,9 +41,9 @@ export const applyKalmanFilter = (data) => {
   };
   
   // Gaussian filter implementation
-  export const applyGaussianFilter = (data) => {
-    const gaussianKernel = [0.06136, 0.24477, 0.38774, 0.24477, 0.06136];
-    const kernelSize = gaussianKernel.length;
+  export const applyGaussianFilter = (data, settings) => {
+    const { kernelSize } = settings;
+    const gaussianKernel = Array(kernelSize).fill(1 / kernelSize); // Simple moving average kernel
     const halfKernelSize = Math.floor(kernelSize / 2);
   
     const applyKernel = (arr, index) => {
