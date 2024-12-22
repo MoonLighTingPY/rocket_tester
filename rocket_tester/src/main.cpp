@@ -32,7 +32,7 @@ unsigned long readingsStartTime = 0;
 unsigned long ingitionStartTime = 0;
 unsigned long engineStartTime = 0;
 unsigned long dataCounter = 0;
-const float SAMPLE_PERIOD = 1.0/860.0;  // ~1.16ms per sample at 860Hz
+const float SAMPLE_PERIOD = 1.0/1000.0;  // ~1.16ms per sample at 860Hz
 struct SensorData {
     float loadCell;
     float pressure1;
@@ -103,16 +103,18 @@ void sensorTask(void *parameter) {
 
 // WebSocket communication task
 void webSocketTask(void *parameter) {
+    const size_t BATCH_SIZE = 20;
+    const size_t JSON_DOC_SIZE = 110 * BATCH_SIZE * 1.1; // 110 bytes per reading, 10% extra for overhead
     while (true) {
         webSocket.loop();
         
         if (isReading && !dataBuffer.isEmpty()) {
-            DynamicJsonDocument doc(2000);
+            DynamicJsonDocument doc(JSON_DOC_SIZE);
             JsonArray array = doc["data"].to<JsonArray>();
             
             portENTER_CRITICAL(&bufferMux);
             int count = 0;
-            while (!dataBuffer.isEmpty() && count < 20) {
+            while (!dataBuffer.isEmpty() && count < BATCH_SIZE) {
                 SensorData data = dataBuffer.shift();
                 JsonObject reading = array.add<JsonObject>();
                 reading["t1"] = data.readingsTimestamp;
@@ -140,7 +142,7 @@ void webSocketTask(void *parameter) {
             engineStarted = true;
         }
 
-        delay(20); // 50Hz WebSocket updates
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
