@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Route, Switch, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { useDataManager } from './hooks/useDataManager';
 import DataContext from './hooks/DataContext';
 import { ChartControls, PressureChart, LoadCellChart, TemperatureChart } from './components/Charts';
@@ -17,35 +17,35 @@ function App() {
             <Link to="/">Home</Link>
             <Link to="/import">Import CSV</Link>
           </nav>
-          <Switch>
-            <Route exact path="/">
-              <h1>Rocket Test Dashboard</h1>
-              <Controls />
-              <div className="ignition-delay">
-                {dataManager.ignitionDelay !== null && (
-                  <p>Ignition Delay: {dataManager.ignitionDelay.toFixed(6)} seconds</p>
-                )}
-              </div>
-              <ChartControls />
-              <div className="charts">
-                <div className="chart">
-                  <h2>Pressure Sensors</h2>
-                  <PressureChart />
+          <Routes>
+            <Route path="/" element={
+              <>
+                <h1>Rocket Test Dashboard</h1>
+                <Controls />
+                <div className="ignition-delay">
+                  {dataManager.ignitionDelay !== null && (
+                    <p>Ignition Delay: {dataManager.ignitionDelay.toFixed(6)} seconds</p>
+                  )}
                 </div>
-                <div className="chart">
-                  <h2>Load Cell</h2>
-                  <LoadCellChart />
+                <ChartControls />
+                <div className="charts">
+                  <div className="chart">
+                    <h2>Pressure Sensors</h2>
+                    <PressureChart />
+                  </div>
+                  <div className="chart">
+                    <h2>Load Cell</h2>
+                    <LoadCellChart />
+                  </div>
+                  <div className="chart">
+                    <h2>Temperature</h2>
+                    <TemperatureChart />
+                  </div>
                 </div>
-                <div className="chart">
-                  <h2>Temperature</h2>
-                  <TemperatureChart />
-                </div>
-              </div>
-            </Route>
-            <Route path="/import">
-              <ImportPage />
-            </Route>
-          </Switch>
+              </>
+            } />
+            <Route path="/import" element={<ImportPage />} />
+          </Routes>
         </div>
       </Router>
     </DataContext.Provider>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Papa from 'papaparse';
 import { Line } from 'react-chartjs-2';
 import { applyKalmanFilter, applyGaussianFilter } from '../utils/filters';
-import { chartOptions } from './Charts';
+import { chartOptions } from './ChartOptions';
 
 const ImportPage = () => {
   const [importedData, setImportedData] = useState([]);
@@ -35,7 +35,7 @@ const ImportPage = () => {
     setFilteredData(data);
   };
 
-  const chartData = {
+  const pressureData = {
     datasets: [
       {
         label: 'Pressure 1',
@@ -58,6 +58,34 @@ const ImportPage = () => {
     ],
   };
 
+  const loadCellData = {
+    datasets: [
+      {
+        label: 'Load Cell',
+        data: filteredData.map((point) => ({
+          x: point['Readings Timestamp (s)'],
+          y: point['Load (kg)'],
+        })),
+        borderColor: 'rgb(153, 102, 255)',
+        pointRadius: 0,
+      },
+    ],
+  };
+
+  const temperatureData = {
+    datasets: [
+      {
+        label: 'Temperature',
+        data: filteredData.map((point) => ({
+          x: point['Readings Timestamp (s)'],
+          y: point['Temperature (°C)'],
+        })),
+        borderColor: 'rgb(255, 159, 64)',
+        pointRadius: 0,
+      },
+    ],
+  };
+
   return (
     <div className="import-page">
       <h1>Import CSV and Apply Filters</h1>
@@ -68,7 +96,16 @@ const ImportPage = () => {
         <option value="gaussian">Gaussian Filter</option>
       </select>
       <div className="chart">
-        <Line options={chartOptions} data={chartData} />
+        <h2>Pressure Sensors</h2>
+        <Line options={chartOptions} data={pressureData} />
+      </div>
+      <div className="chart">
+        <h2>Load Cell</h2>
+        <Line options={chartOptions} data={loadCellData} />
+      </div>
+      <div className="chart">
+        <h2>Temperature</h2>
+        <Line options={chartOptions} data={temperatureData} />
       </div>
     </div>
   );
