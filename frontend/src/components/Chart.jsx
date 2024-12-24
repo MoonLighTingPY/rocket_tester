@@ -1,6 +1,7 @@
 import { Line } from 'react-chartjs-2';
 import { useRef, useEffect, useContext } from 'react';
 import PropTypes from 'prop-types';
+import { Box, VStack } from '@chakra-ui/react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -16,7 +17,6 @@ import annotationPlugin from 'chartjs-plugin-annotation';
 import { chartOptions } from '../config/chartConfig';
 import DataContext from '../hooks/DataContext';
 
-// Register the necessary components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -30,29 +30,93 @@ ChartJS.register(
 );
 
 const Chart = ({ xAxis, yAxis, labels, colors, title }) => {
-    const chartRef = useRef();
-    const { ignitionDelay } = useContext(DataContext);
-  
-    const data = {
-      datasets: labels.map((label, index) => ({
-        label,
-        data: yAxis[index].map((y, i) => ({
-          x: xAxis[i],
-          y
-        })),
-        borderColor: colors[index],
-        pointRadius: 0
-      }))
-    };
+  const chartRef = useRef();
+  const preIgnitionChartRef = useRef();
+  const { ignitionDelay, testData } = useContext(DataContext);
 
-  
-    useEffect(() => {
-      if (chartRef.current) {
-        chartRef.current.update(); // Updates the chart when data changes
+  // Split data into pre-ignition and post-ignition
+  const splitData = () => {
+    const preIgnitionData = [];
+    const postIgnitionData = [];
+    
+    xAxis.forEach((x, i) => {
+      const dataPoint = {
+        x: x,
+        y: yAxis.map(series => series[i])
+      };
+      
+      // Check if ignition has occurred (ignitionT > 0)
+      const isPostIgnition = testData[i]?.ignitionT > 0;
+      
+      if (!isPostIgnition) {
+        // Use readingsT for pre-ignition data
+        dataPoint.x = testData[i]?.readingsT;
+        preIgnitionData.push(dataPoint);
+      } else {
+        postIgnitionData.push(dataPoint);
       }
-    }, [xAxis, yAxis]);
+    });
+  
+    return { preIgnitionData, postIgnitionData };
+  };
 
-  return <Line ref={chartRef} options={chartOptions(title, ignitionDelay)} data={data} />
+  const createChartData = (data, useYIndex = true) => ({
+    datasets: labels.map((label, index) => ({
+      label,
+      data: data.map(point => ({
+        x: point.x,
+        y: useYIndex ? point.y[index] : point.y
+      })),
+      borderColor: colors[index],
+      pointRadius: 0
+    }))
+  });
+
+  useEffect(() => {
+    if (chartRef.current) {
+      chartRef.current.update();
+    }
+    if (preIgnitionChartRef.current) {
+      preIgnitionChartRef.current.update();
+    }
+  }, [xAxis, yAxis]);
+
+  const { preIgnitionData, postIgnitionData } = splitData();
+  const hasPreIgnitionData = preIgnitionData.length > 0;
+  const hasPostIgnitionData = postIgnitionData.length > 0;
+
+  const preIgnitionOptions = {
+    ...chartOptions(title + " (Pre-ignition)", null),
+    plugins: {
+      ...chartOptions(title, null).plugins,
+      legend: {
+        display: true // Hide legend in pre-ignition chart (false to hide lol)
+      }
+    }
+  };
+
+  return (
+    <VStack spacing={2} w="100%">
+      {hasPreIgnitionData && (
+        <Box w="100%">
+          <Line 
+            ref={preIgnitionChartRef}
+            options={preIgnitionOptions}
+            data={createChartData(preIgnitionData)}
+          />
+        </Box>
+      )}
+      {hasPostIgnitionData && (
+        <Box w="100%">
+          <Line 
+            ref={chartRef}
+            options={chartOptions(title + " (Post-ignition)", ignitionDelay)}
+            data={createChartData(postIgnitionData)}
+          />
+        </Box>
+      )}
+    </VStack>
+  );
 };
 
 Chart.propTypes = {

@@ -5,36 +5,17 @@ function processSensorData(raw, testData) {
   const { t1: readingsTime, t2: ignitionTime } = raw;
 
   // Convert microseconds to seconds
-  const readingsTimeInSeconds = readingsTime / 1e6;
-  const ignitionTimeInSeconds = ignitionTime / 1e6;
-
-  // Calculate ignition timestamp relative to zero
-  let ignitionTimestamp;
-  if (ignitionTime === 0) {
-    // Before ignition, use negative time relative to readingsTime
-    ignitionTimestamp = -readingsTimeInSeconds;
-  } else {
-    // After ignition, calculate time relative to ignition
-    ignitionTimestamp = ignitionTimeInSeconds;
-  }
+  const readingsT = readingsTime / 1e6;
+  const ignitionT = ignitionTime / 1e6;
 
   // Create the processed data point
   const processedData = {
     ...raw,
-    ignitionT: ignitionTimestamp,  // Time relative to ignition point (negative before, positive after)
-    readingsT: readingsTimeInSeconds, // Absolute reading timestamp
+    readingsT,    // Absolute time since readings started
+    ignitionT     // Absolute time since ignition (only populated after ignition)
   };
 
-  // Add the new data point to the testData array
-  const updatedTestData = [...testData, processedData];
-
-  // Sort only the `ignitionT` timestamps while preserving the rest of the data
-  const ignitionTValues = updatedTestData.map(data => data.ignitionT).sort((a, b) => a - b);
-  updatedTestData.forEach((data, index) => {
-    data.ignitionT = ignitionTValues[index];
-  });
-
-  return updatedTestData;
+  return [...testData, processedData];
 }
 
 export const useDataManager = () => {

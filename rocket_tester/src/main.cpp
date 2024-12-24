@@ -150,7 +150,6 @@ void webSocketTask(void *parameter) {
             uint32_t currentTime = micros();
             if ((currentTime - ingitionStartTime) >= 150000) {
                 portENTER_CRITICAL(&bufferMux);
-                Serial.println("Engine started");
                 engineStartTime = currentTime; // Capture precise time
                 engineStarted = true;
                 portEXIT_CRITICAL(&bufferMux);

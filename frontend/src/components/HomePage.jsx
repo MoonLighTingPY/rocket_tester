@@ -8,7 +8,7 @@ import { chartTheme } from '../config/chartConfig';
 const HomePage = () => {
   const { testData, ignitionDelay } = useContext(DataContext);
 
-  const xAxis = testData.map(point => point.ignitionT);
+  const xAxis = testData.map(point => point.ignitionT ? point.ignitionT : point.readingsT);
   const pressureY = [testData.map(point => point.p1), testData.map(point => point.p2)];
   const loadCellY = [testData.map(point => point.l)];
   const temperatureY = [testData.map(point => point.tp)];
