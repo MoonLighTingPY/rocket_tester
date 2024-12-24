@@ -87,7 +87,7 @@ const Controls = () => {
           onClick={handleEndTest}
           isDisabled={!isSocketConnected || !isReading}
         >
-          End
+          Stop
         </Button>
       </HStack>
       <HStack spacing={4}>

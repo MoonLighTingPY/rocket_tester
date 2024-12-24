@@ -82,7 +82,7 @@ const ImportPage = () => {
         {
           label: 'Pressure 1',
           data: filteredData.map((point) => ({
-            x: point['Ignition Timestamp (s)'],
+            x: point['Timestamp (s)'],
             y: point['Pressure1 (bar)'],
           })),
           borderColor: 'rgb(75, 192, 192)',
@@ -91,7 +91,7 @@ const ImportPage = () => {
         {
           label: 'Pressure 2',
           data: filteredData.map((point) => ({
-            x: point['Ignition Timestamp (s)'],
+            x: point['Timestamp (s)'],
             y: point['Pressure2 (bar)'],
           })),
           borderColor: 'rgb(255, 99, 132)',
@@ -103,7 +103,7 @@ const ImportPage = () => {
       datasets: [{
         label: 'Load Cell',
         data: filteredData.map((point) => ({
-          x: point['Ignition Timestamp (s)'],
+          x: point['Timestamp (s)'],
           y: point['Load (kg)'],
         })),
         borderColor: 'rgb(153, 102, 255)',
@@ -114,7 +114,7 @@ const ImportPage = () => {
       datasets: [{
         label: 'Temperature',
         data: filteredData.map((point) => ({
-          x: point['Ignition Timestamp (s)'],
+          x: point['Timestamp (s)'],
           y: point['Temperature (°C)'],
         })),
         borderColor: 'rgb(255, 159, 64)',
@@ -186,7 +186,7 @@ const ImportPage = () => {
         </Text>
       )}
 
-      <SimpleGrid columns={[1, null, 2]} spacing={8} w="full">
+      <SimpleGrid columns={[1]} spacing={8} w="full">
         <GridItem>
           <Box p={6} bg="white" shadow="md" rounded="lg">
             <Heading size="md" mb={4}>Pressure Sensors</Heading>

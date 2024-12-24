@@ -87,35 +87,46 @@ const Chart = ({ xAxis, yAxis, labels, colors, title }) => {
 
   const preIgnitionOptions = {
     ...chartOptions(title + " (Pre-ignition)", null),
+    aspectRatio: 0.8, // Make pre-ignition chart narrower
     plugins: {
       ...chartOptions(title, null).plugins,
       legend: {
-        display: true // Hide legend in pre-ignition chart (false to hide lol)
+        display: false // Hide legend in pre-ignition chart
       }
     }
   };
 
-  return (
-    <VStack spacing={2} w="100%">
-      {hasPreIgnitionData && (
-        <Box w="100%">
-          <Line 
-            ref={preIgnitionChartRef}
-            options={preIgnitionOptions}
-            data={createChartData(preIgnitionData)}
-          />
-        </Box>
-      )}
-      {hasPostIgnitionData && (
-        <Box w="100%">
-          <Line 
-            ref={chartRef}
-            options={chartOptions(title + " (Post-ignition)", ignitionDelay)}
-            data={createChartData(postIgnitionData)}
-          />
-        </Box>
-      )}
-    </VStack>
+    return (
+    <Box w="100%">
+      <Box 
+        display={{ base: 'block', md: 'flex' }} // Stack on mobile, row on desktop
+        w="100%"
+        gap={2}
+      >
+        {hasPreIgnitionData && (
+          <Box 
+            w={{ base: '100%', md: '30%' }} // Full width on mobile, 30% on desktop
+            mb={{ base: 2, md: 0 }} // Margin bottom only on mobile
+          >
+            <Line 
+              ref={preIgnitionChartRef}
+              options={preIgnitionOptions}
+              data={createChartData(preIgnitionData)}
+            />
+          </Box>
+        )}
+        {hasPostIgnitionData && (
+          // Full width on mobile, 70% on desktop
+          <Box w={{ base: '100%', md: '70%' }}> 
+            <Line 
+              ref={chartRef}
+              options={chartOptions(title + " (Post-ignition)", ignitionDelay)}
+              data={createChartData(postIgnitionData)}
+            />
+          </Box>
+        )}
+      </Box>
+    </Box>
   );
 };
 

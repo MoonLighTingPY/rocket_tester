@@ -22,7 +22,7 @@ const HomePage = () => {
           Ignition Delay: {ignitionDelay.toFixed(6)} seconds
         </Text>
       )}
-      <SimpleGrid columns={[1, null, 2]} spacing={8} w="full">
+      <SimpleGrid columns={1} spacing={8} w="full">
         <GridItem>
           <Box p={6} bg="white" shadow="md" rounded="lg">
             <Heading size="md" mb={4}>Pressure Sensors</Heading>
