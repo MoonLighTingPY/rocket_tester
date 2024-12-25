@@ -129,7 +129,14 @@ const ImportPage = () => {
   };
 
   const ChartControls = ({ chartRef, title }) => (
-    <HStack spacing={2} position="absolute" top={2} right={2} zIndex={1}>
+    <HStack 
+      spacing={2} 
+      position="absolute" 
+      top={2} 
+      right={2} 
+      zIndex={10} // Increase z-index
+      pointerEvents="auto" // Ensure clicks are captured
+    >
       <IconButton
         size="sm"
         icon={<RepeatIcon />}
@@ -240,7 +247,7 @@ const ImportPage = () => {
 
       <SimpleGrid columns={[1]} spacing={8} w="full">
         <GridItem>
-        <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
+        <Box p={6} bg="white" shadow="md" rounded="lg" position="relative" style={{ touchAction: 'pan-x pan-y' }}>
             <Heading size="md" mb={4}>Pressure Sensors</Heading>
             <ChartControls chartRef={chartRefs.pressure} title="Pressure" />
             <Line 
