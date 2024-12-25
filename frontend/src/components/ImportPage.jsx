@@ -11,6 +11,7 @@ import { FormLabel, FormControl } from '@chakra-ui/form-control';
 import { NumberInput, NumberInputField } from '@chakra-ui/number-input';
 import { applyKalmanFilter, applyGaussianFilter } from '../utils/filters';
 import { chartOptions } from '../config/chartConfig';
+import Statistics from './Statistics';
 import './ImportPage.css';
 
 const ImportPage = () => {
@@ -173,7 +174,11 @@ const ImportPage = () => {
   return (
     <Box className="import-page" p={8} w="full">
       <Heading>Import CSV and Apply Filters</Heading>
-      
+
+      {filteredData.length > 0 && (
+        <Statistics data={filteredData} />
+      )}
+          
       <FormControl>
         <FormLabel>Upload CSV File</FormLabel>
         <input type="file" accept=".csv" onChange={handleFileUpload} />

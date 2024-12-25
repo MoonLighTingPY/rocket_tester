@@ -9,10 +9,10 @@ import Chart from './Chart';
 import { useContext, useRef, useState, useEffect } from 'react';
 import DataContext from '../hooks/DataContext';
 import { chartTheme } from '../config/chartConfig';
-import { socket } from '../websocket';
+import Statistics from './Statistics';
 
 const HomePage = () => {
-  const { testData, ignitionDelay } = useContext(DataContext);
+  const { testData, csvData, ignitionDelay } = useContext(DataContext);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [activeChart, setActiveChart] = useState(null);
   const chartRefs = {
@@ -74,6 +74,10 @@ const HomePage = () => {
     <VStack spacing={6} w="full">
       <Heading>Rocket Test Dashboard</Heading>
       <Controls />
+
+      {testData.length > 0 && (
+        <Statistics data={csvData} />
+      )}
       
       {ignitionDelay !== null && (
         <Text fontSize="xl" fontWeight="bold">
@@ -92,7 +96,7 @@ const HomePage = () => {
               yAxis={pressureY}
               labels={['Pressure 1', 'Pressure 2']}
               colors={[chartTheme.colors.pressure1, chartTheme.colors.pressure2]}
-              title="Pressure Sensors"
+              title="Pressure Sensors (Pre-Ignition)"
             />
           </Box>
 
@@ -120,7 +124,7 @@ const HomePage = () => {
               yAxis={temperatureY}
               labels={['Temperature']}
               colors={[chartTheme.colors.temperature]}
-              title="Temperature"
+              title="Temperature (Pre-Ignition)"
             />
           </Box>
         </GridItem>
