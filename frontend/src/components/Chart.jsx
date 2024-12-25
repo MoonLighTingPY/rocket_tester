@@ -1,7 +1,7 @@
 import { Line } from 'react-chartjs-2';
-import { useRef, useEffect, useContext } from 'react';
+import { useRef, useEffect, useContext, forwardRef } from 'react';
 import PropTypes from 'prop-types';
-import { Box, VStack } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -29,8 +29,7 @@ ChartJS.register(
   annotationPlugin
 );
 
-const Chart = ({ xAxis, yAxis, labels, colors, title }) => {
-  const chartRef = useRef();
+const Chart = forwardRef(({ xAxis, yAxis, labels, colors, title }, ref) => {
   const preIgnitionChartRef = useRef();
   const { ignitionDelay, testData } = useContext(DataContext);
 
@@ -73,13 +72,14 @@ const Chart = ({ xAxis, yAxis, labels, colors, title }) => {
   });
 
   useEffect(() => {
-    if (chartRef.current) {
-      chartRef.current.update();
+    if (ref?.current) {
+      ref.current.update();
     }
     if (preIgnitionChartRef.current) {
       preIgnitionChartRef.current.update();
     }
   }, [xAxis, yAxis]);
+
 
   const { preIgnitionData, postIgnitionData } = splitData();
   const hasPreIgnitionData = preIgnitionData.length > 0;
@@ -119,7 +119,7 @@ const Chart = ({ xAxis, yAxis, labels, colors, title }) => {
           // Full width on mobile, 70% on desktop
           <Box w={{ base: '100%', md: '70%' }}> 
             <Line 
-              ref={chartRef}
+              ref={ref}
               options={chartOptions(title + " (Post-ignition)", ignitionDelay)}
               data={createChartData(postIgnitionData)}
             />
@@ -128,7 +128,9 @@ const Chart = ({ xAxis, yAxis, labels, colors, title }) => {
       </Box>
     </Box>
   );
-};
+});
+
+Chart.displayName = 'Chart';
 
 Chart.propTypes = {
   xAxis: PropTypes.arrayOf(PropTypes.number).isRequired,

@@ -11,7 +11,7 @@ export const chartTheme = {
   annotations: {
     ignitionLine: {
       borderColor: 'red',
-      borderWidth: 2,
+      borderWidth: 3,
       label: {
         content: 'Ignition',
         enabled: true,
