@@ -7,7 +7,6 @@ import {
 } from '@chakra-ui/react';
 import { applyKalmanFilter, applyGaussianFilter } from '../utils/filters';
 import { chartOptions } from '../config/chartConfig';
-import Statistics from './Statistics';
 import ChartControls from './ChartControls';
 import FilterSettings from './FilterSettings';
 import './ImportPage.css';

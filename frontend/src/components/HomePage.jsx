@@ -9,7 +9,7 @@ import Chart from './Chart';
 import { useContext, useRef, useState, useEffect } from 'react';
 import DataContext from '../hooks/DataContext';
 import { chartTheme } from '../config/chartConfig';
-import Statistics from './Statistics';
+
 
 const HomePage = () => {
   const { testData, csvData, ignitionDelay } = useContext(DataContext);
@@ -81,10 +81,6 @@ const HomePage = () => {
     <VStack spacing={6} w="full">
       <Heading>Rocket Test Dashboard</Heading>
       <Controls />
-
-      {testData.length > 0 && (
-        <Statistics data={csvData} />
-      )}
       
       {ignitionDelay !== null && (
         <Text fontSize="xl" fontWeight="bold">

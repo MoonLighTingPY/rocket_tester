@@ -21,8 +21,8 @@ function App() {
                   <Link to="/">
                     <Button colorScheme="blue">Home</Button>
                   </Link>
-                  <Link to="/import">
-                    <Button colorScheme="green">Import CSV</Button>
+                  <Link to="/filter">
+                    <Button colorScheme="green">Filter CSV</Button>
                   </Link>
                   <Link to="/analysis">
                     <Button colorScheme="purple">Analysis</Button>
@@ -30,7 +30,7 @@ function App() {
                 </Flex>
                 <Routes>
                   <Route path="/" element={<HomePage />} />
-                  <Route path="/import" element={<ImportPage />} />
+                  <Route path="/filter" element={<ImportPage />} />
                   <Route path="/analysis" element={<AnalysisPage />} />
                 </Routes>
               </VStack>
