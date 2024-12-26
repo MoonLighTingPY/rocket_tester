@@ -29,7 +29,7 @@ const AnalysisPage = () => {
   
     const filename = `analysis_results_${localDateTime}_` + 
       `from_${analysisResults.integrationStartPoint.replace(/\s+/g, '_')}_` +
-      `to_${analysisResults.integrationEndPoint.replace(/\s+/g, '_')}_` +
+      `to_${analysisResults.integrationEndPoint.replace(/\s+/g, '_')}_#_` +
       `ignition_delay_${ignitionDelay?.toFixed(6) ?? 'none'}.json`;
   
     const resultsBlob = new Blob([JSON.stringify(analysisResults, null, 2)], 
