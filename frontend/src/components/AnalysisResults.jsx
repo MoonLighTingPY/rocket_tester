@@ -1,69 +1,141 @@
-import { HStack, Text, Box, Heading } from '@chakra-ui/react';
-import PropTypes from 'prop-types';
+import { 
+  Box, 
+  Heading, 
+  Table, 
+  Thead, 
+  Tbody, 
+  Tr, 
+  Th, 
+  Td, 
+  TableContainer,
+  Badge
+} from '@chakra-ui/react';
 
-const Statistics = ({ data }) => {
-  const calculateStats = (values) => {
-    const filteredValues = values.filter(v => v !== undefined && !isNaN(v));
-    if (filteredValues.length === 0) return { max: 0, min: 0, avg: 0 };
-    
-    return {
-      max: Math.max(...filteredValues),
-      min: Math.min(...filteredValues),
-      avg: filteredValues.reduce((a, b) => a + b, 0) / filteredValues.length
-    };
-  };
-
-  const pressure1Stats = calculateStats(
-    data.map(point => point.p1 || point['Pressure1 (bar)'])
-  );
-
-  const pressure2Stats = calculateStats(
-    data.map(point => point.p2 || point['Pressure2 (bar)'])
-  );
-  
-  const loadStats = calculateStats(
-    data.map(point => point.l || point['Load (kg)'])
-  );
-  
-  const tempStats = calculateStats(
-    data.map(point => point.tp || point['Temperature (°C)'])
-  );
+const AnalysisResults = ({ analysisResults }) => {
+  if (!analysisResults) return null;
 
   return (
-    <Box p={4} bg="white" shadow="sm" rounded="lg" w="full">
-      <Heading size="sm" mb={4}>Test Statistics</Heading>
-      <HStack align="start" spacing={4}>
-        <Box>
-          <Text fontWeight="bold">Pressure (bar), sensor 1</Text>
-          <Text>Max: {pressure1Stats.max.toFixed(2)}</Text>
-          <Text>Min: {pressure1Stats.min.toFixed(2)}</Text>
-          <Text>Avg: {pressure1Stats.avg.toFixed(2)}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold">Pressure (bar), sensor 2</Text>
-          <Text>Max: {pressure2Stats.max.toFixed(2)}</Text>
-          <Text>Min: {pressure2Stats.min.toFixed(2)}</Text>
-          <Text>Avg: {pressure2Stats.avg.toFixed(2)}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold">Load (kg)</Text>
-          <Text>Max: {loadStats.max.toFixed(2)}</Text>
-          <Text>Min: {loadStats.min.toFixed(2)}</Text>
-          <Text>Avg: {loadStats.avg.toFixed(2)}</Text>
-        </Box>
-        <Box>
-          <Text fontWeight="bold">Temperature (°C)</Text>
-          <Text>Max: {tempStats.max.toFixed(2)}</Text>
-          <Text>Min: {tempStats.min.toFixed(2)}</Text>
-          <Text>Avg: {tempStats.avg.toFixed(2)}</Text>
-        </Box>
-      </HStack>
+    <Box>
+      <Heading 
+        size="lg" 
+        mb={6} 
+        color="blue.600" 
+        textAlign="center"
+      >
+        Analysis Results 
+        <Badge
+          ml={3}
+          colorScheme="gray"
+        >
+          From
+        </Badge>
+        <Badge 
+          ml={3} 
+          colorScheme="green"
+        >
+          {analysisResults.integrationStartPoint}
+        </Badge>
+        <Badge
+          ml={3}
+          colorScheme="gray"
+        >
+          To
+        </Badge>
+        <Badge 
+          ml={3} 
+          colorScheme="green"
+        >
+          {analysisResults.integrationEndPoint}
+        </Badge>
+      </Heading>
+
+      <TableContainer 
+        whiteSpace="normal" 
+        maxWidth="100%" 
+        overflowX="auto"
+        boxShadow="sm"
+        borderRadius="lg"
+      >
+        <Table 
+          variant="striped" 
+          colorScheme="blue"
+          size={{ base: "sm", md: "md" }}
+        >
+          <Thead bg="blue.50">
+            <Tr>
+              <Th fontSize="md" color="gray.700">Parameter</Th>
+              <Th fontSize="md" color="gray.700" isNumeric>Value</Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            <Tr>
+              <Td fontWeight="medium">Integration Start Time</Td>
+              <Td isNumeric>{analysisResults.integrationStartTime?.toFixed(6)} s</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Integration End Time</Td>
+              <Td isNumeric>{analysisResults.engineEndTime?.toFixed(6)} s</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Total Duration</Td>
+              <Td isNumeric>{analysisResults.duration.toFixed(6)} s</Td>
+            </Tr>
+            {/* Pressure Data */}
+            <Tr>
+              <Td fontWeight="medium">Avg Pressure 1</Td>
+              <Td isNumeric>{analysisResults.avgPressure1.toFixed(2)} bar</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Avg Pressure 2</Td>
+              <Td isNumeric>{analysisResults.avgPressure2.toFixed(2)} bar</Td>
+            </Tr>
+            {/* Load and Temperature */}
+            <Tr>
+              <Td fontWeight="medium">Avg Load</Td>
+              <Td isNumeric>{analysisResults.avgLoad.toFixed(2)} kg</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Avg Temperature</Td>
+              <Td isNumeric>{analysisResults.avgTemperature.toFixed(2)} °C</Td>
+            </Tr>
+            {/* Integrals */}
+            <Tr>
+              <Td fontWeight="medium">Partial Pressure 1 Integral</Td>
+              <Td isNumeric>{analysisResults.partialPressureIntegral1?.toFixed(2)} bar·s</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Partial Pressure 2 Integral</Td>
+              <Td isNumeric>{analysisResults.partialPressureIntegral2?.toFixed(2)} bar·s</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Partial Load Integral</Td>
+              <Td isNumeric>{analysisResults.partialLoadIntegral?.toFixed(2)} kg·s</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Partial Temperature Integral</Td>
+              <Td isNumeric>{analysisResults.partialTemperatureIntegral?.toFixed(2)} °C·s</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Full Pressure 1 Integral</Td>
+              <Td isNumeric>{analysisResults.fullPressureIntegral1?.toFixed(2)} bar·s</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Full Pressure 2 Integral</Td>
+              <Td isNumeric>{analysisResults.fullPressureIntegral2?.toFixed(2)} bar·s</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Full Load Integral</Td>
+              <Td isNumeric>{analysisResults.fullLoadIntegral?.toFixed(2)} kg·s</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Full Temperature Integral</Td>
+              <Td isNumeric>{analysisResults.fullTemperatureIntegral?.toFixed(2)} °C·s</Td>
+            </Tr>
+          </Tbody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 };
 
-Statistics.propTypes = {
-  data: PropTypes.arrayOf(PropTypes.object).isRequired
-};
-
-export default Statistics;
+export default AnalysisResults;

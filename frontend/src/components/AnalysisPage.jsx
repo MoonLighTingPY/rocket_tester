@@ -1,10 +1,8 @@
 import { useState, useCallback } from 'react';
-import { 
-  VStack, Box, Heading, FormControl, FormLabel, Select, 
-  NumberInput, NumberInputField, Button, Text, Table,
-  Thead, Tbody, Tr, Th, Td, HStack, RadioGroup, Radio
-} from '@chakra-ui/react';
+import { VStack, Box, Button } from '@chakra-ui/react';
 import Papa from 'papaparse';
+import AnalysisControls from './AnalysisControls';
+import AnalysisResults from './AnalysisResults';
 
 const AnalysisPage = () => {
   const [data, setData] = useState([]);
@@ -20,6 +18,27 @@ const AnalysisPage = () => {
     integrationEnd: 'threshold',
   });
   const [ignitionDelay, setIgnitionDelay] = useState(null);
+
+  const saveAnalysisResults = () => {
+    if (!analysisResults) return;
+  
+    const now = new Date();
+    const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
+      .replace(' ', '_')
+      .replace(':', '-');
+  
+    const filename = `analysis_results_${localDateTime}_` + 
+      `from_${analysisResults.integrationStartPoint.replace(/\s+/g, '_')}_` +
+      `to_${analysisResults.integrationEndPoint.replace(/\s+/g, '_')}_` +
+      `ignition_delay_${ignitionDelay?.toFixed(6) ?? 'none'}.json`;
+  
+    const resultsBlob = new Blob([JSON.stringify(analysisResults, null, 2)], 
+      { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(resultsBlob);
+    link.download = filename;
+    link.click();
+  };
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -58,7 +77,6 @@ const AnalysisPage = () => {
     let consecutiveCount = 0;
     let endIndex = -1;
   
-    // Find the index of the highest point in the data
     const highestPointIndex = data.reduce((maxIndex, point, index) => {
       const currentValue = settings.endCriterion === 'pressure'
         ? Math.max(point['Pressure1 (bar)'], point['Pressure2 (bar)'])
@@ -74,8 +92,6 @@ const AnalysisPage = () => {
         ? (data[i]['Pressure1 (bar)'] < threshold && data[i]['Pressure2 (bar)'] < threshold)
         : data[i]['Load (kg)'] < threshold;
   
-      console.log(`Index: ${i}, isBelowThreshold: ${isBelowThreshold}, consecutiveCount: ${consecutiveCount}`);
-  
       if (isBelowThreshold) {
         consecutiveCount++;
       } else {
@@ -88,11 +104,8 @@ const AnalysisPage = () => {
       }
     }
   
-    console.log(`End Index: ${endIndex}`);
     return endIndex !== -1 ? data[endIndex]['Timestamp (s)'] : null;
   }, [data, settings.endCriterion, ignitionDelay]);
-  
-
 
   const calculateIntegrals = useCallback((startTime, endTime) => {
     const relevantData = data.filter(point => 
@@ -195,230 +208,159 @@ const AnalysisPage = () => {
         settings.endLoadThreshold
     );
   
+    // In the runAnalysis function, update the switch cases:
     let startTime;
-    let startTimeLabel;
-    switch (settings.integrationStart) {
-      case 'button':
-        startTime = data[0]['Timestamp (s)'];
-        startTimeLabel = 'Button Press';
-        break;
-      case 'pressure':
-        startTime = pressureBasedDelay;
-        startTimeLabel = 'Pressure/Load Rise';
-        break;
-      case 'ignition':
-        startTime = ignitionDelay;
-        startTimeLabel = 'Real Ignition';
-        break;
-      default:
-        startTime = data[0]['Timestamp (s)'];
-        startTimeLabel = 'Button Press';
-    }
+let startTimeLabel;
+switch (settings.integrationStart) {
+  case 'button':
+    startTime = data[0]['Timestamp (s)'];
+    startTimeLabel = 'Button Press';
+    break;
+  case 'pressure':
+    startTime = pressureBasedDelay;
+    startTimeLabel = settings.startCriterion === 'pressure' ? 'Pressure Rise' : 'Load Rise';
+    break;
+  case 'ignition':
+    startTime = ignitionDelay;
+    startTimeLabel = 'Real Ignition';
+    break;
+  default:
+    startTime = data[0]['Timestamp (s)'];
+    startTimeLabel = 'Button Press';
+}
+let endTime;
+let endTimeLabel;
+switch (settings.integrationEnd) {
+  case 'threshold':
+    endTime = engineEndTime;
+    endTimeLabel = settings.endCriterion === 'pressure' ? 'Pressure Drop' : 'Load Drop';
+    break;
+  case 'button':
+    endTime = data[data.length - 1]['Timestamp (s)'];
+    endTimeLabel = 'End Button Press';
+    break;
+  default:
+    endTime = engineEndTime;
+    endTimeLabel = settings.endCriterion === 'pressure' ? 'Pressure Drop' : 'Load Drop';
+}
   
-    let endTime;
-    switch (settings.integrationEnd) {
-      case 'threshold':
-        endTime = engineEndTime;
-        break;
-      case 'button':
-        endTime = data[data.length - 1]['Timestamp (s)'];
-        break;
-      default:
-        endTime = engineEndTime;
+
+const results = calculateIntegrals(startTime, endTime);
+setAnalysisResults({
+  ...results,
+  integrationStartPoint: startTimeLabel,    // Add this
+integrationEndPoint: endTimeLabel,        // Add this
+integrationStartTime: startTime,
+engineEndTime: endTime,
+  metadata: {
+    units: {
+      time: "seconds",
+      pressure: "bar",
+      load: "kg",
+      temperature: "°C",
+      pressureIntegral: "bar·s",
+      loadIntegral: "kg·s",
+      temperatureIntegral: "°C·s"
+    },
+    description: {
+      avgPressure: "Average pressure during integration period",
+      avgLoad: "Average load during integration period",
+      avgTemperature: "Average temperature during integration period",
+      partialIntegrals: "Integrals calculated only during the integration period",
+      fullIntegrals: "Integrals calculated over the entire dataset",
+      minMax: "Minimum and maximum values during integration period",
+      delays: "Various time delay measurements",
+      integrationPoints: "Start and end points of integration"
     }
-  
-    const results = calculateIntegrals(startTime, endTime);
-    setAnalysisResults({
-      ...results,
-      pressureBasedDelay,
-      engineEndTime: endTime, // Update this line to use the calculated endTime
-      integrationStartPoint: startTimeLabel,
-      integrationStartTime: startTime
-    });
+  },
+  measurements: {
+    duration: {
+      value: results.duration,
+      unit: "s"
+    },
+    pressure: {
+      avg1: { value: results.avgPressure1, unit: "bar" },
+      avg2: { value: results.avgPressure2, unit: "bar" },
+      min1: { value: results.minPressure1, unit: "bar" },
+      max1: { value: results.maxPressure1, unit: "bar" },
+      min2: { value: results.minPressure2, unit: "bar" },
+      max2: { value: results.maxPressure2, unit: "bar" }
+    },
+    load: {
+      avg: { value: results.avgLoad, unit: "kg" },
+      min: { value: results.minLoad, unit: "kg" },
+      max: { value: results.maxLoad, unit: "kg" }
+    },
+    temperature: {
+      avg: { value: results.avgTemperature, unit: "°C" },
+      min: { value: results.minTemperature, unit: "°C" },
+      max: { value: results.maxTemperature, unit: "°C" }
+    },
+    integrals: {
+      partial: {
+        pressure1: { value: results.partialPressureIntegral1, unit: "bar·s" },
+        pressure2: { value: results.partialPressureIntegral2, unit: "bar·s" },
+        load: { value: results.partialLoadIntegral, unit: "kg·s" },
+        temperature: { value: results.partialTemperatureIntegral, unit: "°C·s" }
+      },
+      full: {
+        pressure1: { value: results.fullPressureIntegral1, unit: "bar·s" },
+        pressure2: { value: results.fullPressureIntegral2, unit: "bar·s" },
+        load: { value: results.fullLoadIntegral, unit: "kg·s" },
+        temperature: { value: results.fullTemperatureIntegral, unit: "°C·s" }
+      }
+    },
+    delays: {
+      pressureBased: { value: pressureBasedDelay, unit: "s" },
+      engineEnd: { value: endTime, unit: "s" },
+      integrationStart: { value: startTime, unit: "s" }
+    },
+    integrationPoints: {
+      start: startTimeLabel,
+      end: endTimeLabel
+    }
+  }
+});
   };
 
   return (
-    <VStack spacing={6} p={6} align="stretch">
-      <Heading size="lg">Analysis Settings</Heading>
-
-      <FormControl>
-        <FormLabel>Upload Filtered Data CSV</FormLabel>
-        <input type="file" accept=".csv" onChange={handleFileUpload} />
-      </FormControl>
-
-      <FormControl>
-  <FormLabel>Engine Start Criterion</FormLabel>
-  <RadioGroup 
-    value={settings.startCriterion}
-    onChange={value => setSettings(prev => ({ ...prev, startCriterion: value }))}
-  >
-    <HStack>
-      <Radio value="pressure">Pressure</Radio>
-      <Radio value="load">Load</Radio>
-    </HStack>
-  </RadioGroup>
-</FormControl>
-
-{settings.startCriterion === 'pressure' ? (
-  <FormControl>
-    <FormLabel>Start Pressure Threshold (bar)</FormLabel>
-    <NumberInput 
-      value={settings.ignitionPressureThreshold}
-      onChange={(_, value) => setSettings(prev => ({ ...prev, ignitionPressureThreshold: value }))}
+    <Box 
+      p={[4, 6, 8]} 
+      maxW="1200px" 
+      mx="auto"
     >
-      <NumberInputField />
-    </NumberInput>
-  </FormControl>
-) : (
-  <FormControl>
-    <FormLabel>Start Load Threshold (kg)</FormLabel>
-    <NumberInput 
-      value={settings.ignitionLoadThreshold}
-      onChange={(_, value) => setSettings(prev => ({ ...prev, ignitionLoadThreshold: value }))}
-    >
-      <NumberInputField />
-    </NumberInput>
-  </FormControl>
-)}
-
-      <FormControl>
-        <FormLabel>Engine End Criterion</FormLabel>
-        <RadioGroup 
-          value={settings.endCriterion}
-          onChange={value => setSettings(prev => ({ ...prev, endCriterion: value }))}
+      <VStack spacing={8} align="stretch">
+        <AnalysisControls
+          settings={settings}
+          setSettings={setSettings}
+          handleFileUpload={handleFileUpload}
+          runAnalysis={runAnalysis}
+          data={data}
+        />
+        <Box
+          bg="white"
+          shadow="lg"
+          rounded="xl"
+          p={8}
+          w="full"
         >
-          <HStack>
-            <Radio value="pressure">Pressure</Radio>
-            <Radio value="load">Load</Radio>
-          </HStack>
-        </RadioGroup>
-      </FormControl>
-
-      {settings.endCriterion === 'pressure' ? (
-        <FormControl>
-          <FormLabel>End Pressure Threshold (bar)</FormLabel>
-          <NumberInput 
-            value={settings.endPressureThreshold}
-            onChange={(_, value) => setSettings(prev => ({ ...prev, endPressureThreshold: value }))}
+          <AnalysisResults analysisResults={analysisResults} />
+          {analysisResults && (
+          <Button
+            colorScheme="green"
+            size="lg"
+            w="full"
+            mt={4}
+            onClick={saveAnalysisResults}
+            _hover={{ transform: 'translateY(-2px)' }}
+            transition="all 0.2s"
           >
-            <NumberInputField />
-          </NumberInput>
-        </FormControl>
-      ) : (
-        <FormControl>
-          <FormLabel>End Load Threshold (kg)</FormLabel>
-          <NumberInput 
-            value={settings.endLoadThreshold}
-            onChange={(_, value) => setSettings(prev => ({ ...prev, endLoadThreshold: value }))}
-          >
-            <NumberInputField />
-          </NumberInput>
-        </FormControl>
-      )}
-
-      <FormControl>
-        <FormLabel>Integration Start Point</FormLabel>
-        <Select 
-          value={settings.integrationStart}
-          onChange={e => setSettings(prev => ({ ...prev, integrationStart: e.target.value }))}
-        >
-          <option value="button">Ignition Button Press</option>
-          <option value="pressure">Pressure/Load Rise Threshold</option>
-          <option value="ignition">Real Ignition Moment</option>
-        </Select>
-      </FormControl>
-
-      <FormControl>
-        <FormLabel>Integration End Point</FormLabel>
-        <Select 
-            value={settings.integrationEnd}
-            onChange={e => setSettings(prev => ({ ...prev, integrationEnd: e.target.value }))}
-        >
-            <option value="threshold">Pressure/Load Drop Threshold</option>
-            <option value="button">End Button Press (Last Timestamp)</option>
-        </Select>
-        </FormControl>
-
-      <Button colorScheme="blue" onClick={runAnalysis} isDisabled={!data.length}>
-        Calculate Results
-      </Button>
-
-      {analysisResults && (
-        <Box>
-            <Heading size="md" mb={4}>Analysis Results</Heading>
-            <Table variant="simple">
-            <Thead>
-                <Tr>
-                <Th>Parameter</Th>
-                <Th>Value</Th>
-                </Tr>
-            </Thead>
-            <Tbody>
-            <Tr>
-  <Td>Integration Start Time</Td>
-  <Td>{analysisResults.integrationStartTime?.toFixed(6)} s</Td>
-</Tr>
-<Tr>
-  <Td>Integration End Time</Td>
-  <Td>{analysisResults.engineEndTime?.toFixed(6)} s</Td>
-</Tr>
-<Tr>
-  <Td>Total Duration</Td>
-  <Td>{analysisResults.duration.toFixed(6)} s</Td>
-</Tr>
-<Tr>
-  <Td>Avg Pressure 1</Td>
-  <Td>{analysisResults.avgPressure1.toFixed(2)} bar</Td>
-</Tr>
-<Tr>
-  <Td>Avg Pressure 2</Td>
-  <Td>{analysisResults.avgPressure2.toFixed(2)} bar</Td>
-</Tr>
-<Tr>
-  <Td>Avg Load</Td>
-  <Td>{analysisResults.avgLoad.toFixed(2)} kg</Td>
-</Tr>
-<Tr>
-  <Td>Avg Temperature</Td>
-  <Td>{analysisResults.avgTemperature.toFixed(2)} °C</Td>
-</Tr>
-<Tr>
-  <Td>Partial Pressure 1 Integral</Td>
-  <Td>{analysisResults.partialPressureIntegral1?.toFixed(2)} bar·s</Td>
-</Tr>
-<Tr>
-  <Td>Partial Pressure 2 Integral</Td>
-  <Td>{analysisResults.partialPressureIntegral2?.toFixed(2)} bar·s</Td>
-</Tr>
-<Tr>
-  <Td>Partial Load Integral</Td>
-  <Td>{analysisResults.partialLoadIntegral?.toFixed(2)} kg·s</Td>
-</Tr>
-<Tr>
-  <Td>Partial Temperature Integral</Td>
-  <Td>{analysisResults.partialTemperatureIntegral?.toFixed(2)} °C·s</Td>
-</Tr>
-<Tr>
-  <Td>Full Pressure 1 Integral</Td>
-  <Td>{analysisResults.fullPressureIntegral1?.toFixed(2)} bar·s</Td>
-</Tr>
-<Tr>
-  <Td>Full Pressure 2 Integral</Td>
-  <Td>{analysisResults.fullPressureIntegral2?.toFixed(2)} bar·s</Td>
-</Tr>
-<Tr>
-  <Td>Full Load Integral</Td>
-  <Td>{analysisResults.fullLoadIntegral?.toFixed(2)} kg·s</Td>
-</Tr>
-<Tr>
-  <Td>Full Temperature Integral</Td>
-  <Td>{analysisResults.fullTemperatureIntegral?.toFixed(2)} °C·s</Td>
-</Tr>
-            </Tbody>
-            </Table>
-        </Box>
+            Save Analysis Results
+          </Button>
         )}
-    </VStack>
+        </Box>
+      </VStack>
+    </Box>
   );
 };
 
