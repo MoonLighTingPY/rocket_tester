@@ -91,7 +91,7 @@ void sensorTask(void *parameter) {
             data.loadCell = dataCounter++;
             data.pressure1 = random(0, 100);
             data.pressure2 = random(0, 100); 
-            data.temperature = dataCounter;
+            data.temperature = random (50, 150);
             
             if (!dataBuffer.isFull()) {
                 dataBuffer.push(data);

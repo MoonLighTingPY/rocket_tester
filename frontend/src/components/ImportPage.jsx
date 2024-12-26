@@ -2,16 +2,14 @@ import { useState, useRef } from 'react';
 import Papa from 'papaparse';
 import { Line } from 'react-chartjs-2';
 import { 
-  Box, Heading, Select, Button, Text, SimpleGrid, GridItem, VStack,
-  HStack, IconButton, useDisclosure, Modal, ModalOverlay,
-  ModalContent, ModalBody, ModalCloseButton
+  Box, Heading, Checkbox, CheckboxGroup, Button, Text, SimpleGrid, GridItem, VStack,
+  useDisclosure, FormControl, FormLabel, Select
 } from '@chakra-ui/react';
-import { DownloadIcon, RepeatIcon, ViewIcon } from '@chakra-ui/icons';
-import { FormLabel, FormControl } from '@chakra-ui/form-control';
-import { NumberInput, NumberInputField } from '@chakra-ui/number-input';
 import { applyKalmanFilter, applyGaussianFilter } from '../utils/filters';
 import { chartOptions } from '../config/chartConfig';
 import Statistics from './Statistics';
+import ChartControls from './ChartControls';
+import FilterSettings from './FilterSettings';
 import './ImportPage.css';
 
 const ImportPage = () => {
@@ -19,16 +17,13 @@ const ImportPage = () => {
   const [importedData, setImportedData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [filterType, setFilterType] = useState('none');
+  const [filterTargets, setFilterTargets] = useState([]);
   const [kalmanSettings, setKalmanSettings] = useState({ Q: '0.0001', R: '0.01' });
   const [gaussianSettings, setGaussianSettings] = useState({ kernelSize: '5' });
   const [ignitionDelay, setIgnitionDelay] = useState(null);
   const [activeChart, setActiveChart] = useState(null);
-  const chartRefs = {
-    pressure: useRef(),
-    load: useRef(),
-    temperature: useRef()
-  };
-
+  const [csvHeaders, setCsvHeaders] = useState([]);
+  const chartRefs = useRef({});
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -47,145 +42,81 @@ const ImportPage = () => {
       complete: (results) => {
         setImportedData(results.data);
         setFilteredData(results.data);
+        setCsvHeaders(Object.keys(results.data[0]).filter(header => header !== 'Timestamp (s)'));
       },
     });
   };
 
   const handleFilterChange = (event) => setFilterType(event.target.value);
+  const handleFilterTargetsChange = (values) => setFilterTargets(values);
 
   const applyFilter = () => {
     let data = importedData;
-    if (filterType === 'kalman') {
-      data = applyKalmanFilter(importedData, { Q: parseFloat(kalmanSettings.Q), R: parseFloat(kalmanSettings.R) });
-    } else if (filterType === 'gaussian') {
-      data = applyGaussianFilter(importedData, { kernelSize: parseInt(gaussianSettings.kernelSize) });
-    }
-    setFilteredData(data);
+    filterTargets.forEach(target => {
+      if (filterType === 'kalman') {
+        data = applyKalmanFilter(data, { Q: parseFloat(kalmanSettings.Q), R: parseFloat(kalmanSettings.R) }, target);
+      } else if (filterType === 'gaussian') {
+        data = applyGaussianFilter(data, { kernelSize: parseInt(gaussianSettings.kernelSize) }, target);
+      }
+    });
+    // Format filtered data to 6 decimal points
+    const formattedData = data.map(point => {
+      const formattedPoint = { ...point };
+      filterTargets.forEach(target => {
+        formattedPoint[target] = parseFloat(point[target].toFixed(6));
+      });
+      return formattedPoint;
+    });
+    setFilteredData(formattedData);
   };
 
-  const handleKalmanChange = (field, value) => {
-    if (value === '' || !isNaN(value)) {
-      setKalmanSettings(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    }
-  };
-
-  const handleGaussianChange = (value) => {
-    if (value === '' || !isNaN(value)) {
-      setGaussianSettings(prev => ({
-        ...prev,
-        kernelSize: value
-      }));
-    }
-  };
-
-  const charts = {
-    pressure: {
-      datasets: [
-        {
-          label: 'Pressure 1',
-          data: filteredData.map((point) => ({
-            x: point['Timestamp (s)'],
-            y: point['Pressure1 (bar)'],
-          })),
-          borderColor: 'rgb(75, 192, 192)',
-          pointRadius: 0,
-        },
-        {
-          label: 'Pressure 2',
-          data: filteredData.map((point) => ({
-            x: point['Timestamp (s)'],
-            y: point['Pressure2 (bar)'],
-          })),
-          borderColor: 'rgb(255, 99, 132)',
-          pointRadius: 0,
-        },
-      ],
-    },
-    loadCell: {
-      datasets: [{
-        label: 'Load Cell',
-        data: filteredData.map((point) => ({
-          x: point['Timestamp (s)'],
-          y: point['Load (kg)'],
-        })),
-        borderColor: 'rgb(153, 102, 255)',
-        pointRadius: 0,
-      }],
-    },
-    temperature: {
-      datasets: [{
-        label: 'Temperature',
-        data: filteredData.map((point) => ({
-          x: point['Timestamp (s)'],
-          y: point['Temperature (°C)'],
-        })),
-        borderColor: 'rgb(255, 159, 64)',
-        pointRadius: 0,
-      }],
-    },
-  };
-
-  const ChartControls = ({ chartRef, title }) => (
-    <HStack 
-      spacing={2} 
-      position="absolute" 
-      top={2} 
-      right={2} 
-      zIndex={10} // Increase z-index
-      pointerEvents="auto" // Ensure clicks are captured
-    >
-      <IconButton
-        size="sm"
-        icon={<RepeatIcon />}
-        onClick={() => handleResetZoom(chartRef)}
-        aria-label="Reset zoom"
-      />
-      <IconButton
-        size="sm"
-        icon={<DownloadIcon />}
-        onClick={() => handleDownloadChart(chartRef, title)}
-        aria-label="Download chart"
-      />
-      <IconButton
-        size="sm"
-        icon={<ViewIcon />}
-        onClick={() => {
-          setActiveChart(title);
-          onOpen();
-        }}
-        aria-label="Fullscreen"
-      />
-    </HStack>
-  );
-
-  const handleDownloadChart = (chartRef, title) => {
+  const saveFilteredData = () => {
+    const csv = Papa.unparse(filteredData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const now = new Date();
     const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
       .replace(' ', '_')
       .replace(':', '-');
-    link.download = `${title}-${localDateTime}.png`;
-    link.href = chartRef.current.toBase64Image();
+    const filename = `filtered_data_${filterTargets.join('_')}_${localDateTime}${ignitionDelay !== null ? `_ignition_delay_${ignitionDelay.toFixed(6)}` : ''}.csv`;
+    link.download = filename;
+    link.href = URL.createObjectURL(blob);
     link.click();
   };
 
-  const handleResetZoom = (chartRef) => {
-    if (chartRef.current) {
-      chartRef.current.resetZoom();
-    }
+  const generateColor = (index) => {
+    const colors = [
+      'rgb(75, 192, 192)',
+      'rgb(255, 99, 132)',
+      'rgb(153, 102, 255)',
+      'rgb(255, 159, 64)',
+      'rgb(54, 162, 235)',
+      'rgb(255, 206, 86)',
+      'rgb(75, 192, 192)',
+      'rgb(255, 99, 132)',
+      'rgb(153, 102, 255)',
+      'rgb(255, 159, 64)',
+    ];
+    return colors[index % colors.length];
   };
+
+  const generateChartData = (data, target, index) => ({
+    datasets: [
+      {
+        label: target,
+        data: data.map((point) => ({
+          x: point['Timestamp (s)'],
+          y: point[target],
+        })),
+        borderColor: generateColor(index),
+        pointRadius: 0,
+      },
+    ],
+  });
 
   return (
     <Box className="import-page" p={8} w="full">
       <Heading>Import CSV and Apply Filters</Heading>
-
-      {filteredData.length > 0 && (
-        <Statistics data={filteredData} />
-      )}
-          
       <FormControl>
         <FormLabel>Upload CSV File</FormLabel>
         <input type="file" accept=".csv" onChange={handleFileUpload} />
@@ -200,43 +131,31 @@ const ImportPage = () => {
         </Select>
       </FormControl>
 
-      {filterType === 'kalman' && (
-        <VStack spacing={4}>
-          <FormControl>
-            <FormLabel>Q Value</FormLabel>
-            <NumberInput step={0.0001} min={0} value={kalmanSettings.Q}>
-              <NumberInputField
-                value={kalmanSettings.Q}
-                onChange={(e) => handleKalmanChange('Q', e.target.value)}
-              />
-            </NumberInput>
-          </FormControl>
-          <FormControl>
-            <FormLabel>R Value</FormLabel>
-            <NumberInput step={0.01} min={0} value={kalmanSettings.R}>
-              <NumberInputField
-                value={kalmanSettings.R}
-                onChange={(e) => handleKalmanChange('R', e.target.value)}
-              />
-            </NumberInput>
-          </FormControl>
-        </VStack>
-      )}
+      <FormControl>
+        <FormLabel>Filter Targets</FormLabel>
+        <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+          <VStack align="start">
+            {csvHeaders.map(header => (
+              <Checkbox key={header} value={header}>{header}</Checkbox>
+            ))}
+          </VStack>
+        </CheckboxGroup>
+      </FormControl>
 
-      {filterType === 'gaussian' && (
-        <FormControl>
-          <FormLabel>Kernel Size</FormLabel>
-          <NumberInput step={2} min={3} value={gaussianSettings.kernelSize}>
-            <NumberInputField
-              value={gaussianSettings.kernelSize}
-              onChange={(e) => handleGaussianChange(e.target.value)}
-            />
-          </NumberInput>
-        </FormControl>
-      )}
+      <FilterSettings 
+        filterType={filterType} 
+        kalmanSettings={kalmanSettings} 
+        setKalmanSettings={setKalmanSettings} 
+        gaussianSettings={gaussianSettings} 
+        setGaussianSettings={setGaussianSettings} 
+      />
 
-      <Button colorScheme="blue" onClick={applyFilter}>
+      <Button colorScheme="blue" onClick={applyFilter} isDisabled={filterType === 'none'}>
         Apply Filter
+      </Button>
+
+      <Button colorScheme="green" onClick={saveFilteredData} mt={4} mb={4} isDisabled={filteredData.length === 0}>
+        Save Filtered Data
       </Button>
 
       {ignitionDelay !== null && (
@@ -245,67 +164,23 @@ const ImportPage = () => {
         </Text>
       )}
 
-      <SimpleGrid columns={[1]} spacing={8} w="full">
-        <GridItem>
-        <Box p={6} bg="white" shadow="md" rounded="lg" position="relative" style={{ touchAction: 'pan-x pan-y' }}>
-            <Heading size="md" mb={4}>Pressure Sensors</Heading>
-            <ChartControls chartRef={chartRefs.pressure} title="Pressure" />
-            <Line 
-              ref={chartRefs.pressure}
-              options={chartOptions("Pressure Sensors", ignitionDelay)} 
-              data={charts.pressure} 
-            />
-          </Box>
-        </GridItem>
-        <GridItem>
-          <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
-            <Heading size="md" mb={4}>Load Cell</Heading>
-            <ChartControls chartRef={chartRefs.load} title="Load" />
-            <Line 
-              ref={chartRefs.load}
-              options={chartOptions("Load Sensor", ignitionDelay)} 
-              data={charts.loadCell} 
-            />
-          </Box>
-        </GridItem>
-        <GridItem>
-          <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
-            <Heading size="md" mb={4}>Temperature</Heading>
-            <ChartControls chartRef={chartRefs.temperature} title="Temperature" />
-            <Line 
-              ref={chartRefs.temperature}
-              options={chartOptions("Temperature Sensor", ignitionDelay)} 
-              data={charts.temperature} 
-            />
-          </Box>
-        </GridItem>
-      </SimpleGrid>
-      <Modal isOpen={isOpen} onClose={onClose} size="full">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalCloseButton />
-          <ModalBody>
-            {activeChart === "Pressure" && (
-              <Line 
-                options={chartOptions("Pressure Sensors", ignitionDelay)} 
-                data={charts.pressure} 
-              />
-            )}
-            {activeChart === "Load" && (
-              <Line 
-                options={chartOptions("Load Sensor", ignitionDelay)} 
-                data={charts.loadCell} 
-              />
-            )}
-            {activeChart === "Temperature" && (
-              <Line 
-                options={chartOptions("Temperature Sensor", ignitionDelay)} 
-                data={charts.temperature} 
-              />
-            )}
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+      {filteredData.length > 0 && (
+        <SimpleGrid columns={[1, null, 2]} spacing={8} w="full">
+          {csvHeaders.map((header, index) => (
+            <GridItem key={header}>
+              <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
+                <Heading size="md" mb={4}>{header}</Heading>
+                <ChartControls chartRef={chartRefs.current[header]} title={header} />
+                <Line 
+                  ref={el => chartRefs.current[header] = el}
+                  options={chartOptions(header, ignitionDelay)} 
+                  data={generateChartData(filteredData, header, index)} 
+                />
+              </Box>
+            </GridItem>
+          ))}
+        </SimpleGrid>
+      )}
     </Box>
   );
 };

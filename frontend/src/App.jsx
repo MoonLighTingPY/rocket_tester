@@ -1,10 +1,10 @@
-import { ChakraProvider, ColorModeProvider, CSSReset } from '@chakra-ui/react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Box, VStack, Flex, Button } from '@chakra-ui/react';
+import { Box, VStack, Flex, Button, ChakraProvider, ColorModeProvider, CSSReset } from '@chakra-ui/react';
 import { useDataManager } from './hooks/useDataManager';
 import DataContext from './hooks/DataContext';
 import HomePage from './components/HomePage';
 import ImportPage from './components/ImportPage';
+import AnalysisPage from './components/AnalysisPage';
 import "./App.css"
 
 function App() {
@@ -24,11 +24,14 @@ function App() {
                   <Link to="/import">
                     <Button colorScheme="green">Import CSV</Button>
                   </Link>
+                  <Link to="/analysis">
+                    <Button colorScheme="purple">Analysis</Button>
+                  </Link>
                 </Flex>
-                
                 <Routes>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/import" element={<ImportPage />} />
+                  <Route path="/analysis" element={<AnalysisPage />} />
                 </Routes>
               </VStack>
             </Box>

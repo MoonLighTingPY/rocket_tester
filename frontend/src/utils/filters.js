@@ -1,47 +1,30 @@
 // Kalman filter implementation
-export const applyKalmanFilter = (data, settings) => {
-    const { Q, R } = settings;
-    let P = 1;        // Estimation error covariance
-    let K = 0;        // Kalman gain
-    let X = data[0]['Pressure1 (bar)']; // Initial estimate
-  
-    const filteredData = data.map((point) => {
-      // Prediction update
-      P = P + Q;
-  
-      // Measurement update
-      K = P / (P + R);
-      X = X + K * (point['Pressure1 (bar)'] - X);
-      P = (1 - K) * P;
-  
-      return {
-        ...point,
-        'Pressure1 (bar)': X,
-      };
-    });
-  
-    P = 1;
-    K = 0;
-    X = data[0]['Pressure2 (bar)'];
-  
-    return filteredData.map((point, index) => {
-      // Prediction update
-      P = P + Q;
-  
-      // Measurement update
-      K = P / (P + R);
-      X = X + K * (data[index]['Pressure2 (bar)'] - X);
-      P = (1 - K) * P;
-  
-      return {
-        ...point,
-        'Pressure2 (bar)': X,
-      };
-    });
-  };
+export const applyKalmanFilter = (data, settings, target) => {
+  const { Q, R } = settings;
+  let P = 1;        // Estimation error covariance
+  let K = 0;        // Kalman gain
+  let X = data[0][target]; // Initial estimate
+
+  const filteredData = data.map((point) => {
+    // Prediction update
+    P = P + Q;
+
+    // Measurement update
+    K = P / (P + R);
+    X = X + K * (point[target] - X);
+    P = (1 - K) * P;
+
+    return {
+      ...point,
+      [target]: X,
+    };
+  });
+
+  return filteredData;
+};
   
   // Gaussian filter implementation
-  export const applyGaussianFilter = (data, settings) => {
+  export const applyGaussianFilter = (data, settings, target) => {
     const { kernelSize } = settings;
     const gaussianKernel = Array(kernelSize).fill(1 / kernelSize); // Simple moving average kernel
     const halfKernelSize = Math.floor(kernelSize / 2);
@@ -57,15 +40,11 @@ export const applyKalmanFilter = (data, settings) => {
       return result;
     };
   
-    const pressure1Data = data.map(point => point['Pressure1 (bar)']);
-    const pressure2Data = data.map(point => point['Pressure2 (bar)']);
-  
-    const filteredPressure1 = pressure1Data.map((_, index) => applyKernel(pressure1Data, index));
-    const filteredPressure2 = pressure2Data.map((_, index) => applyKernel(pressure2Data, index));
+    const targetData = data.map(point => point[target]);
+    const filteredTarget = targetData.map((_, index) => applyKernel(targetData, index));
   
     return data.map((point, index) => ({
       ...point,
-      'Pressure1 (bar)': filteredPressure1[index],
-      'Pressure2 (bar)': filteredPressure2[index],
+      [target]: filteredTarget[index],
     }));
   };
