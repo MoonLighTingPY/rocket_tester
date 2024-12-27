@@ -33,7 +33,7 @@ const AnalysisResults = ({ analysisResults }) => {
           ml={3} 
           colorScheme="green"
         >
-          {analysisResults.integrationStartPoint}
+          {analysisResults.partialIntegrationStartPoint}
         </Badge>
         <Badge
           ml={3}
@@ -45,7 +45,7 @@ const AnalysisResults = ({ analysisResults }) => {
           ml={3} 
           colorScheme="green"
         >
-          {analysisResults.integrationEndPoint}
+          {analysisResults.partialIntegrationEndPoint}
         </Badge>
       </Heading>
 
@@ -69,34 +69,16 @@ const AnalysisResults = ({ analysisResults }) => {
           </Thead>
           <Tbody>
             <Tr>
-              <Td fontWeight="medium">Integration Start Time</Td>
-              <Td isNumeric>{analysisResults.integrationStartTime?.toFixed(6)} s</Td>
+              <Td fontWeight="medium">Partial Integration Start Time</Td>
+              <Td isNumeric>{analysisResults.partialIntegrationStartTime?.toFixed(6)} s</Td>
             </Tr>
             <Tr>
-              <Td fontWeight="medium">Integration End Time</Td>
-              <Td isNumeric>{analysisResults.engineEndTime?.toFixed(6)} s</Td>
+              <Td fontWeight="medium">Partial Integration End Time</Td>
+              <Td isNumeric>{analysisResults.partialIntegrationEndTime?.toFixed(6)} s</Td>
             </Tr>
             <Tr>
-              <Td fontWeight="medium">Total Duration</Td>
-              <Td isNumeric>{analysisResults.duration.toFixed(6)} s</Td>
-            </Tr>
-            {/* Pressure Data */}
-            <Tr>
-              <Td fontWeight="medium">Avg Pressure 1</Td>
-              <Td isNumeric>{analysisResults.avgPressure1.toFixed(2)} bar</Td>
-            </Tr>
-            <Tr>
-              <Td fontWeight="medium">Avg Pressure 2</Td>
-              <Td isNumeric>{analysisResults.avgPressure2.toFixed(2)} bar</Td>
-            </Tr>
-            {/* Load and Temperature */}
-            <Tr>
-              <Td fontWeight="medium">Avg Load</Td>
-              <Td isNumeric>{analysisResults.avgLoad.toFixed(2)} kg</Td>
-            </Tr>
-            <Tr>
-              <Td fontWeight="medium">Avg Temperature</Td>
-              <Td isNumeric>{analysisResults.avgTemperature.toFixed(2)} °C</Td>
+              <Td fontWeight="medium">Integration Duration</Td>
+              <Td isNumeric>{analysisResults.partialIntegralDuration.toFixed(6)} s</Td>
             </Tr>
             {/* Integrals */}
             <Tr>
@@ -130,6 +112,56 @@ const AnalysisResults = ({ analysisResults }) => {
             <Tr>
               <Td fontWeight="medium">Full Temperature Integral</Td>
               <Td isNumeric>{analysisResults.fullTemperatureIntegral?.toFixed(2)} °C·s</Td>
+            </Tr>
+            {/* Pressure Data */}
+            <Tr>
+              <Td fontWeight="medium">Avg Pressure 1</Td>
+              <Td isNumeric>{analysisResults.avgPressure1.toFixed(2)} bar</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Min Pressure 1</Td>
+              <Td isNumeric>{analysisResults.minPressure1.toFixed(2)} bar</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Max Pressure 1</Td>
+              <Td isNumeric>{analysisResults.maxPressure1.toFixed(2)} bar</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Avg Pressure 2</Td>
+              <Td isNumeric>{analysisResults.avgPressure2.toFixed(2)} bar</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Min Pressure 2</Td>
+              <Td isNumeric>{analysisResults.minPressure2.toFixed(2)} bar</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Max Pressure 2</Td>
+              <Td isNumeric>{analysisResults.maxPressure2.toFixed(2)} bar</Td>
+            </Tr>
+            {/* Load and Temperature */}
+            <Tr>
+              <Td fontWeight="medium">Avg Load</Td>
+              <Td isNumeric>{analysisResults.avgLoad.toFixed(2)} kg</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Min Load</Td>
+              <Td isNumeric>{analysisResults.minLoad.toFixed(2)} kg</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Max Load</Td>
+              <Td isNumeric>{analysisResults.maxLoad.toFixed(2)} kg</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Avg Temperature</Td>
+              <Td isNumeric>{analysisResults.avgTemperature.toFixed(2)} °C</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Min Temperature</Td>
+              <Td isNumeric>{analysisResults.minTemperature.toFixed(2)} °C</Td>
+            </Tr>
+            <Tr>
+              <Td fontWeight="medium">Max Temperature</Td>
+              <Td isNumeric>{analysisResults.maxTemperature.toFixed(2)} °C</Td>
             </Tr>
           </Tbody>
         </Table>

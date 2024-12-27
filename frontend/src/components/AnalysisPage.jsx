@@ -15,7 +15,7 @@ const AnalysisPage = () => {
     endLoadThreshold: 100.0,
     endCriterion: 'pressure',
     integrationStart: 'ignition',
-    integrationEnd: 'threshold',
+    integrationEnd: 'button',
   });
   const [ignitionDelay, setIgnitionDelay] = useState(null);
 
@@ -28,8 +28,8 @@ const AnalysisPage = () => {
       .replace(':', '-');
   
     const filename = `analysis_results_${localDateTime}_` + 
-      `from_${analysisResults.integrationStartPoint.replace(/\s+/g, '_')}_` +
-      `to_${analysisResults.integrationEndPoint.replace(/\s+/g, '_')}_#_` +
+      `from_${analysisResults.partialIntegrationStartPoint.replace(/\s+/g, '_')}_` +
+      `to_${analysisResults.partialIntegrationEndPoint.replace(/\s+/g, '_')}_#_` +
       `ignition_delay_${ignitionDelay?.toFixed(6) ?? 'none'}.json`;
   
     const resultsBlob = new Blob([JSON.stringify(analysisResults, null, 2)], 
@@ -167,38 +167,39 @@ const AnalysisPage = () => {
     const temperatureStats = calculateStats(relevantData.map(point => point['Temperature (°C)']));
   
     return {
-      duration: endTime - startTime,
-      avgPressure1: pressureIntegral1 / (endTime - startTime),
-      avgPressure2: pressureIntegral2 / (endTime - startTime),
-      avgLoad: loadIntegral / (endTime - startTime),
-      avgTemperature: temperatureIntegral / (endTime - startTime),
-      partialPressureIntegral1: pressureIntegral1,
-      partialPressureIntegral2: pressureIntegral2,
-      partialLoadIntegral: loadIntegral,
-      partialTemperatureIntegral: temperatureIntegral,
-      fullPressureIntegral1,
-      fullPressureIntegral2,
-      fullLoadIntegral,
-      fullTemperatureIntegral,
-      minPressure1: pressure1Stats.min,
-      maxPressure1: pressure1Stats.max,
-      avgPressure1: pressure1Stats.avg,
-      minPressure2: pressure2Stats.min,
-      maxPressure2: pressure2Stats.max,
-      avgPressure2: pressure2Stats.avg,
-      minLoad: loadStats.min,
-      maxLoad: loadStats.max,
-      avgLoad: loadStats.avg,
-      minTemperature: temperatureStats.min,
-      maxTemperature: temperatureStats.max,
-      avgTemperature: temperatureStats.avg
+      // Integrals
+      partialIntegralDuration: endTime - startTime,
+    partialPressureIntegral1: pressureIntegral1,
+    partialPressureIntegral2: pressureIntegral2,
+    partialLoadIntegral: loadIntegral,
+    partialTemperatureIntegral: temperatureIntegral,
+    fullIntegralDuration: data[data.length - 1]['Timestamp (s)'] - data[0]['Timestamp (s)'],
+    fullPressureIntegral1,
+    fullPressureIntegral2, 
+    fullLoadIntegral,
+    fullTemperatureIntegral,
+    // Pressure data
+    minPressure1: pressure1Stats.min,
+    maxPressure1: pressure1Stats.max,
+    avgPressure1: pressure1Stats.avg,
+    minPressure2: pressure2Stats.min,
+    maxPressure2: pressure2Stats.max,
+    avgPressure2: pressure2Stats.avg,
+    // Load data
+    minLoad: loadStats.min,
+    maxLoad: loadStats.max,
+    avgLoad: loadStats.avg,
+    // Temperature data  
+    minTemperature: temperatureStats.min,
+    maxTemperature: temperatureStats.max,
+    avgTemperature: temperatureStats.avg,
     };
   }, [data]);
   
   const runAnalysis = () => {
     if (!data.length) return;
   
-    const pressureBasedDelay = calculateIgnitionDelay(
+    const thresholdBasedDelay = calculateIgnitionDelay(
       settings.ignitionPressureThreshold,
       settings.ignitionLoadThreshold
     );
@@ -214,10 +215,10 @@ let startTimeLabel;
 switch (settings.integrationStart) {
   case 'button':
     startTime = data[0]['Timestamp (s)'];
-    startTimeLabel = 'Button Press';
+    startTimeLabel = 'First Timestamp';
     break;
   case 'pressure':
-    startTime = pressureBasedDelay;
+    startTime = thresholdBasedDelay;
     startTimeLabel = settings.startCriterion === 'pressure' ? 'Pressure Rise' : 'Load Rise';
     break;
   case 'ignition':
@@ -226,7 +227,7 @@ switch (settings.integrationStart) {
     break;
   default:
     startTime = data[0]['Timestamp (s)'];
-    startTimeLabel = 'Button Press';
+    startTimeLabel = 'First Timestamp';
 }
 let endTime;
 let endTimeLabel;
@@ -237,21 +238,22 @@ switch (settings.integrationEnd) {
     break;
   case 'button':
     endTime = data[data.length - 1]['Timestamp (s)'];
-    endTimeLabel = 'End Button Press';
+    endTimeLabel = 'Last Timestamp';
     break;
   default:
-    endTime = engineEndTime;
-    endTimeLabel = settings.endCriterion === 'pressure' ? 'Pressure Drop' : 'Load Drop';
+    endTime = data[data.length - 1]['Timestamp (s)'];
+    endTimeLabel = 'Last Timestamp';
 }
   
 
 const results = calculateIntegrals(startTime, endTime);
 setAnalysisResults({
+  partialIntegrationStartPoint: startTimeLabel,
+  partialIntegrationEndPoint: endTimeLabel,      
+  partialIntegrationStartTime: startTime,
+  partialIntegrationEndTime: endTime,
   ...results,
-  integrationStartPoint: startTimeLabel,    // Add this
-integrationEndPoint: endTimeLabel,        // Add this
-integrationStartTime: startTime,
-engineEndTime: endTime,
+ignitionDelay: ignitionDelay,
   metadata: {
     units: {
       time: "seconds",
@@ -261,23 +263,9 @@ engineEndTime: endTime,
       pressureIntegral: "bar·s",
       loadIntegral: "kg·s",
       temperatureIntegral: "°C·s"
-    },
-    description: {
-      avgPressure: "Average pressure during integration period",
-      avgLoad: "Average load during integration period",
-      avgTemperature: "Average temperature during integration period",
-      partialIntegrals: "Integrals calculated only during the integration period",
-      fullIntegrals: "Integrals calculated over the entire dataset",
-      minMax: "Minimum and maximum values during integration period",
-      delays: "Various time delay measurements",
-      integrationPoints: "Start and end points of integration"
     }
   },
   measurements: {
-    duration: {
-      value: results.duration,
-      unit: "s"
-    },
     pressure: {
       avg1: { value: results.avgPressure1, unit: "bar" },
       avg2: { value: results.avgPressure2, unit: "bar" },
@@ -298,12 +286,14 @@ engineEndTime: endTime,
     },
     integrals: {
       partial: {
+        duration: { value: results.partialIntegralDuration, unit: "s" },
         pressure1: { value: results.partialPressureIntegral1, unit: "bar·s" },
         pressure2: { value: results.partialPressureIntegral2, unit: "bar·s" },
         load: { value: results.partialLoadIntegral, unit: "kg·s" },
         temperature: { value: results.partialTemperatureIntegral, unit: "°C·s" }
       },
       full: {
+        duration: { value: results.fullIntegralDuration, unit: "s" },
         pressure1: { value: results.fullPressureIntegral1, unit: "bar·s" },
         pressure2: { value: results.fullPressureIntegral2, unit: "bar·s" },
         load: { value: results.fullLoadIntegral, unit: "kg·s" },
@@ -311,7 +301,8 @@ engineEndTime: endTime,
       }
     },
     delays: {
-      pressureBased: { value: pressureBasedDelay, unit: "s" },
+      ignitionDelay: { value: ignitionDelay, unit: "s" },
+      thresholdBasedDelay: { value: thresholdBasedDelay, unit: "s" },
       engineEnd: { value: endTime, unit: "s" },
       integrationStart: { value: startTime, unit: "s" }
     },
