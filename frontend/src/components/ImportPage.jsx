@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Papa from 'papaparse';
 import { Line } from 'react-chartjs-2';
 import { 
   Box, Heading, Checkbox, CheckboxGroup, Button, Text, SimpleGrid, GridItem, VStack,
-  useDisclosure, FormControl, FormLabel, Select
+  useDisclosure, FormControl, FormLabel, Select, Modal, ModalOverlay,
+  ModalContent, ModalBody, ModalCloseButton
 } from '@chakra-ui/react';
 import { applyKalmanFilter, applyGaussianFilter } from '../utils/filters';
 import { chartOptions } from '../config/chartConfig';
@@ -21,8 +22,62 @@ const ImportPage = () => {
   const [gaussianSettings, setGaussianSettings] = useState({ kernelSize: '5' });
   const [ignitionDelay, setIgnitionDelay] = useState(null);
   const [activeChart, setActiveChart] = useState(null);
+  const [activeChartData, setActiveChartData] = useState(null);
   const [csvHeaders, setCsvHeaders] = useState([]);
   const chartRefs = useRef({});
+
+  // Initialize refs when csvHeaders change
+  useEffect(() => {
+    const newRefs = {};
+    csvHeaders.forEach(header => {
+      newRefs[header] = chartRefs.current[header] || null;
+    });
+    chartRefs.current = newRefs;
+  }, [csvHeaders]);
+
+  const handleDownloadChart = (header) => {
+    const chartInstance = chartRefs.current[header];
+    if (!chartInstance) return;
+    
+    const link = document.createElement('a');
+    const now = new Date();
+    const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
+      .replace(' ', '_')
+      .replace(':', '-');
+    link.download = `${header}-${localDateTime}.png`;
+    link.href = chartInstance.toBase64Image();
+    link.click();
+  };
+
+  const safeResetZoom = (header) => {
+    // Wait for next render cycle
+    requestAnimationFrame(() => {
+      // Get both chart instances
+      const fullScreenChart = chartRefs.current[header]?.fullScreen?.current;
+      const regularChart = chartRefs.current[header]?.current;
+      
+      const resetChart = (chart) => {
+        if (!chart) return;
+        
+        try {
+          // Ensure chart is mounted and initialized
+          if (chart.ctx && chart.canvas && typeof chart.resetZoom === 'function') {
+            chart.resetZoom();
+          }
+        } catch (err) {
+          console.warn('Failed to reset zoom:', err);
+        }
+      };
+  
+      // Reset both charts with a small delay between them
+      if (fullScreenChart) {
+        setTimeout(() => resetChart(fullScreenChart), 10);
+      }
+      if (regularChart) {
+        setTimeout(() => resetChart(regularChart), 20); 
+      }
+    });
+  };
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -47,6 +102,7 @@ const ImportPage = () => {
   };
 
   const handleFilterChange = (event) => setFilterType(event.target.value);
+
   const handleFilterTargetsChange = (values) => setFilterTargets(values);
 
   const applyFilter = () => {
@@ -163,25 +219,69 @@ const ImportPage = () => {
         </Text>
       )}
 
-      {filteredData.length > 0 && (
+        {filteredData.length > 0 && (
         <SimpleGrid columns={[1, null, 2]} spacing={8} w="full">
           {csvHeaders.map((header, index) => (
             <GridItem key={header}>
               <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
                 <Heading size="md" mb={4}>{header}</Heading>
-                <ChartControls chartRef={chartRefs.current[header]} title={header} />
-                <Line 
-                  ref={el => chartRefs.current[header] = el}
-                  options={chartOptions(header, ignitionDelay)} 
-                  data={generateChartData(filteredData, header, index)} 
+                <ChartControls 
+                  chartRef={chartRefs.current[header]}
+                  title={header}
+                  onDownload={() => handleDownloadChart(header)}
+                  onResetZoom={() => safeResetZoom(header)} 
+                  onOpen={() => {
+                    setActiveChart(header);
+                    setActiveChartData(generateChartData(filteredData, header, index));
+                    onOpen();
+                  }}
+                  setActiveChart={setActiveChart}
                 />
+<Line 
+  ref={el => {
+    if (el) {
+      chartRefs.current[header] = {
+        current: el,
+        resetZoom: () => safeResetZoom(header)
+      };
+    }
+  }}
+  options={chartOptions(header, ignitionDelay)}
+  data={generateChartData(filteredData, header, index)}
+/>
               </Box>
             </GridItem>
           ))}
         </SimpleGrid>
       )}
+
+<Modal isOpen={isOpen} onClose={onClose} size="full">
+  <ModalOverlay />
+  <ModalContent>
+    <ModalCloseButton />
+    <ModalBody>
+      {activeChart && (
+        <Line 
+          ref={el => {
+            if (el) {
+              // Store both regular and fullscreen refs
+              chartRefs.current[activeChart] = {
+                ...chartRefs.current[activeChart],
+                fullScreen: {
+                  current: el,
+                  resetZoom: () => safeResetZoom(activeChart)
+                }
+              };
+            }
+          }}
+          options={chartOptions(activeChart, ignitionDelay)}
+          data={activeChartData || generateChartData(filteredData, activeChart, csvHeaders.indexOf(activeChart))}
+        />
+      )}
+    </ModalBody>
+  </ModalContent>
+</Modal>
     </Box>
   );
 };
-
 export default ImportPage;

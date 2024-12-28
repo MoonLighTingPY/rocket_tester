@@ -1,21 +1,26 @@
+// src/components/ChartControls.jsx
+
+/* eslint-disable react/prop-types */
 import { HStack, IconButton } from '@chakra-ui/react';
 import { DownloadIcon, RepeatIcon, ViewIcon } from '@chakra-ui/icons';
 
-const ChartControls = ({ chartRef, title, onOpen, setActiveChart }) => {
-  const handleDownloadChart = (chartRef, title) => {
-    const link = document.createElement('a');
-    const now = new Date();
-    const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
-      .replace(' ', '_')
-      .replace(':', '-');
-    link.download = `${title}-${localDateTime}.png`;
-    link.href = chartRef.current.toBase64Image();
-    link.click();
+const ChartControls = ({ chartRef, title, onDownload, onResetZoom, onOpen, setActiveChart }) => {
+  const handleDownloadChart = () => {
+    if (chartRef && chartRef.toBase64Image) {
+      const link = document.createElement('a');
+      const now = new Date();
+      const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
+        .replace(' ', '_')
+        .replace(':', '-');
+      link.download = `${title}-${localDateTime}.png`;
+      link.href = chartRef.toBase64Image();
+      link.click();
+    }
   };
 
-  const handleResetZoom = (chartRef) => {
-    if (chartRef.current) {
-      chartRef.current.resetZoom();
+  const handleResetZoom = () => {
+    if (typeof chartRef?.resetZoom === 'function') {
+      chartRef.resetZoom();
     }
   };
 
@@ -31,20 +36,22 @@ const ChartControls = ({ chartRef, title, onOpen, setActiveChart }) => {
       <IconButton
         size="sm"
         icon={<RepeatIcon />}
-        onClick={() => handleResetZoom(chartRef)}
+        onClick={() => handleResetZoom() || onResetZoom()}
         aria-label="Reset zoom"
       />
       <IconButton
         size="sm"
         icon={<DownloadIcon />}
-        onClick={() => handleDownloadChart(chartRef, title)}
+        onClick={() => handleDownloadChart() || onDownload()}
         aria-label="Download chart"
       />
       <IconButton
         size="sm"
         icon={<ViewIcon />}
         onClick={() => {
-          setActiveChart(title);
+          if (setActiveChart) {
+            setActiveChart(title);
+          }
           onOpen();
         }}
         aria-label="Fullscreen"

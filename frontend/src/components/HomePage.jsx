@@ -19,7 +19,10 @@ const HomePage = () => {
   const chartRefs = {
     pressure: useRef(),
     load: useRef(),
-    temperature: useRef()
+    temperature: useRef(),
+    pressureFullScreen: useRef(),
+    loadFullScreen: useRef(),
+    temperatureFullScreen: useRef()
   };
 
 
@@ -38,14 +41,18 @@ const HomePage = () => {
     link.href = chartRef.current.toBase64Image();
     link.click();
   };
-
-  const handleResetZoom = (chartRef) => {
-    if (chartRef.current) {
-      chartRef.current.resetZoom();
-    }
+  const handleResetZoom = (chartRef, fullScreenRef) => {
+    const resetZoom = (ref) => {
+      if (ref?.current) {
+        ref.current.resetZoom();
+      }
+    };
+  
+    resetZoom(chartRef);
+    resetZoom(fullScreenRef);
   };
 
-  const ChartControls = ({ chartRef, title }) => (
+  const ChartControls = ({ chartRef, fullScreenRef, title }) => (
     <HStack 
       spacing={2} 
       position="absolute" 
@@ -57,7 +64,7 @@ const HomePage = () => {
       <IconButton
         size="sm"
         icon={<RepeatIcon />}
-        onClick={() => handleResetZoom(chartRef)}
+        onClick={() => handleResetZoom(chartRef, fullScreenRef)}
         aria-label="Reset zoom"
       />
       <IconButton
@@ -93,7 +100,7 @@ const HomePage = () => {
 
           <Box p={6} bg="white" shadow="md" rounded="lg" position="relative" style={{ touchAction: 'pan-x pan-y' }}>
             <Heading size="md" mb={4}>Pressure Sensors</Heading>
-            <ChartControls chartRef={chartRefs.pressure} title="Pressure" />
+            <ChartControls chartRef={chartRefs.pressure} fullScreenRef={chartRefs.pressureFullScreen} title="Pressure" />
             <Chart
               ref={chartRefs.pressure}
               xAxis={xAxis}
@@ -107,7 +114,7 @@ const HomePage = () => {
         <GridItem>
           <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
             <Heading size="md" mb={4}>Load Cell</Heading>
-            <ChartControls chartRef={chartRefs.load} title="Load" />
+            <ChartControls chartRef={chartRefs.load} fullScreenRef={chartRefs.loadFullScreen}  title="Load" />
             <Chart
               ref={chartRefs.load}
               xAxis={xAxis}
@@ -121,7 +128,7 @@ const HomePage = () => {
         <GridItem>
           <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
             <Heading size="md" mb={4}>Temperature</Heading>
-            <ChartControls chartRef={chartRefs.temperature} title="Temperature" />
+            <ChartControls chartRef={chartRefs.temperature} fullScreenRef={chartRefs.temperatureFullScreen} title="Temperature" />
             <Chart
               ref={chartRefs.temperature}
               xAxis={xAxis}
@@ -141,7 +148,7 @@ const HomePage = () => {
           <ModalBody>
             {activeChart === "Pressure" && (
               <Chart
-                ref={chartRefs.pressure}  // Use the same ref as the main view
+                ref={chartRefs.pressureFullScreen}
                 xAxis={xAxis}
                 yAxis={pressureY}
                 labels={['Pressure 1', 'Pressure 2']}
@@ -151,7 +158,7 @@ const HomePage = () => {
             )}
             {activeChart === "Load" && (
               <Chart
-                ref={chartRefs.load}  // Use the same ref as the main view
+                ref={chartRefs.loadFullScreen}
                 xAxis={xAxis}
                 yAxis={loadCellY}
                 labels={['Load Cell']}
@@ -161,7 +168,7 @@ const HomePage = () => {
             )}
             {activeChart === "Temperature" && (
               <Chart
-                ref={chartRefs.temperature}  // Use the same ref as the main view
+                ref={chartRefs.temperatureFullScreen}
                 xAxis={xAxis}
                 yAxis={temperatureY}
                 labels={['Temperature']}
