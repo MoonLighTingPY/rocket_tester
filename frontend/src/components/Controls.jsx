@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect } from 'react';
-import { HStack, VStack, Button } from '@chakra-ui/react';
+import { HStack, VStack, Button, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, Text } from '@chakra-ui/react';
 import { useToast } from '@chakra-ui/toast';
 import { socket } from '../websocket';
 import DataContext from '../hooks/DataContext';
@@ -8,7 +8,10 @@ import ReadingContext from '../hooks/ReadingContext';
 const Controls = () => {
   const { clearTestData, exportToCsv, clearCsvData, csvData } = useContext(DataContext);
   const { isReading, setIsReading } = useContext(ReadingContext);
+  const [isIgnited, setIsIgnited] = useState(false);
   const [isSocketConnected, setIsSocketConnected] = useState(socket.readyState === WebSocket.OPEN);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [timer, setTimer] = useState(10);
   const toast = useToast();
 
   useEffect(() => {
@@ -28,6 +31,15 @@ const Controls = () => {
   }, [setIsReading]);
 
   const handleStartReadings = () => {
+    if (csvData.length > 0) {
+      setIsModalOpen(true);
+      setTimer(10);
+      return;
+    }
+    startReadings();
+  };
+
+  const startReadings = () => {
     socket.send('start_readings');
     setIsReading(true);
     clearTestData();
@@ -38,7 +50,28 @@ const Controls = () => {
     });
   };
 
+  const handleModalStart = () => {
+    setIsModalOpen(false);
+    startReadings();
+    setTimer(10);
+  };
+
+  const handleModalCancel = () => {
+    setIsModalOpen(false);
+    setTimer(10);
+  };
+
+  useEffect(() => {
+    if (isModalOpen && timer > 0) {
+      const countdown = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+      return () => clearInterval(countdown);
+    }
+  }, [isModalOpen, timer]);
+
   const handleIgnite = () => {
+    setIsIgnited(true);
     socket.send('start_ignition');
     toast({
       title: 'Ignition started',
@@ -50,6 +83,7 @@ const Controls = () => {
   const handleEndTest = () => {
     socket.send('end_test');
     setIsReading(false);
+    setIsIgnited(false);
     toast({
       title: 'Test ended',
       status: 'info',
@@ -66,6 +100,8 @@ const Controls = () => {
     });
   };
 
+  
+
   return (
     <VStack spacing={4}>
       <HStack spacing={4}>
@@ -79,7 +115,7 @@ const Controls = () => {
         <Button
           colorScheme="orange"
           onClick={handleIgnite}
-          isDisabled={!isSocketConnected || !isReading}
+          isDisabled={!isSocketConnected || !isReading || isIgnited}
         >
           Ignite
         </Button>
@@ -107,6 +143,38 @@ const Controls = () => {
           Clear CSV Data
         </Button>
       </HStack>
+
+      <Modal isOpen={isModalOpen} onClose={handleModalCancel}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Warning</ModalHeader>
+          <ModalBody>
+            <Text>
+              There is still CSV data from the previous test. If you start the test, it will add on top of it. It is advised to clear the CSV data before starting a new test. Are you sure you want to continue?
+            </Text>
+            {csvData.length > 0 && (
+            <Text mt={4}>
+              You can still start the test in {timer} seconds.
+            </Text>)}
+            {csvData.length === 0 && (
+              <Text mt={4}>
+                CSV data cleared. You can start the test now.
+              </Text>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button colorScheme="red" onClick={handleModalCancel} mr={3} isDisabled={csvData.length === 0}>
+              Cancel
+            </Button>
+            <Button colorScheme="blue" onClick={() => { clearCsvData(); setTimer(0); }} mr={3} isDisabled={csvData.length === 0}>
+              Clear CSV Data
+            </Button>
+            <Button colorScheme="green" onClick={handleModalStart} isDisabled={timer > 0}>
+              Start the Test
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </VStack>
   );
 };
