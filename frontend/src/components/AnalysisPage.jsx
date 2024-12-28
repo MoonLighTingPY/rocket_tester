@@ -58,8 +58,8 @@ const AnalysisPage = () => {
   const calculateIgnitionDelay = useCallback((pressureThreshold, loadThreshold) => {
     const startIndex = data.findIndex(point => 
       settings.startCriterion === 'pressure' 
-        ? (point['Pressure1 (bar)'] > pressureThreshold || point['Pressure2 (bar)'] > pressureThreshold)
-        : point['Load (kg)'] > loadThreshold
+        ? (point['Pressure1 (bar)'] >= pressureThreshold || point['Pressure2 (bar)'] >= pressureThreshold)
+        : point['Load (kg)'] >= loadThreshold
     );
     
     if (startIndex === -1) return null;
@@ -89,8 +89,8 @@ const AnalysisPage = () => {
   
     for (let i = highestPointIndex; i < data.length; i++) {
       const isBelowThreshold = settings.endCriterion === 'pressure'
-        ? (data[i]['Pressure1 (bar)'] < threshold && data[i]['Pressure2 (bar)'] < threshold)
-        : data[i]['Load (kg)'] < threshold;
+        ? (data[i]['Pressure1 (bar)'] <= threshold && data[i]['Pressure2 (bar)'] <= threshold)
+        : data[i]['Load (kg)'] <= threshold;
   
       if (isBelowThreshold) {
         consecutiveCount++;
