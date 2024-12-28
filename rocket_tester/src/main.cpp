@@ -166,7 +166,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             
         case WStype_TEXT: {
             String message = String((char*)payload);
-            Serial.printf("Received message: %s\n", message.c_str());
             
             if (message == "start_readings") {
                 isReading = true;
