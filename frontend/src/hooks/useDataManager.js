@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { socket } from '../websocket';
 
 export const useDataManager = () => {
   const [testData, setTestData] = useState([]);
   const [csvData, setCsvData] = useState([]);
   const [ignitionDelay, setIgnitionDelay] = useState(null);
-  const rawDataRef = useRef([]);
+
 
   const handleMessage = useCallback((event) => {
     const message = JSON.parse(event.data);

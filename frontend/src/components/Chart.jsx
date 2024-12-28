@@ -16,6 +16,7 @@ import zoomPlugin from 'chartjs-plugin-zoom';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import { chartOptions } from '../config/chartConfig';
 import DataContext from '../hooks/DataContext';
+import ReadingContext from '../hooks/ReadingContext';
 
 ChartJS.register(
   CategoryScale,
@@ -29,46 +30,53 @@ ChartJS.register(
   annotationPlugin
 );
 
+const MAX_POINTS = 1000;
+
+const decimateData = (dataArray) => {
+  if (dataArray.length <= MAX_POINTS) return dataArray;
+  const ratio = Math.ceil(dataArray.length / MAX_POINTS);
+  const result = [];
+  for (let i = 0; i < dataArray.length; i += ratio) {
+    result.push(dataArray[i]);
+  }
+  return result;
+};
+
 const Chart = forwardRef(({ xAxis, yAxis, labels, colors, title }, ref) => {
   const preIgnitionChartRef = useRef();
   const { ignitionDelay, testData } = useContext(DataContext);
+  const { isReading } = useContext(ReadingContext);
 
-  // Split data into pre-ignition and post-ignition
   const splitData = () => {
     const preIgnitionData = [];
     const postIgnitionData = [];
-    
+
     xAxis.forEach((x, i) => {
       const dataPoint = {
-        x: x,
-        y: yAxis.map(series => series[i])
+        x,
+        y: yAxis.map((series) => series[i]),
       };
-      
-      // Check if ignition has occurred (ignitionT > 0)
       const isPostIgnition = testData[i]?.ignitionT > 0;
-      
       if (!isPostIgnition) {
-        // Use readingsT for pre-ignition data
         dataPoint.x = testData[i]?.readingsT;
         preIgnitionData.push(dataPoint);
       } else {
         postIgnitionData.push(dataPoint);
       }
     });
-  
     return { preIgnitionData, postIgnitionData };
   };
 
   const createChartData = (data, useYIndex = true) => ({
     datasets: labels.map((label, index) => ({
       label,
-      data: data.map(point => ({
+      data: data.map((point) => ({
         x: point.x,
-        y: useYIndex ? point.y[index] : point.y
+        y: useYIndex ? point.y[index] : point.y,
       })),
       borderColor: colors[index],
-      pointRadius: 0
-    }))
+      pointRadius: 0,
+    })),
   });
 
   useEffect(() => {
@@ -78,50 +86,50 @@ const Chart = forwardRef(({ xAxis, yAxis, labels, colors, title }, ref) => {
     if (preIgnitionChartRef.current) {
       preIgnitionChartRef.current.update();
     }
-  }, [xAxis, yAxis]);
-
+  }, [xAxis, yAxis, ref]);
 
   const { preIgnitionData, postIgnitionData } = splitData();
-  const hasPreIgnitionData = preIgnitionData.length > 0;
-  const hasPostIgnitionData = postIgnitionData.length > 0;
+
+  const decimatedPreIgnition = isReading ? decimateData(preIgnitionData) : preIgnitionData;
+  const decimatedPostIgnition = isReading ? decimateData(postIgnitionData) : postIgnitionData;
+
+  const hasPreIgnitionData = decimatedPreIgnition.length > 0;
+  const hasPostIgnitionData = decimatedPostIgnition.length > 0;
 
   const preIgnitionOptions = {
-    ...chartOptions(title + " (Pre-ignition)", null),
-    aspectRatio: 0.8, // Make pre-ignition chart narrower
+    ...chartOptions(title + ' (Pre-ignition)', null),
+    aspectRatio: 0.8,
     plugins: {
       ...chartOptions(title, null).plugins,
-      legend: {
-        display: false // Hide legend in pre-ignition chart
-      }
-    }
+      legend: { display: false },
+    },
   };
 
-    return (
+  return (
     <Box w="100%">
       <Box 
-        display={{ base: 'block', md: 'flex' }} // Stack on mobile, row on desktop
+        display={{ base: 'block', md: 'flex' }} 
         w="100%"
         gap={2}
       >
         {hasPreIgnitionData && (
-          <Box 
-            w={{ base: '100%', md: '30%' }} // Full width on mobile, 30% on desktop
-            mb={{ base: 2, md: 0 }} // Margin bottom only on mobile
+          <Box
+            w={{ base: '100%', md: '30%' }}
+            mb={{ base: 2, md: 0 }}
           >
-            <Line 
+            <Line
               ref={preIgnitionChartRef}
               options={preIgnitionOptions}
-              data={createChartData(preIgnitionData)}
+              data={createChartData(decimatedPreIgnition)}
             />
           </Box>
         )}
         {hasPostIgnitionData && (
-          // Full width on mobile, 70% on desktop
-          <Box w={{ base: '100%', md: '70%' }}> 
-            <Line 
+          <Box w={{ base: '100%', md: '70%' }}>
+            <Line
               ref={ref}
-              options={chartOptions(title + " (Post-ignition)", ignitionDelay)}
-              data={createChartData(postIgnitionData)}
+              options={chartOptions(title + ' (Post-ignition)', ignitionDelay)}
+              data={createChartData(decimatedPostIgnition)}
             />
           </Box>
         )}
@@ -137,7 +145,11 @@ Chart.propTypes = {
   yAxis: PropTypes.arrayOf(PropTypes.arrayOf(PropTypes.number)).isRequired,
   labels: PropTypes.arrayOf(PropTypes.string).isRequired,
   colors: PropTypes.arrayOf(PropTypes.string).isRequired,
-  title: PropTypes.string
+  title: PropTypes.string,
+};
+
+Chart.defaultProps = {
+  title: '',
 };
 
 export default Chart;

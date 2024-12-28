@@ -1,18 +1,19 @@
+/* eslint-disable react/prop-types */
 import { 
   VStack, Heading, SimpleGrid, GridItem, Box, Text, HStack, 
-  Badge, IconButton, useDisclosure, Modal, ModalOverlay, 
+   IconButton, useDisclosure, Modal, ModalOverlay, 
   ModalContent, ModalBody, ModalCloseButton
 } from '@chakra-ui/react';
 import { DownloadIcon, RepeatIcon, ViewIcon } from '@chakra-ui/icons';
 import Controls from './Controls';
 import Chart from './Chart';
-import { useContext, useRef, useState, useEffect } from 'react';
+import { useContext, useRef, useState} from 'react';
 import DataContext from '../hooks/DataContext';
 import { chartTheme } from '../config/chartConfig';
 
 
 const HomePage = () => {
-  const { testData, csvData, ignitionDelay } = useContext(DataContext);
+  const { testData, ignitionDelay } = useContext(DataContext);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [activeChart, setActiveChart] = useState(null);
   const chartRefs = {

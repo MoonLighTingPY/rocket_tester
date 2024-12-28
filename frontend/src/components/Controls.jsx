@@ -3,11 +3,12 @@ import { HStack, VStack, Button } from '@chakra-ui/react';
 import { useToast } from '@chakra-ui/toast';
 import { socket } from '../websocket';
 import DataContext from '../hooks/DataContext';
+import ReadingContext from '../hooks/ReadingContext';
 
 const Controls = () => {
   const { clearTestData, exportToCsv, clearCsvData, csvData } = useContext(DataContext);
+  const { isReading, setIsReading } = useContext(ReadingContext);
   const [isSocketConnected, setIsSocketConnected] = useState(socket.readyState === WebSocket.OPEN);
-  const [isReading, setIsReading] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -24,7 +25,7 @@ const Controls = () => {
       socket.removeEventListener('open', handleOpen);
       socket.removeEventListener('close', handleClose);
     };
-  }, []);
+  }, [setIsReading]);
 
   const handleStartReadings = () => {
     socket.send('start_readings');
@@ -94,14 +95,14 @@ const Controls = () => {
         <Button
           colorScheme="blue"
           onClick={handleExport}
-          isDisabled={csvData.length === 0}
+          isDisabled={csvData.length === 0 || isReading}
         >
           Export CSV
         </Button>
         <Button
           colorScheme="yellow"
           onClick={clearCsvData}
-          isDisabled={csvData.length === 0}
+          isDisabled={csvData.length === 0 || isReading}
         >
           Clear CSV Data
         </Button>
