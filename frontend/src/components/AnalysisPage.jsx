@@ -245,55 +245,47 @@ const findEngineEndTime = useCallback((threshold) => {
         settings.endLoadThreshold
     );
   
-    // In the runAnalysis function, update the switch cases:
     let startTime;
-let startTimeLabel;
-switch (settings.integrationStart) {
-  case 'button':
-    startTime = data[0]['Timestamp (s)'];
-    startTimeLabel = 'First Timestamp';
-    break;
-  case 'pressure':
-    // Handle case where thresholdBasedDelay is null
-    startTime = thresholdBasedDelay || data[0]['Timestamp (s)'];
-    startTimeLabel = thresholdBasedDelay ? 
-      (settings.startCriterion === 'pressure' ? 'Pressure Rise' : 'Load Rise') :
-      'First Timestamp (Threshold not met)';
-    break;
-  case 'ignition':
-    // Handle case where ignitionDelay is null
-    startTime = ignitionDelay || data[0]['Timestamp (s)'];
-    startTimeLabel = ignitionDelay ? 
-      'Real Ignition' : 
-      'First Timestamp (No ignition detected)';
-    break;
-  default:
-    startTime = data[0]['Timestamp (s)'];
-    startTimeLabel = 'First Timestamp';
-}
-
-  // Always ensure we have a valid start time
-  if (startTime === null || startTime === undefined) {
-    startTime = data[0]['Timestamp (s)'];
-    startTimeLabel = 'First Timestamp (Fallback)';
-  }
-
-
-let endTime;
-let endTimeLabel;
-switch (settings.integrationEnd) {
-  case 'threshold':
-    endTime = engineEndTime; 
-    endTimeLabel = settings.endCriterion === 'pressure' ? 'Pressure Drop' : 'Load Drop';
-    break;
-  case 'button':
-    endTime = data[data.length - 1]['Timestamp (s)'];
-    endTimeLabel = 'Last Timestamp';
-    break;
-  default:
-    endTime = data[data.length - 1]['Timestamp (s)'];
-    endTimeLabel = 'Last Timestamp';
-}
+    let startTimeLabel;
+    switch (settings.integrationStart) {
+      case 'button':
+        startTime = data[0]['Timestamp (s)'];
+        startTimeLabel = 'First Timestamp';
+        break;
+      case 'pressure':
+        startTime = thresholdBasedDelay ?? data[0]['Timestamp (s)'];
+        startTimeLabel = thresholdBasedDelay ? 
+          (settings.startCriterion === 'pressure' ? 'Pressure Rise' : 'Load Rise') :
+          'First Timestamp (Threshold not met)';
+        break;
+      case 'ignition':
+        startTime = ignitionDelay ?? data[0]['Timestamp (s)'];
+        startTimeLabel = ignitionDelay ? 
+          'Real Ignition' : 
+          'First Timestamp (No ignition detected)';
+        break;
+      default:
+        startTime = data[0]['Timestamp (s)'];
+        startTimeLabel = 'First Timestamp';
+    }
+  
+    let endTime;
+    let endTimeLabel;
+    switch (settings.integrationEnd) {
+      case 'threshold':
+        endTime = engineEndTime ?? data[data.length - 1]['Timestamp (s)'];
+        endTimeLabel = engineEndTime ? 
+          (settings.endCriterion === 'pressure' ? 'Pressure Drop' : 'Load Drop') :
+          'Last Timestamp (Threshold not met)';
+        break;
+      case 'button':
+        endTime = data[data.length - 1]['Timestamp (s)'];
+        endTimeLabel = 'Last Timestamp';
+        break;
+      default:
+        endTime = data[data.length - 1]['Timestamp (s)'];
+        endTimeLabel = 'Last Timestamp';
+    }
   
 
 const results = calculateIntegrals(startTime, endTime);
