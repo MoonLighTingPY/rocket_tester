@@ -200,7 +200,6 @@ const findEngineEndTime = useCallback((threshold) => {
     const temperatureStats = calculateStats(relevantData.map(point => point['Temperature (°C)']));
   
     return {
-      // Your existing return object with updated integral values
       partialIntegralDuration: (endTime - startTime),
       partialPressureIntegral1: pressureIntegral1,
       partialPressureIntegral2: pressureIntegral2,
@@ -211,7 +210,7 @@ const findEngineEndTime = useCallback((threshold) => {
       fullPressureIntegral2,
       fullLoadIntegral,
       fullTemperatureIntegral,
-      // Statistics remain the same
+
       minPressure1: pressure1Stats.min,
       maxPressure1: pressure1Stats.max,
       avgPressure1: pressure1Stats.avg,
