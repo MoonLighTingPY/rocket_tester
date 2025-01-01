@@ -56,100 +56,133 @@ const AnalysisPage = () => {
   };
 
   const calculateIgnitionDelay = useCallback((pressureThreshold, loadThreshold) => {
-    const startIndex = data.findIndex(point => 
-      settings.startCriterion === 'pressure' 
-        ? (point['Pressure1 (bar)'] >= pressureThreshold || point['Pressure2 (bar)'] >= pressureThreshold)
-        : point['Load (kg)'] >= loadThreshold
-    );
+  // Find the first pair of points where threshold is crossed
+  let startIndex = -1;
+  for (let i = 0; i < data.length - 1; i++) {
+    const current = settings.startCriterion === 'pressure'
+      ? Math.max(data[i]['Pressure1 (bar)'], data[i]['Pressure2 (bar)'])
+      : data[i]['Load (kg)'];
+    const next = settings.startCriterion === 'pressure'
+      ? Math.max(data[i + 1]['Pressure1 (bar)'], data[i + 1]['Pressure2 (bar)'])
+      : data[i + 1]['Load (kg)'];
     
-    if (startIndex === -1) return null;
-    return data[startIndex]['Timestamp (s)'];
-  }, [data, settings.startCriterion]);
+    const threshold = settings.startCriterion === 'pressure' ? pressureThreshold : loadThreshold;
+    
+    if (current <= threshold && next > threshold) {
+      startIndex = i;
+      break;
+    }
+  }
+  
+  if (startIndex === -1) return null;
+  
+  // Linear interpolation
+  const p1 = settings.startCriterion === 'pressure'
+    ? Math.max(data[startIndex]['Pressure1 (bar)'], data[startIndex]['Pressure2 (bar)'])
+    : data[startIndex]['Load (kg)'];
+  const p2 = settings.startCriterion === 'pressure'
+    ? Math.max(data[startIndex + 1]['Pressure1 (bar)'], data[startIndex + 1]['Pressure2 (bar)'])
+    : data[startIndex + 1]['Load (kg)'];
+  const t1 = data[startIndex]['Timestamp (s)'];
+  const t2 = data[startIndex + 1]['Timestamp (s)'];
+  const threshold = settings.startCriterion === 'pressure' ? pressureThreshold : loadThreshold;
+  
+  // y = kx + b => x = (y - b) / k
+  const k = (p2 - p1) / (t2 - t1);
+  const b = p1 - k * t1;
+  const interpolatedTime = (threshold - b) / k;
+  
+  return interpolatedTime;
+}, [data, settings.startCriterion]);
 
-  const findEngineEndTime = useCallback((threshold) => {
-    const ignitionIndex = data.findIndex(point => 
-      point['Timestamp (s)'] >= (ignitionDelay || 0)
-    );
-  
-    if (ignitionIndex === -1) return null;
-  
-    const CONSECUTIVE_POINTS = 5;
-    let consecutiveCount = 0;
-    let endIndex = -1;
-  
-    const highestPointIndex = data.reduce((maxIndex, point, index) => {
-      const currentValue = settings.endCriterion === 'pressure'
-        ? Math.max(point['Pressure1 (bar)'], point['Pressure2 (bar)'])
-        : point['Load (kg)'];
-      const maxValue = settings.endCriterion === 'pressure'
-        ? Math.max(data[maxIndex]['Pressure1 (bar)'], data[maxIndex]['Pressure2 (bar)'])
-        : data[maxIndex]['Load (kg)'];
-      return currentValue > maxValue ? index : maxIndex;
-    }, ignitionIndex);
-  
-    for (let i = highestPointIndex; i < data.length; i++) {
-      const isBelowThreshold = settings.endCriterion === 'pressure'
-        ? (data[i]['Pressure1 (bar)'] <= threshold && data[i]['Pressure2 (bar)'] <= threshold)
-        : data[i]['Load (kg)'] <= threshold;
-  
-      if (isBelowThreshold) {
-        consecutiveCount++;
-      } else {
-        consecutiveCount = 0;
+const findEngineEndTime = useCallback((threshold) => {
+  const ignitionIndex = data.findIndex(point => 
+    point['Timestamp (s)'] >= (ignitionDelay || 0)
+  );
+
+  if (ignitionIndex === -1) return null;
+
+  const CONSECUTIVE_POINTS = 5;
+
+  const highestPointIndex = data.reduce((maxIndex, point, index) => {
+    const currentValue = settings.endCriterion === 'pressure'
+      ? Math.max(point['Pressure1 (bar)'], point['Pressure2 (bar)'])
+      : point['Load (kg)'];
+    const maxValue = settings.endCriterion === 'pressure'
+      ? Math.max(data[maxIndex]['Pressure1 (bar)'], data[maxIndex]['Pressure2 (bar)'])
+      : data[maxIndex]['Load (kg)'];
+    return currentValue > maxValue ? index : maxIndex;
+  }, ignitionIndex);
+
+  // Find where value drops below threshold consistently
+  for (let i = highestPointIndex; i < data.length - 1; i++) {
+    const current = settings.endCriterion === 'pressure'
+      ? Math.max(data[i]['Pressure1 (bar)'], data[i]['Pressure2 (bar)'])
+      : data[i]['Load (kg)'];
+    const next = settings.endCriterion === 'pressure'
+      ? Math.max(data[i + 1]['Pressure1 (bar)'], data[i + 1]['Pressure2 (bar)'])
+      : data[i + 1]['Load (kg)'];
+
+    if (current >= threshold && next < threshold) {
+      // Linear interpolation for end point
+      const p1 = current;
+      const p2 = next;
+      const t1 = data[i]['Timestamp (s)'];
+      const t2 = data[i + 1]['Timestamp (s)'];
+      
+      const k = (p2 - p1) / (t2 - t1);
+      const b = p1 - k * t1;
+      const interpolatedTime = (threshold - b) / k;
+
+      // Verify the next points stay below threshold
+      let allBelow = true;
+      for (let j = i + 1; j < Math.min(i + 1 + CONSECUTIVE_POINTS, data.length); j++) {
+        const value = settings.endCriterion === 'pressure'
+          ? Math.max(data[j]['Pressure1 (bar)'], data[j]['Pressure2 (bar)'])
+          : data[j]['Load (kg)'];
+        if (value >= threshold) {
+          allBelow = false;
+          break;
+        }
       }
-  
-      if (consecutiveCount >= CONSECUTIVE_POINTS) {
-        endIndex = i;
-        break;
+      
+      if (allBelow) {
+        return interpolatedTime;
       }
     }
-  
-    return endIndex !== -1 ? data[endIndex]['Timestamp (s)'] : null;
-  }, [data, settings.endCriterion, ignitionDelay]);
+  }
 
+  return null;
+}, [data, settings.endCriterion, ignitionDelay]);
   const calculateIntegrals = useCallback((startTime, endTime) => {
     const relevantData = data.filter(point => 
       point['Timestamp (s)'] >= startTime && 
       point['Timestamp (s)'] <= endTime
     );
   
-    let pressureIntegral1 = 0;
-    let pressureIntegral2 = 0;
-    let loadIntegral = 0;
-    let temperatureIntegral = 0;
+    const trapezoidalIntegral = (points, yKey) => {
+      let integral = 0;
+      for (let i = 1; i < points.length; i++) {
+        const dt = points[i]['Timestamp (s)'] - points[i-1]['Timestamp (s)'];
+        const y1 = points[i-1][yKey];
+        const y2 = points[i][yKey];
+        // S = dt * (y1 + y2) / 2
+        integral += dt * (y1 + y2) / 2;
+      }
+      return integral;
+    };
   
-    for (let i = 1; i < relevantData.length; i++) {
-      const dt = relevantData[i]['Timestamp (s)'] - relevantData[i-1]['Timestamp (s)'];
-      pressureIntegral1 += (relevantData[i]['Pressure1 (bar)'] * dt);
-      pressureIntegral2 += (relevantData[i]['Pressure2 (bar)'] * dt);
-      loadIntegral += (relevantData[i]['Load (kg)'] * dt);
-      temperatureIntegral += (relevantData[i]['Temperature (°C)'] * dt);
-    }
+    const pressureIntegral1 = trapezoidalIntegral(relevantData, 'Pressure1 (bar)');
+    const pressureIntegral2 = trapezoidalIntegral(relevantData, 'Pressure2 (bar)');
+    const loadIntegral = trapezoidalIntegral(relevantData, 'Load (kg)');
+    const temperatureIntegral = trapezoidalIntegral(relevantData, 'Temperature (°C)');
   
-    const fullPressureIntegral1 = data.reduce((acc, point, i, arr) => {
-      if (i === 0) return acc;
-      const dt = point['Timestamp (s)'] - arr[i-1]['Timestamp (s)'];
-      return acc + (point['Pressure1 (bar)'] * dt);
-    }, 0);
+    const fullPressureIntegral1 = trapezoidalIntegral(data, 'Pressure1 (bar)');
+    const fullPressureIntegral2 = trapezoidalIntegral(data, 'Pressure2 (bar)');
+    const fullLoadIntegral = trapezoidalIntegral(data, 'Load (kg)');
+    const fullTemperatureIntegral = trapezoidalIntegral(data, 'Temperature (°C)');
   
-    const fullPressureIntegral2 = data.reduce((acc, point, i, arr) => {
-      if (i === 0) return acc;
-      const dt = point['Timestamp (s)'] - arr[i-1]['Timestamp (s)'];
-      return acc + (point['Pressure2 (bar)'] * dt);
-    }, 0);
-  
-    const fullLoadIntegral = data.reduce((acc, point, i, arr) => {
-      if (i === 0) return acc;
-      const dt = point['Timestamp (s)'] - arr[i-1]['Timestamp (s)'];
-      return acc + (point['Load (kg)'] * dt);
-    }, 0);
-  
-    const fullTemperatureIntegral = data.reduce((acc, point, i, arr) => {
-      if (i === 0) return acc;
-      const dt = point['Timestamp (s)'] - arr[i-1]['Timestamp (s)'];
-      return acc + (point['Temperature (°C)'] * dt);
-    }, 0);
-  
+
     const calculateStats = (values) => {
       const filteredValues = values.filter(v => v !== undefined && !isNaN(v));
       if (filteredValues.length === 0) return { min: 0, max: 0, avg: 0 };
@@ -167,32 +200,30 @@ const AnalysisPage = () => {
     const temperatureStats = calculateStats(relevantData.map(point => point['Temperature (°C)']));
   
     return {
-      // Integrals
+      // Your existing return object with updated integral values
       partialIntegralDuration: (endTime - startTime),
-    partialPressureIntegral1: pressureIntegral1,
-    partialPressureIntegral2: pressureIntegral2,
-    partialLoadIntegral: loadIntegral,
-    partialTemperatureIntegral: temperatureIntegral,
-    fullIntegralDuration: data[data.length - 1]['Timestamp (s)'] - data[0]['Timestamp (s)'],
-    fullPressureIntegral1,
-    fullPressureIntegral2, 
-    fullLoadIntegral,
-    fullTemperatureIntegral,
-    // Pressure data
-    minPressure1: pressure1Stats.min,
-    maxPressure1: pressure1Stats.max,
-    avgPressure1: pressure1Stats.avg,
-    minPressure2: pressure2Stats.min,
-    maxPressure2: pressure2Stats.max,
-    avgPressure2: pressure2Stats.avg,
-    // Load data
-    minLoad: loadStats.min,
-    maxLoad: loadStats.max,
-    avgLoad: loadStats.avg,
-    // Temperature data  
-    minTemperature: temperatureStats.min,
-    maxTemperature: temperatureStats.max,
-    avgTemperature: temperatureStats.avg,
+      partialPressureIntegral1: pressureIntegral1,
+      partialPressureIntegral2: pressureIntegral2,
+      partialLoadIntegral: loadIntegral,
+      partialTemperatureIntegral: temperatureIntegral,
+      fullIntegralDuration: data[data.length - 1]['Timestamp (s)'] - data[0]['Timestamp (s)'],
+      fullPressureIntegral1,
+      fullPressureIntegral2,
+      fullLoadIntegral,
+      fullTemperatureIntegral,
+      // Statistics remain the same
+      minPressure1: pressure1Stats.min,
+      maxPressure1: pressure1Stats.max,
+      avgPressure1: pressure1Stats.avg,
+      minPressure2: pressure2Stats.min,
+      maxPressure2: pressure2Stats.max,
+      avgPressure2: pressure2Stats.avg,
+      minLoad: loadStats.min,
+      maxLoad: loadStats.max,
+      avgLoad: loadStats.avg,
+      minTemperature: temperatureStats.min,
+      maxTemperature: temperatureStats.max,
+      avgTemperature: temperatureStats.avg,
     };
   }, [data]);
   
@@ -218,22 +249,36 @@ switch (settings.integrationStart) {
     startTimeLabel = 'First Timestamp';
     break;
   case 'pressure':
-    startTime = thresholdBasedDelay;
-    startTimeLabel = settings.startCriterion === 'pressure' ? 'Pressure Rise' : 'Load Rise';
+    // Handle case where thresholdBasedDelay is null
+    startTime = thresholdBasedDelay || data[0]['Timestamp (s)'];
+    startTimeLabel = thresholdBasedDelay ? 
+      (settings.startCriterion === 'pressure' ? 'Pressure Rise' : 'Load Rise') :
+      'First Timestamp (Threshold not met)';
     break;
   case 'ignition':
-    startTime = ignitionDelay;
-    startTimeLabel = 'Real Ignition';
+    // Handle case where ignitionDelay is null
+    startTime = ignitionDelay || data[0]['Timestamp (s)'];
+    startTimeLabel = ignitionDelay ? 
+      'Real Ignition' : 
+      'First Timestamp (No ignition detected)';
     break;
   default:
     startTime = data[0]['Timestamp (s)'];
     startTimeLabel = 'First Timestamp';
 }
+
+  // Always ensure we have a valid start time
+  if (startTime === null || startTime === undefined) {
+    startTime = data[0]['Timestamp (s)'];
+    startTimeLabel = 'First Timestamp (Fallback)';
+  }
+
+
 let endTime;
 let endTimeLabel;
 switch (settings.integrationEnd) {
   case 'threshold':
-    endTime = engineEndTime;
+    endTime = engineEndTime; 
     endTimeLabel = settings.endCriterion === 'pressure' ? 'Pressure Drop' : 'Load Drop';
     break;
   case 'button':
