@@ -168,7 +168,7 @@ const AnalysisPage = () => {
   
     return {
       // Integrals
-      partialIntegralDuration: endTime - startTime,
+      partialIntegralDuration: (endTime - startTime),
     partialPressureIntegral1: pressureIntegral1,
     partialPressureIntegral2: pressureIntegral2,
     partialLoadIntegral: loadIntegral,
