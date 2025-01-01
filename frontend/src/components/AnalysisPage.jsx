@@ -159,6 +159,12 @@ const findEngineEndTime = useCallback((threshold) => {
       point['Timestamp (s)'] >= startTime && 
       point['Timestamp (s)'] <= endTime
     );
+    // from first ever timestamp to the last timestamp
+    const fullRelevantData = data.filter(point =>
+      point['Timestamp (s)'] >= data[0]['Timestamp (s)'] &&
+      point['Timestamp (s)'] <= data[data.length - 1]['Timestamp (s)']
+    );
+
   
     const trapezoidalIntegral = (points, yKey) => {
       let integral = 0;
@@ -177,10 +183,10 @@ const findEngineEndTime = useCallback((threshold) => {
     const loadIntegral = trapezoidalIntegral(relevantData, 'Load (kg)');
     const temperatureIntegral = trapezoidalIntegral(relevantData, 'Temperature (°C)');
   
-    const fullPressureIntegral1 = trapezoidalIntegral(data, 'Pressure1 (bar)');
-    const fullPressureIntegral2 = trapezoidalIntegral(data, 'Pressure2 (bar)');
-    const fullLoadIntegral = trapezoidalIntegral(data, 'Load (kg)');
-    const fullTemperatureIntegral = trapezoidalIntegral(data, 'Temperature (°C)');
+    const fullPressureIntegral1 = trapezoidalIntegral(fullRelevantData, 'Pressure1 (bar)');
+    const fullPressureIntegral2 = trapezoidalIntegral(fullRelevantData, 'Pressure2 (bar)');
+    const fullLoadIntegral = trapezoidalIntegral(fullRelevantData, 'Load (kg)');
+    const fullTemperatureIntegral = trapezoidalIntegral(fullRelevantData, 'Temperature (°C)');
   
 
     const calculateStats = (values) => {
