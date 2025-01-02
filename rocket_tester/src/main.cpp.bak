@@ -6,47 +6,95 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <Adafruit_ADS1X15.h>
-#include "secret.h"
 
-// Network credentials (secret.h)
+// Create an instance of the ADS1115
+Adafruit_ADS1115 ads;
+#include "secret.h"
+#include <CircularBuffer.hpp>
+#include <ESPmDNS.h>
+
+// Network credentials
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASS;
+const char* hostname = "esp32-rockettester";
 
 // Web server and WebSocket setup
 AsyncWebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
-// ADS1115 setup
-Adafruit_ADS1115 ads;
-const uint8_t ADS_I2C_ADDRESS = 0x48;
-
 // Pin definitions
-const int ENGINE_OUT_PIN = 26;  // Wire detection output
-const int ENGINE_IN_PIN = 27;   // Wire detection input
-const int PYRO_PIN = 25;        // Pyro charge ignition
+const int ENGINE_OUT_PIN = 26;
+const int ENGINE_IN_PIN = 27;
+const int PYRO_PIN = 25;
 
 // Global variables
 bool isReading = false;
-bool testStarted = false;
+bool ingitedWire = false;
 bool engineStarted = false;
-unsigned long testStartTime = 0;
+unsigned long readingsStartTime = 0;
+unsigned long ingitionStartTime = 0;
 unsigned long engineStartTime = 0;
-
-// Task handle
-TaskHandle_t sensorTaskHandle = NULL;
-
-// Sensor data structure
-struct SensorData {
-    float loadCell;    // A0
-    float pressure1;   // A1
-    float pressure2;   // A2
-    float temperature; // A3
-    unsigned long timestamp;
+unsigned long dataCounter = 0;
+const float SAMPLE_PERIOD = 1.0/1000.0;  // ~1.16ms per sample at 860Hz
+// Sensor types
+enum SensorType {
+    LOAD = 0,
+    PRESSURE = 1,
+    TEMPERATURE = 2
 };
 
-// Engine start detection ISR
+// Sensor configuration structure
+struct SensorConfig {
+    bool enabled;
+    SensorType type;
+    uint8_t adcChannel;
+    const char* name;
+    float conversionFactor;  // For converting voltage to actual units
+    float offset;           // For calibration offset
+};
+
+// Array of sensor configurations
+constexpr size_t SENSOR_COUNT = 8;
+SensorConfig sensorConfigs[SENSOR_COUNT] = {
+    {true, LOAD, 0, "LoadCell", 0.3025, 0},         // Channel 0: Load Cell 
+    {true, PRESSURE, 1, "Pressure1", 250.0, 0},     // Channel 1: Pressure Sensor 1
+    {true, PRESSURE, 2, "Pressure2", 250.0, 0},     // Channel 2: Pressure Sensor 2
+    {true, PRESSURE, 3, "Pressure3", 250.0, 0},     // Channel 3: Pressure Sensor 3
+    {true, PRESSURE, 4, "Pressure4", 250.0, 0},     // Channel 4: Pressure Sensor 4
+    {true, TEMPERATURE, 5, "Temperature1", 100.0, 0}, // Channel 5: Temperature Sensor 1
+    {true, TEMPERATURE, 6, "Temperature2", 100.0, 0}, // Channel 6: Temperature Sensor 2
+    {true, TEMPERATURE, 7, "Temperature3", 100.0, 0}  // Channel 7: Temperature Sensor 3
+};
+
+// Updated sensor data structure
+struct SensorData {
+    float values[SENSOR_COUNT];  // Fixed-size array for sensor values
+    unsigned long readingsTimestamp;
+    unsigned long ignitionTimestamp; 
+    unsigned long engineTimestamp;
+
+    SensorData() : readingsTimestamp(0), ignitionTimestamp(0), engineTimestamp(0) {
+        for(int i = 0; i < SENSOR_COUNT; i++) {
+            values[i] = 0.0f;
+        }
+    }
+};
+
+// Circular buffer to store sensor data
+constexpr size_t BUFFER_SIZE = 1000; // Reduced from 2000 to 1000
+CircularBuffer<SensorData, BUFFER_SIZE> dataBuffer;
+
+
+// Task handles
+TaskHandle_t sensorTaskHandle = NULL;
+TaskHandle_t webSocketTaskHandle = NULL;
+
+
+// Mutex for buffer access
+portMUX_TYPE bufferMux = portMUX_INITIALIZER_UNLOCKED;
+
 void IRAM_ATTR engineStartISR() {
-    if (testStarted && !engineStarted) {
+    if (ingitedWire && !engineStarted) {
         if (digitalRead(ENGINE_IN_PIN) == LOW) {
             engineStartTime = micros();
             engineStarted = true;
@@ -54,52 +102,119 @@ void IRAM_ATTR engineStartISR() {
     }
 }
 
-void setupADS1115() {
-    if (!ads.begin(ADS_I2C_ADDRESS)) {
-        Serial.println("Failed to initialize ADS1115!");
-        return;
+// Function to clear the buffer
+void clearBuffer() {
+    portENTER_CRITICAL(&bufferMux);
+    while (!dataBuffer.isEmpty()) {
+        dataBuffer.shift();
     }
-    ads.setGain(GAIN_ONE);  // ±4.096V range
-    ads.setDataRate(RATE_ADS1115_860SPS);  // Maximum 860 samples per second
+    portEXIT_CRITICAL(&bufferMux);
 }
 
+// High-speed sensor reading task
 void sensorTask(void *parameter) {
     SensorData data;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(1); // ~860Hz sampling
-
+    const TickType_t xFrequency = pdMS_TO_TICKS(1);
+    
     while (true) {
-        if (isReading) {
-            data.timestamp = micros();
-            
-            // Read all sensors
-            data.loadCell = ads.computeVolts(ads.readADC_SingleEnded(0));
-            data.pressure1 = ads.computeVolts(ads.readADC_SingleEnded(1));
-            data.pressure2 = ads.computeVolts(ads.readADC_SingleEnded(2));
-            data.temperature = ads.computeVolts(ads.readADC_SingleEnded(3));
-
-            // Convert sensor readings
-            data.loadCell = map(data.loadCell * 1000, 0, 3300, 0, 1000); // Map to kg
-            // With 200Ω resistor:
-            // 4mA = 0.8V = 800mV
-            // 20mA = 4V = 4000mV
-            data.pressure1 = map(data.pressure1 * 1000, 800, 4000, 0, 1000); // Map to bar
-            data.pressure2 = map(data.pressure2 * 1000, 800, 4000, 0, 1000); // Map to bar
-
-            // Send data via WebSocket
-            StaticJsonDocument<200> doc;
-            doc["type"] = "test_data";
-            doc["load"] = data.loadCell;
-            doc["pressure1"] = data.pressure1;
-            doc["pressure2"] = data.pressure2;
-            doc["temp"] = data.temperature;
-            doc["timestamp"] = data.timestamp;
-
-            String jsonString;
-            serializeJson(doc, jsonString);
-            webSocket.broadcastTXT(jsonString);
-        }
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        
+        if (isReading) {
+            portENTER_CRITICAL(&bufferMux);
+            uint32_t currentTime = micros();
+            data.readingsTimestamp = currentTime - readingsStartTime;
+            data.ignitionTimestamp = ingitedWire ? (currentTime - ingitionStartTime) : 0;
+            
+            // Read enabled sensors
+            for (size_t i = 0; i < SENSOR_COUNT; i++) {
+                const SensorConfig& sensor = sensorConfigs[i];
+                if (sensor.enabled) {
+                    if (sensor.adcChannel < 4) { // ADS1115 has 4 channels (0-3)
+                        float voltage = ads.computeVolts(ads.readADC_SingleEnded(sensor.adcChannel));
+                        data.values[i] = voltage * sensor.conversionFactor + sensor.offset;
+                    } else {
+                        Serial.printf("ADC Channel %u out of bounds!\n", sensor.adcChannel);
+                        data.values[i] = 0.0f;
+                    }
+                } else {
+                    data.values[i] = 0.0f;
+                }
+            }
+
+            if (!dataBuffer.isFull()) {
+                dataBuffer.push(data);
+            }
+            portEXIT_CRITICAL(&bufferMux);
+        }
+    }
+}
+
+// WebSocket communication task
+void webSocketTask(void *parameter) {
+    const size_t BATCH_SIZE = 20;
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(20);
+    
+    while (true) {
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        webSocket.loop();
+
+        if (isReading && !dataBuffer.isEmpty()) {
+            JsonDocument doc;
+            JsonArray array = doc["data"].to<JsonArray>();
+
+            portENTER_CRITICAL(&bufferMux);
+            size_t count = 0;
+            while (!dataBuffer.isEmpty() && count < BATCH_SIZE) {
+                SensorData data = dataBuffer.shift();
+                JsonObject reading = array.add<JsonObject>();
+
+                reading["t1"] = data.readingsTimestamp;
+                reading["t2"] = data.ignitionTimestamp;
+
+                // Add only enabled sensors to JSON with their names
+                for (size_t i = 0; i < SENSOR_COUNT; i++) {
+                    const SensorConfig& sensor = sensorConfigs[i];
+                    if (sensor.enabled) {
+                        reading[sensor.name] = data.values[i];
+                    }
+                }
+                count++;
+            }
+            portEXIT_CRITICAL(&bufferMux);
+
+            if (count > 0) {
+                // Send sensor configuration on first message
+                if (dataCounter == 0) {
+                    JsonArray sensors = doc["sensors"].to<JsonArray>();
+                    for (size_t i = 0; i < SENSOR_COUNT; i++) {
+                        const SensorConfig& sensor = sensorConfigs[i];
+                        if (sensor.enabled) {
+                            JsonObject sensorObj = sensors.add<JsonObject>();
+                            sensorObj["name"] = sensor.name;
+                            sensorObj["type"] = sensor.type;
+                        }
+                    }
+                }
+                doc["type"] = "test_data";
+                String jsonString;
+                serializeJson(doc, jsonString);
+                webSocket.broadcastTXT(jsonString);
+                dataCounter++;
+            }
+        }
+
+        // Check for engine start with precise timing
+        if (ingitedWire && !engineStarted) {
+            uint32_t currentTime = micros();
+            if ((currentTime - ingitionStartTime) >= 150000) {
+                portENTER_CRITICAL(&bufferMux);
+                engineStartTime = currentTime; // Capture precise time
+                engineStarted = true;
+                portEXIT_CRITICAL(&bufferMux);
+            }
+        }
     }
 }
 
@@ -114,32 +229,32 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             
             if (message == "start_readings") {
                 isReading = true;
+                dataCounter = 0;
+                readingsStartTime = micros();
             }
-            else if (message == "start_test") {
-                testStarted = true;
-                testStartTime = micros();
+            else if (message == "start_ignition") {
+                ingitedWire = true;
                 engineStarted = false;
-                
-                // Trigger pyro charge
+                ingitionStartTime = micros();
                 digitalWrite(PYRO_PIN, HIGH);
-                delay(100);
-                digitalWrite(PYRO_PIN, LOW);
+
+
             }
             else if (message == "end_test") {
                 isReading = false;
-                testStarted = false;
+                ingitedWire = false;
                 engineStarted = false;
-            }
-
-            // Send engine start time difference if detected
-            if (engineStarted) {
-                StaticJsonDocument<100> doc;
+                dataCounter = 0;
+                clearBuffer(); // Clear the buffer when stopping the readings so that the next test starts with an empty buffer and no old data lmaooo
+                JsonDocument doc;
+                doc.clear(); // Good practice to clear the document before reuse
                 doc["type"] = "time_difference";
-                doc["value"] = engineStartTime - testStartTime;
+                doc["value"] = engineStartTime - ingitionStartTime;
                 String jsonString;
                 serializeJson(doc, jsonString);
                 webSocket.broadcastTXT(jsonString);
             }
+
             break;
         }
     }
@@ -148,13 +263,21 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 void setup() {
     Serial.begin(115200);
     
-    // Initialize SPIFFS
     if(!SPIFFS.begin(true)) {
         Serial.println("SPIFFS Mount Failed");
         return;
     }
+    
+    // Initialize the ADS1115
+    if (!ads.begin()) {
+        Serial.println("Failed to initialize ADS.");
+        return;
+    }
 
-    // Setup GPIO pins
+    // Set ADC configuration
+    ads.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V
+    ads.setDataRate(RATE_ADS1115_860SPS); // Fastest sampling rate
+
     pinMode(ENGINE_OUT_PIN, OUTPUT);
     pinMode(ENGINE_IN_PIN, INPUT_PULLUP);
     pinMode(PYRO_PIN, OUTPUT);
@@ -162,14 +285,8 @@ void setup() {
     digitalWrite(ENGINE_OUT_PIN, HIGH);
     digitalWrite(PYRO_PIN, LOW);
     
-    // Attach engine start detection interrupt
     attachInterrupt(digitalPinToInterrupt(ENGINE_IN_PIN), engineStartISR, FALLING);
 
-    // Initialize I2C and ADS1115
-    Wire.begin();
-    setupADS1115();
-
-    // Connect to WiFi
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(1000);
@@ -177,28 +294,44 @@ void setup() {
     }
     Serial.println(WiFi.localIP());
 
-    // Setup web server
+    if (!MDNS.begin(hostname)) {
+        Serial.println("Error setting up MDNS responder!");
+    } else {
+        Serial.println("mDNS responder started");
+        Serial.println("http://" + String(hostname) + ".local");
+    }
+
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send(SPIFFS, "/index.html", "text/html");
     });
+    server.serveStatic("/assets", SPIFFS, "/assets");
     server.begin();
 
-    // Start WebSocket server
     webSocket.begin();
     webSocket.onEvent(webSocketEvent);
 
-    // Create sensor reading task
+    // Create tasks on different cores
     xTaskCreatePinnedToCore(
         sensorTask,
         "SensorTask",
         10000,
         NULL,
-        1,
+        configMAX_PRIORITIES - 1,  // Highest priority for sensor readings
         &sensorTaskHandle,
-        0
+        0  // Core 0
+    );
+
+    xTaskCreatePinnedToCore(
+        webSocketTask,
+        "WebSocketTask",
+        10000,
+        NULL,
+        configMAX_PRIORITIES - 2,  // High but lower than sensor task
+        &webSocketTaskHandle,
+        1  // Core 1
     );
 }
 
 void loop() {
-    webSocket.loop();
+    vTaskDelete(NULL); // Delete setup and loop task
 }

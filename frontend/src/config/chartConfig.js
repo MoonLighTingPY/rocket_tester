@@ -3,22 +3,21 @@ import { Chart as ChartJS } from 'chart.js';
 
 export const chartTheme = {
   colors: {
-    pressure1: 'rgb(75, 192, 192)',
-    pressure2: 'rgb(255, 99, 132)',
-    loadCell: 'rgb(153, 102, 255)', 
-    temperature: 'rgb(255, 159, 64)'
+    loadCell: ['#FF6384'],           // For Load Cell sensors
+    pressure: ['#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'], // For multiple Pressure sensors
+    temperature: ['#FF9F40', '#C9CBCF', '#FF6384', '#36A2EB'], // For multiple Temperature sensors
   },
   annotations: {
     ignitionLine: {
       borderColor: 'red',
-      borderWidth: 3,
+      borderWidth: 2,
       label: {
         content: 'Ignition',
         enabled: true,
-        position: 'start'
-      }
-    }
-  }
+        position: 'start',
+      },
+    },
+  },
 };
 
 export const chartOptions = (title, ignitionDelay) => ({

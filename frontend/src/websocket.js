@@ -13,8 +13,8 @@ socket.onclose = () => {
 };
 
 //console log every messsage
-// socket.addEventListener('message', (event) => {
-//   console.log('Message from server ', event.data);
-// });
+socket.addEventListener('message', (event) => {
+  console.log('Message from server ', event.data);
+});
 
 export { socket };

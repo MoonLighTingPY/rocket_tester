@@ -5,38 +5,38 @@ export const useDataManager = () => {
   const [testData, setTestData] = useState([]);
   const [csvData, setCsvData] = useState([]);
   const [ignitionDelay, setIgnitionDelay] = useState(null);
+  const [sensorConfig, setSensorConfig] = useState([]);
 
 
   const handleMessage = useCallback((event) => {
     const message = JSON.parse(event.data);
 
     if (message.type === 'test_data') {
-      const newTestData = message.data.map(point => ({
-        readingsT: point.t1 / 1e6,
-        ignitionT: point.t2 / 1e6,
-        l: point.l,
-        p1: point.p1,
-        p2: point.p2,
-        tp: point.tp
+        // Store sensor configuration from first message
+        if (message.sensors) {
+            setSensorConfig(message.sensors);
+        }
+
+        const newTestData = message.data.map(point => ({
+          readingsT: point.t1 / 1e6,
+          ignitionT: point.t2 / 1e6,
+          ...point
       }));
 
       const newCsvData = message.data
-        .filter(point => point.t2 > 0)
-        .map(point => ({
-          ignitionT: point.t2 / 1e6,
-          l: point.l,
-          p1: point.p1,
-          p2: point.p2,
-          tp: point.tp
-        }));
+          .filter(point => point.t2 > 0)
+          .map(point => ({
+              ignitionT: point.t2 / 1e6,
+              ...point
+          }));
 
-      if (newTestData.length > 0) {
-        setTestData(prev => [...prev, ...newTestData]);
-      }
+        if (newTestData.length > 0) {
+            setTestData(prev => [...prev, ...newTestData]);
+        }
 
-      if (newCsvData.length > 0) {
-        setCsvData(prev => [...prev, ...newCsvData]);
-      }
+        if (newCsvData.length > 0) {
+            setCsvData(prev => [...prev, ...newCsvData]);
+        }
     }
 
     if (message.type === 'time_difference') {
@@ -51,12 +51,33 @@ export const useDataManager = () => {
   }, [handleMessage]);
 
   const exportToCsv = useCallback(() => {
-    const headers = ['Timestamp (s),Load (kg),Pressure1 (bar),Pressure2 (bar),Temperature (°C)'];
-    const data = csvData.map(point => (
-      `${point.ignitionT.toFixed(6)},${point.l},${point.p1},${point.p2},${point.tp}`
-    ));
-
-    const csvContent = headers.concat(data).join('\n');
+            // Create headers based on sensor configuration
+            const headers = ['Timestamp (s)'];
+            for (const sensor of sensorConfig) {
+                let unit = '';
+                switch (sensor.type) {
+                    case 0: // LOAD
+                        unit = '(kg)';
+                        break;
+                    case 1: // PRESSURE  
+                        unit = '(bar)';
+                        break;
+                    case 2: // TEMPERATURE
+                        unit = '(°C)';
+                        break;
+                }
+                headers.push(`${sensor.name} ${unit}`);
+            }
+    
+            const data = csvData.map(point => {
+                const values = [point.ignitionT.toFixed(6)];
+                for (const sensor of sensorConfig) {
+                    values.push(point[sensor.name]);
+                }
+                return values.join(',');
+            });
+    
+            const csvContent = [headers.join(',')].concat(data).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const now = new Date();
@@ -71,7 +92,7 @@ export const useDataManager = () => {
     link.href = URL.createObjectURL(blob);
     link.download = filename;
     link.click();
-  }, [csvData, ignitionDelay]);
+  }, [csvData, ignitionDelay, sensorConfig]);
 
   const clearCsvData = () => setCsvData([]);
   const clearTestData = () => setTestData([]);
@@ -80,6 +101,7 @@ export const useDataManager = () => {
     testData,
     csvData,
     ignitionDelay,
+    sensorConfig,
     exportToCsv,
     clearCsvData,
     clearTestData

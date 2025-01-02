@@ -6,6 +6,9 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <Adafruit_ADS1X15.h>
+
+// Create an instance of the ADS1115
+Adafruit_ADS1115 ads;
 #include "secret.h"
 #include <CircularBuffer.hpp>
 #include <ESPmDNS.h>
@@ -33,23 +36,59 @@ unsigned long ingitionStartTime = 0;
 unsigned long engineStartTime = 0;
 unsigned long dataCounter = 0;
 const float SAMPLE_PERIOD = 1.0/1000.0;  // ~1.16ms per sample at 860Hz
-struct SensorData {
-    float loadCell;
-    float pressure1;
-    float pressure2;
-    float temperature;
-    unsigned long readingsTimestamp;
-    unsigned long ingitionTimestamp;
-    unsigned long engineTimestamp;
+// Sensor types
+enum SensorType {
+    LOAD = 0,
+    PRESSURE = 1,
+    TEMPERATURE = 2
 };
 
-// Create a circular buffer to store 2000 readings
-#define BUFFER_SIZE 2000
+// Sensor configuration structure
+struct SensorConfig {
+    bool enabled;
+    SensorType type;
+    uint8_t adcChannel;
+    const char* name;
+    float conversionFactor;  // For converting voltage to actual units
+    float offset;           // For calibration offset
+};
+
+// Array of sensor configurations
+constexpr size_t SENSOR_COUNT = 8;
+SensorConfig sensorConfigs[SENSOR_COUNT] = {
+    {true, LOAD, 0, "LoadCell", 0.3025, 0},         // Channel 0: Load Cell 
+    {true, PRESSURE, 1, "Pressure1", 250.0, 0},     // Channel 1: Pressure Sensor 1
+    {true, PRESSURE, 2, "Pressure2", 250.0, 0},     // Channel 2: Pressure Sensor 2
+    {true, PRESSURE, 3, "Pressure3", 250.0, 0},     // Channel 3: Pressure Sensor 3
+    {true, PRESSURE, 4, "Pressure4", 250.0, 0},     // Channel 4: Pressure Sensor 4
+    {true, TEMPERATURE, 5, "Temperature1", 100.0, 0}, // Channel 5: Temperature Sensor 1
+    {true, TEMPERATURE, 6, "Temperature2", 100.0, 0}, // Channel 6: Temperature Sensor 2
+    {true, TEMPERATURE, 7, "Temperature3", 100.0, 0}  // Channel 7: Temperature Sensor 3
+};
+
+// Updated sensor data structure
+struct SensorData {
+    float values[SENSOR_COUNT];  // Fixed-size array for sensor values
+    unsigned long readingsTimestamp;
+    unsigned long ignitionTimestamp; 
+    unsigned long engineTimestamp;
+
+    SensorData() : readingsTimestamp(0), ignitionTimestamp(0), engineTimestamp(0) {
+        for(int i = 0; i < SENSOR_COUNT; i++) {
+            values[i] = 0.0f;
+        }
+    }
+};
+
+// Circular buffer to store sensor data
+constexpr size_t BUFFER_SIZE = 1000; // Reduced from 2000 to 1000
 CircularBuffer<SensorData, BUFFER_SIZE> dataBuffer;
+
 
 // Task handles
 TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t webSocketTaskHandle = NULL;
+
 
 // Mutex for buffer access
 portMUX_TYPE bufferMux = portMUX_INITIALIZER_UNLOCKED;
@@ -66,7 +105,9 @@ void IRAM_ATTR engineStartISR() {
 // Function to clear the buffer
 void clearBuffer() {
     portENTER_CRITICAL(&bufferMux);
-    dataBuffer.clear();
+    while (!dataBuffer.isEmpty()) {
+        dataBuffer.shift();
+    }
     portEXIT_CRITICAL(&bufferMux);
 }
 
@@ -74,25 +115,33 @@ void clearBuffer() {
 void sensorTask(void *parameter) {
     SensorData data;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    // Use exact frequency for ADS1115 max rate
-    const TickType_t xFrequency = pdMS_TO_TICKS(1); // 860Hz max
+    const TickType_t xFrequency = pdMS_TO_TICKS(1);
     
     while (true) {
-        // Precise timing for sensor reads
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         
         if (isReading) {
             portENTER_CRITICAL(&bufferMux);
             uint32_t currentTime = micros();
             data.readingsTimestamp = currentTime - readingsStartTime;
-            data.ingitionTimestamp = ingitedWire ? (currentTime - ingitionStartTime) : 0;
+            data.ignitionTimestamp = ingitedWire ? (currentTime - ingitionStartTime) : 0;
             
-            // Read sensors here with precise timing
-            data.loadCell = dataCounter++;
-            data.pressure1 = random(0, 100);
-            data.pressure2 = random(0, 100); 
-            data.temperature = random (50, 150);
-            
+            // Read enabled sensors
+            for (size_t i = 0; i < SENSOR_COUNT; i++) {
+                const SensorConfig& sensor = sensorConfigs[i];
+                if (sensor.enabled) {
+                    if (sensor.adcChannel < 8) { // ADS1215 has 8 channels (0-7)
+                        float voltage = random(0, 1000) / 1000.0f; // Placeholder for actual voltage reading
+                        data.values[i] = voltage * sensor.conversionFactor + sensor.offset;
+                    } else {
+                        Serial.printf("ADC Channel %u out of bounds!\n", sensor.adcChannel);
+                        data.values[i] = 0.0f;
+                    }
+                } else {
+                    data.values[i] = 0.0f;
+                }
+            }
+
             if (!dataBuffer.isFull()) {
                 dataBuffer.push(data);
             }
@@ -102,46 +151,57 @@ void sensorTask(void *parameter) {
 }
 
 // WebSocket communication task
-// WebSocket communication task
 void webSocketTask(void *parameter) {
     const size_t BATCH_SIZE = 20;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(20); // Fixed 50Hz rate for websocket updates
+    const TickType_t xFrequency = pdMS_TO_TICKS(20);
     
     while (true) {
-        // Use vTaskDelayUntil for precise timing
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        
         webSocket.loop();
-        
+
         if (isReading && !dataBuffer.isEmpty()) {
             JsonDocument doc;
-            doc.clear();
             JsonArray array = doc["data"].to<JsonArray>();
-            
-            // Use critical section for buffer access
+
             portENTER_CRITICAL(&bufferMux);
-            int count = 0;
+            size_t count = 0;
             while (!dataBuffer.isEmpty() && count < BATCH_SIZE) {
                 SensorData data = dataBuffer.shift();
                 JsonObject reading = array.add<JsonObject>();
-                
-                // Add high-precision timestamps
+
                 reading["t1"] = data.readingsTimestamp;
-                reading["t2"] = data.ingitionTimestamp;
-                reading["l"] = data.loadCell;
-                reading["p1"] = data.pressure1; 
-                reading["p2"] = data.pressure2;
-                reading["tp"] = data.temperature;
+                reading["t2"] = data.ignitionTimestamp;
+
+                // Add only enabled sensors to JSON with their names
+                for (size_t i = 0; i < SENSOR_COUNT; i++) {
+                    const SensorConfig& sensor = sensorConfigs[i];
+                    if (sensor.enabled) {
+                        reading[sensor.name] = data.values[i];
+                    }
+                }
                 count++;
             }
             portEXIT_CRITICAL(&bufferMux);
 
             if (count > 0) {
+                // Send sensor configuration on first message
+                if (dataCounter == 0) {
+                    JsonArray sensors = doc["sensors"].to<JsonArray>();
+                    for (size_t i = 0; i < SENSOR_COUNT; i++) {
+                        const SensorConfig& sensor = sensorConfigs[i];
+                        if (sensor.enabled) {
+                            JsonObject sensorObj = sensors.add<JsonObject>();
+                            sensorObj["name"] = sensor.name;
+                            sensorObj["type"] = sensor.type;
+                        }
+                    }
+                }
                 doc["type"] = "test_data";
                 String jsonString;
                 serializeJson(doc, jsonString);
                 webSocket.broadcastTXT(jsonString);
+                dataCounter++;
             }
         }
 
@@ -207,6 +267,18 @@ void setup() {
         Serial.println("SPIFFS Mount Failed");
         return;
     }
+    
+    // Initialize the ADS1115
+    if (!ads.begin()) {
+        Serial.println("Failed to initialize ADS.");
+    } else {
+        // Set ADC configuration
+        ads.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V
+        ads.setDataRate(RATE_ADS1115_860SPS); // Fastest sampling rate
+
+        Serial.println("ADS initialized.");
+    }
+
 
     pinMode(ENGINE_OUT_PIN, OUTPUT);
     pinMode(ENGINE_IN_PIN, INPUT_PULLUP);

@@ -1,89 +1,55 @@
 /* eslint-disable react/prop-types */
 import { 
-  VStack, Heading, SimpleGrid, GridItem, Box, Text, HStack, 
-   IconButton, useDisclosure, Modal, ModalOverlay, 
+  VStack, Heading, SimpleGrid, GridItem, Box, Text,
+  useDisclosure, Modal, ModalOverlay, 
   ModalContent, ModalBody, ModalCloseButton
 } from '@chakra-ui/react';
-import { DownloadIcon, RepeatIcon, ViewIcon } from '@chakra-ui/icons';
 import Controls from './Controls';
 import Chart from './Chart';
-import { useContext, useRef, useState} from 'react';
+import ChartControls from './ChartControls';
+import { useContext, useRef, useState } from 'react';
 import DataContext from '../hooks/DataContext';
 import { chartTheme } from '../config/chartConfig';
 
 
 const HomePage = () => {
-  const { testData, ignitionDelay } = useContext(DataContext);
+  const { testData, ignitionDelay, sensorConfig } = useContext(DataContext);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [activeChart, setActiveChart] = useState(null);
   const chartRefs = {
-    pressure: useRef(),
-    load: useRef(),
-    temperature: useRef(),
-    pressureFullScreen: useRef(),
-    loadFullScreen: useRef(),
-    temperatureFullScreen: useRef()
+    fullScreen: useRef(),
+    regular: useRef()
   };
 
+  // Define sensor type labels and colors
+  // Map numerical SensorType to string labels
+  const sensorTypeLabels = {
+    0: 'Load Cell',
+    1: 'Pressure',
+    2: 'Temperature',
 
-  const xAxis = testData.map(point => point.ignitionT ? point.ignitionT : point.readingsT);
-  const pressureY = [testData.map(point => point.p1), testData.map(point => point.p2)];
-  const loadCellY = [testData.map(point => point.l)];
-  const temperatureY = [testData.map(point => point.tp)];
-
-  const handleDownloadChart = (chartRef, title) => {
-    const link = document.createElement('a');
-    const now = new Date();
-    const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
-      .replace(' ', '_')
-      .replace(':', '-');
-    link.download = `${title}-${localDateTime}.png`;
-    link.href = chartRef.current.toBase64Image();
-    link.click();
-  };
-  const handleResetZoom = (chartRef, fullScreenRef) => {
-    const resetZoom = (ref) => {
-      if (ref?.current) {
-        ref.current.resetZoom();
-      }
-    };
-  
-    resetZoom(chartRef);
-    resetZoom(fullScreenRef);
+    default: 'Unknown Sensor',
   };
 
-  const ChartControls = ({ chartRef, fullScreenRef, title }) => (
-    <HStack 
-      spacing={2} 
-      position="absolute" 
-      top={2} 
-      right={2} 
-      zIndex={10} // Increase z-index
-      pointerEvents="auto" // Ensure clicks are captured
-    >
-      <IconButton
-        size="sm"
-        icon={<RepeatIcon />}
-        onClick={() => handleResetZoom(chartRef, fullScreenRef)}
-        aria-label="Reset zoom"
-      />
-      <IconButton
-        size="sm"
-        icon={<DownloadIcon />}
-        onClick={() => handleDownloadChart(chartRef, title)}
-        aria-label="Download chart"
-      />
-      <IconButton
-        size="sm"
-        icon={<ViewIcon />}
-        onClick={() => {
-          setActiveChart(title);
-          onOpen();
-        }}
-        aria-label="Fullscreen"
-      />
-    </HStack>
-  );
+  // Map numerical SensorType to corresponding colors
+  const sensorTypeColors = {
+    0: chartTheme.colors.loadCell,
+    1: chartTheme.colors.pressure,
+    2: chartTheme.colors.temperature,
+
+    default: '#000000', // Fallback color
+  };
+
+  // Group sensors by type (numerical)
+  const groupedSensors = sensorConfig.reduce((groups, sensor) => {
+    const type = sensor.type; // Numerical type
+    if (!groups[type]) {
+      groups[type] = [];
+    }
+    groups[type].push(sensor);
+    return groups;
+  }, {});
+
 
   return (
     <VStack spacing={6} w="full">
@@ -96,49 +62,31 @@ const HomePage = () => {
         </Text>
       )}
 
-      <SimpleGrid columns={1} spacing={8} w="full">
-
-          <Box p={6} bg="white" shadow="md" rounded="lg" position="relative" style={{ touchAction: 'pan-x pan-y' }}>
-            <Heading size="md" mb={4}>Pressure Sensors</Heading>
-            <ChartControls chartRef={chartRefs.pressure} fullScreenRef={chartRefs.pressureFullScreen} title="Pressure" />
-            <Chart
-              ref={chartRefs.pressure}
-              xAxis={xAxis}
-              yAxis={pressureY}
-              labels={['Pressure 1', 'Pressure 2']}
-              colors={[chartTheme.colors.pressure1, chartTheme.colors.pressure2]}
-              title="Pressure Sensors (Pre-Ignition)"
-            />
-          </Box>
-
-        <GridItem>
-          <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
-            <Heading size="md" mb={4}>Load Cell</Heading>
-            <ChartControls chartRef={chartRefs.load} fullScreenRef={chartRefs.loadFullScreen}  title="Load" />
-            <Chart
-              ref={chartRefs.load}
-              xAxis={xAxis}
-              yAxis={loadCellY}
-              labels={['Load Cell']}
-              colors={[chartTheme.colors.loadCell]}
-              title="Load Cell"
-            />
-          </Box>
-        </GridItem>
-        <GridItem>
-          <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
-            <Heading size="md" mb={4}>Temperature</Heading>
-            <ChartControls chartRef={chartRefs.temperature} fullScreenRef={chartRefs.temperatureFullScreen} title="Temperature" />
-            <Chart
-              ref={chartRefs.temperature}
-              xAxis={xAxis}
-              yAxis={temperatureY}
-              labels={['Temperature']}
-              colors={[chartTheme.colors.temperature]}
-              title="Temperature (Pre-Ignition)"
-            />
-          </Box>
-        </GridItem>
+<SimpleGrid columns={1} spacing={8} w="full">
+        {Object.keys(groupedSensors).map((type) => (
+          <GridItem key={type}>
+            <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
+              <Heading size="md" mb={4}>{sensorTypeLabels[type]}</Heading>
+              <ChartControls 
+                chartRef={chartRefs.regular}
+                fullScreenRef={chartRefs.fullScreen}
+                title={sensorTypeLabels[type]}
+                onOpen={onOpen}
+                setActiveChart={setActiveChart}
+              />
+              <Chart
+                ref={chartRefs.regular}
+                xAxis={testData.map(point => point.ignitionT ? point.ignitionT : point.readingsT)}
+                yAxis={groupedSensors[type].map(sensor => testData.map(point => point[sensor.name]))}
+                labels={groupedSensors[type].map(sensor => sensor.name)}
+                colors={groupedSensors[type].map((_, index) => 
+                  sensorTypeColors[type][index % sensorTypeColors[type].length]
+                )}
+                title={`${sensorTypeLabels[type]} Sensors`}
+              />
+            </Box>
+          </GridItem>
+        ))}
       </SimpleGrid>
 
       <Modal isOpen={isOpen} onClose={onClose} size="full">
@@ -146,34 +94,14 @@ const HomePage = () => {
         <ModalContent>
           <ModalCloseButton />
           <ModalBody>
-            {activeChart === "Pressure" && (
+          {activeChart && (
               <Chart
-                ref={chartRefs.pressureFullScreen}
-                xAxis={xAxis}
-                yAxis={pressureY}
-                labels={['Pressure 1', 'Pressure 2']}
-                colors={[chartTheme.colors.pressure1, chartTheme.colors.pressure2]}
-                title="Pressure Sensors"
-              />
-            )}
-            {activeChart === "Load" && (
-              <Chart
-                ref={chartRefs.loadFullScreen}
-                xAxis={xAxis}
-                yAxis={loadCellY}
-                labels={['Load Cell']}
-                colors={[chartTheme.colors.loadCell]}
-                title="Load Cell"
-              />
-            )}
-            {activeChart === "Temperature" && (
-              <Chart
-                ref={chartRefs.temperatureFullScreen}
-                xAxis={xAxis}
-                yAxis={temperatureY}
-                labels={['Temperature']}
-                colors={[chartTheme.colors.temperature]}
-                title="Temperature"
+                ref={chartRefs.fullScreen}
+                xAxis={testData.map(point => point.ignitionT ? point.ignitionT : point.readingsT)}
+                yAxis={groupedSensors[activeChart].map(sensor => testData.map(point => point[sensor.name]))}
+                labels={groupedSensors[activeChart].map(sensor => sensor.name)}
+                colors={groupedSensors[activeChart].map((_, index) => sensorTypeColors[activeChart][index % sensorTypeColors[activeChart].length])}
+                title={`${sensorTypeLabels[activeChart]} Sensors`}
               />
             )}
           </ModalBody>
