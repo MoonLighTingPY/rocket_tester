@@ -4,6 +4,11 @@ import Papa from 'papaparse';
 import AnalysisControls from './AnalysisControls';
 import AnalysisResults from './AnalysisResults';
 
+/**
+ * AnalysisPage handles CSV data uploads, calculates ignition delay, engine end time,
+ * integrates sensor data, and prepares results for display in
+ * [src/components/AnalysisResults.jsx](src/components/AnalysisResults.jsx).
+ */
 const AnalysisPage = () => {
   const [data, setData] = useState([]);
   const [analysisResults, setAnalysisResults] = useState(null);
@@ -19,35 +24,14 @@ const AnalysisPage = () => {
   });
   const [ignitionDelay, setIgnitionDelay] = useState(null);
 
-  const saveAnalysisResults = () => {
-    if (!analysisResults) return;
-  
-    const now = new Date();
-    const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
-      .replace(' ', '_')
-      .replace(':', '-');
-  
-    const filename = `analysis_results_${localDateTime}_` + 
-      `from_${analysisResults.partialIntegrationStartPoint.replace(/\s+/g, '_')}_` +
-      `to_${analysisResults.partialIntegrationEndPoint.replace(/\s+/g, '_')}_#_` +
-      `ignition_delay_${ignitionDelay?.toFixed(6) ?? 'none'}.json`;
-  
-    const resultsBlob = new Blob([JSON.stringify(analysisResults, null, 2)], 
-      { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(resultsBlob);
-    link.download = filename;
-    link.click();
-  };
-
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     const delayMatch = file.name.match(/ignition_delay_([\d.]+)\.csv$/);
-    
     if (delayMatch) {
       setIgnitionDelay(parseFloat(delayMatch[1]));
+    } else {
+      setIgnitionDelay(null);
     }
-
     Papa.parse(file, {
       header: true,
       dynamicTyping: true,
@@ -55,196 +39,237 @@ const AnalysisPage = () => {
     });
   };
 
+  /**
+   * [`calculateIgnitionDelay`](src/components/AnalysisPage.jsx) finds the crossing time
+   * where the chosen sensor type rises above a threshold.
+   */
   const calculateIgnitionDelay = useCallback((pressureThreshold, loadThreshold) => {
-  // Find the first pair of points where threshold is crossed
-  let startIndex = -1;
-  for (let i = 0; i < data.length - 1; i++) {
-    const current = settings.startCriterion === 'pressure'
-      ? Math.max(data[i]['Pressure1 (bar)'], data[i]['Pressure2 (bar)'])
-      : data[i]['Load (kg)'];
-    const next = settings.startCriterion === 'pressure'
-      ? Math.max(data[i + 1]['Pressure1 (bar)'], data[i + 1]['Pressure2 (bar)'])
-      : data[i + 1]['Load (kg)'];
-    
-    const threshold = settings.startCriterion === 'pressure' ? pressureThreshold : loadThreshold;
-    
-    if (current <= threshold && next > threshold) {
-      startIndex = i;
-      break;
+    if (!data.length) return null;
+    // Fallback if there aren't any recognized columns
+    const hasPressure = Object.keys(data[0]).some((col) => col.includes('Pressure'));
+    const hasLoad = Object.keys(data[0]).some((col) => col.includes('LoadCell'));
+
+    let startIndex = -1;
+    for (let i = 0; i < data.length - 1; i++) {
+      const current = settings.startCriterion === 'pressure' && hasPressure
+        ? Math.max(...Object.keys(data[i])
+            .filter((k) => k.includes('Pressure'))
+            .map((k) => data[i][k] || 0))
+        : hasLoad
+          ? Math.max(...Object.keys(data[i])
+              .filter((k) => k.includes('LoadCell'))
+              .map((k) => data[i][k] || 0))
+          : 0;
+      const next = settings.startCriterion === 'pressure' && hasPressure
+        ? Math.max(...Object.keys(data[i + 1])
+            .filter((k) => k.includes('Pressure'))
+            .map((k) => data[i + 1][k] || 0))
+        : hasLoad
+          ? Math.max(...Object.keys(data[i + 1])
+              .filter((k) => k.includes('LoadCell'))
+              .map((k) => data[i + 1][k] || 0))
+          : 0;
+
+      const threshold = settings.startCriterion === 'pressure' ? pressureThreshold : loadThreshold;
+      if (current <= threshold && next > threshold) {
+        startIndex = i;
+        break;
+      }
     }
-  }
-  
-  if (startIndex === -1) return null;
-  
-  // Linear interpolation
-  const p1 = settings.startCriterion === 'pressure'
-    ? Math.max(data[startIndex]['Pressure1 (bar)'], data[startIndex]['Pressure2 (bar)'])
-    : data[startIndex]['Load (kg)'];
-  const p2 = settings.startCriterion === 'pressure'
-    ? Math.max(data[startIndex + 1]['Pressure1 (bar)'], data[startIndex + 1]['Pressure2 (bar)'])
-    : data[startIndex + 1]['Load (kg)'];
-  const t1 = data[startIndex]['Timestamp (s)'];
-  const t2 = data[startIndex + 1]['Timestamp (s)'];
-  const threshold = settings.startCriterion === 'pressure' ? pressureThreshold : loadThreshold;
-  
-  // y = kx + b => x = (y - b) / k
-  const k = (p2 - p1) / (t2 - t1);
-  const b = p1 - k * t1;
-  const interpolatedTime = (threshold - b) / k;
-  
-  return interpolatedTime;
-}, [data, settings.startCriterion]);
+    if (startIndex === -1) return null;
 
-const findEngineEndTime = useCallback((threshold) => {
-  const ignitionIndex = data.findIndex(point => 
-    point['Timestamp (s)'] >= (ignitionDelay || 0)
-  );
+    // Values around the threshold crossing
+    const c1 = settings.startCriterion === 'pressure' && hasPressure
+      ? Math.max(...Object.keys(data[startIndex])
+          .filter((k) => k.includes('Pressure'))
+          .map((k) => data[startIndex][k] || 0))
+      : hasLoad
+        ? Math.max(...Object.keys(data[startIndex])
+            .filter((k) => k.includes('LoadCell'))
+            .map((k) => data[startIndex][k] || 0))
+        : 0;
+    const c2 = settings.startCriterion === 'pressure' && hasPressure
+      ? Math.max(...Object.keys(data[startIndex + 1])
+          .filter((k) => k.includes('Pressure'))
+          .map((k) => data[startIndex + 1][k] || 0))
+      : hasLoad
+        ? Math.max(...Object.keys(data[startIndex + 1])
+            .filter((k) => k.includes('LoadCell'))
+            .map((k) => data[startIndex + 1][k] || 0))
+        : 0;
+    const t1 = data[startIndex]['Timestamp (s)'];
+    const t2 = data[startIndex + 1]['Timestamp (s)'];
+    const threshold = settings.startCriterion === 'pressure' ? pressureThreshold : loadThreshold;
+    const k = (c2 - c1) / (t2 - t1);
+    const b = c1 - k * t1;
+    const interpolatedTime = (threshold - b) / k;
+    return interpolatedTime;
+  }, [data, settings.startCriterion]);
 
-  if (ignitionIndex === -1) return null;
+  /**
+   * [`findEngineEndTime`](src/components/AnalysisPage.jsx) finds when the chosen sensor type drops below a threshold.
+   */
+  const findEngineEndTime = useCallback((threshold) => {
+    if (!data.length) return null;
+    if (!Object.keys(data[0]).some((col) => col.includes('Pressure') || col.includes('LoadCell'))) {
+      return null;
+    }
+    const ignitionIndex = data.findIndex((point) => point['Timestamp (s)'] >= (ignitionDelay || 0));
+    if (ignitionIndex === -1) return null;
 
-  const CONSECUTIVE_POINTS = 5;
+    const CONSECUTIVE_POINTS = 5;
+    const headers = Object.keys(data[0]).filter((key) => key !== 'Timestamp (s)');
+    const relevantHeaders = settings.endCriterion === 'pressure'
+      ? headers.filter((h) => h.includes('Pressure'))
+      : headers.filter((h) => h.includes('LoadCell'));
 
-  const highestPointIndex = data.reduce((maxIndex, point, index) => {
-    const currentValue = settings.endCriterion === 'pressure'
-      ? Math.max(point['Pressure1 (bar)'], point['Pressure2 (bar)'])
-      : point['Load (kg)'];
-    const maxValue = settings.endCriterion === 'pressure'
-      ? Math.max(data[maxIndex]['Pressure1 (bar)'], data[maxIndex]['Pressure2 (bar)'])
-      : data[maxIndex]['Load (kg)'];
-    return currentValue > maxValue ? index : maxIndex;
-  }, ignitionIndex);
+    if (!relevantHeaders.length) return null;
 
-  // Find where value drops below threshold consistently
-  for (let i = highestPointIndex; i < data.length - 1; i++) {
-    const current = settings.endCriterion === 'pressure'
-      ? Math.max(data[i]['Pressure1 (bar)'], data[i]['Pressure2 (bar)'])
-      : data[i]['Load (kg)'];
-    const next = settings.endCriterion === 'pressure'
-      ? Math.max(data[i + 1]['Pressure1 (bar)'], data[i + 1]['Pressure2 (bar)'])
-      : data[i + 1]['Load (kg)'];
+    const getMaxValue = (point) => Math.max(...relevantHeaders.map((h) => point[h] || 0));
+    const highestPointIndex = data.reduce((maxIndex, point, index) => {
+      const currentValue = getMaxValue(point);
+      const maxValue = getMaxValue(data[maxIndex]);
+      return currentValue > maxValue ? index : maxIndex;
+    }, ignitionIndex);
 
-    if (current >= threshold && next < threshold) {
-      // Linear interpolation for end point
-      const p1 = current;
-      const p2 = next;
-      const t1 = data[i]['Timestamp (s)'];
-      const t2 = data[i + 1]['Timestamp (s)'];
-      
-      const k = (p2 - p1) / (t2 - t1);
-      const b = p1 - k * t1;
-      const interpolatedTime = (threshold - b) / k;
-
-      // Verify the next points stay below threshold
-      let allBelow = true;
-      for (let j = i + 1; j < Math.min(i + 1 + CONSECUTIVE_POINTS, data.length); j++) {
-        const value = settings.endCriterion === 'pressure'
-          ? Math.max(data[j]['Pressure1 (bar)'], data[j]['Pressure2 (bar)'])
-          : data[j]['Load (kg)'];
-        if (value >= threshold) {
-          allBelow = false;
-          break;
+    for (let i = highestPointIndex; i < data.length - 1; i++) {
+      const current = getMaxValue(data[i]);
+      const next = getMaxValue(data[i + 1]);
+      if (current >= threshold && next < threshold) {
+        const p1 = current;
+        const p2 = next;
+        const t1 = data[i]['Timestamp (s)'];
+        const t2 = data[i + 1]['Timestamp (s)'];
+        const k = (p2 - p1) / (t2 - t1);
+        const b = p1 - k * t1;
+        const interpolatedTime = (threshold - b) / k;
+        let allBelow = true;
+        for (let j = i + 1; j < Math.min(i + 1 + CONSECUTIVE_POINTS, data.length); j++) {
+          if (getMaxValue(data[j]) >= threshold) {
+            allBelow = false;
+            break;
+          }
+        }
+        if (allBelow) {
+          return interpolatedTime;
         }
       }
-      
-      if (allBelow) {
-        return interpolatedTime;
-      }
     }
-  }
+    return null;
+  }, [data, settings.endCriterion, ignitionDelay]);
 
-  return null;
-}, [data, settings.endCriterion, ignitionDelay]);
+  /**
+   * [`calculateIntegrals`](src/components/AnalysisPage.jsx) calculates partial and full integrals
+   * as well as min, max, and avg for each sensor type.
+   */
   const calculateIntegrals = useCallback((startTime, endTime) => {
-    const relevantData = data.filter(point => 
-      point['Timestamp (s)'] >= startTime && 
-      point['Timestamp (s)'] <= endTime
+    if (!data.length) return null;
+
+    const relevantData = data.filter((point) =>
+      point['Timestamp (s)'] >= startTime && point['Timestamp (s)'] <= endTime
     );
-    // from first ever timestamp to the last timestamp
-    const fullRelevantData = data.filter(point =>
+    const fullRelevantData = data.filter((point) =>
       point['Timestamp (s)'] >= data[0]['Timestamp (s)'] &&
       point['Timestamp (s)'] <= data[data.length - 1]['Timestamp (s)']
     );
 
-  
     const trapezoidalIntegral = (points, yKey) => {
       let integral = 0;
       for (let i = 1; i < points.length; i++) {
-        const dt = points[i]['Timestamp (s)'] - points[i-1]['Timestamp (s)'];
-        const y1 = points[i-1][yKey];
-        const y2 = points[i][yKey];
-        // S = dt * (y1 + y2) / 2
+        const dt = points[i]['Timestamp (s)'] - points[i - 1]['Timestamp (s)'];
+        const y1 = points[i - 1][yKey] || 0;
+        const y2 = points[i][yKey] || 0;
         integral += dt * (y1 + y2) / 2;
       }
       return integral;
     };
-  
-    const pressureIntegral1 = trapezoidalIntegral(relevantData, 'Pressure1 (bar)');
-    const pressureIntegral2 = trapezoidalIntegral(relevantData, 'Pressure2 (bar)');
-    const loadIntegral = trapezoidalIntegral(relevantData, 'Load (kg)');
-    const temperatureIntegral = trapezoidalIntegral(relevantData, 'Temperature (°C)');
-  
-    const fullPressureIntegral1 = trapezoidalIntegral(fullRelevantData, 'Pressure1 (bar)');
-    const fullPressureIntegral2 = trapezoidalIntegral(fullRelevantData, 'Pressure2 (bar)');
-    const fullLoadIntegral = trapezoidalIntegral(fullRelevantData, 'Load (kg)');
-    const fullTemperatureIntegral = trapezoidalIntegral(fullRelevantData, 'Temperature (°C)');
-  
+
+    const allHeaders = Object.keys(data[0]).filter((key) => key !== 'Timestamp (s)');
+    const loadHeaders = allHeaders.filter((h) => h.toLowerCase().includes('loadcell'));
+    const pressureHeaders = allHeaders.filter((h) => h.toLowerCase().includes('pressure'));
+    const temperatureHeaders = allHeaders.filter((h) => h.toLowerCase().includes('temperature'));
+
+    const integrals = {
+      partial: {
+        load: loadHeaders.map((header) => ({
+          name: header,
+          value: trapezoidalIntegral(relevantData, header),
+        })),
+        pressure: pressureHeaders.map((header) => ({
+          name: header,
+          value: trapezoidalIntegral(relevantData, header),
+        })),
+        temperature: temperatureHeaders.map((header) => ({
+          name: header,
+          value: trapezoidalIntegral(relevantData, header),
+        })),
+      },
+      full: {
+        load: loadHeaders.map((header) => ({
+          name: header,
+          value: trapezoidalIntegral(fullRelevantData, header),
+        })),
+        pressure: pressureHeaders.map((header) => ({
+          name: header,
+          value: trapezoidalIntegral(fullRelevantData, header),
+        })),
+        temperature: temperatureHeaders.map((header) => ({
+          name: header,
+          value: trapezoidalIntegral(fullRelevantData, header),
+        })),
+      },
+    };
 
     const calculateStats = (values) => {
-      const filteredValues = values.filter(v => v !== undefined && !isNaN(v));
-      if (filteredValues.length === 0) return { min: 0, max: 0, avg: 0 };
-  
+      const filteredValues = values.filter((v) => v !== undefined && !isNaN(v));
+      if (!filteredValues.length) return { min: 0, max: 0, avg: 0 };
       return {
         min: Math.min(...filteredValues),
         max: Math.max(...filteredValues),
-        avg: filteredValues.reduce((a, b) => a + b, 0) / filteredValues.length
+        avg: filteredValues.reduce((a, b) => a + b, 0) / filteredValues.length,
       };
     };
-  
-    const pressure1Stats = calculateStats(relevantData.map(point => point['Pressure1 (bar)']));
-    const pressure2Stats = calculateStats(relevantData.map(point => point['Pressure2 (bar)']));
-    const loadStats = calculateStats(relevantData.map(point => point['Load (kg)']));
-    const temperatureStats = calculateStats(relevantData.map(point => point['Temperature (°C)']));
-  
-    return {
-      partialIntegralDuration: (endTime - startTime),
-      partialPressureIntegral1: pressureIntegral1,
-      partialPressureIntegral2: pressureIntegral2,
-      partialLoadIntegral: loadIntegral,
-      partialTemperatureIntegral: temperatureIntegral,
-      fullIntegralDuration: data[data.length - 1]['Timestamp (s)'] - data[0]['Timestamp (s)'],
-      fullPressureIntegral1,
-      fullPressureIntegral2,
-      fullLoadIntegral,
-      fullTemperatureIntegral,
 
-      minPressure1: pressure1Stats.min,
-      maxPressure1: pressure1Stats.max,
-      avgPressure1: pressure1Stats.avg,
-      minPressure2: pressure2Stats.min,
-      maxPressure2: pressure2Stats.max,
-      avgPressure2: pressure2Stats.avg,
-      minLoad: loadStats.min,
-      maxLoad: loadStats.max,
-      avgLoad: loadStats.avg,
-      minTemperature: temperatureStats.min,
-      maxTemperature: temperatureStats.max,
-      avgTemperature: temperatureStats.avg,
+    const stats = {
+      load: loadHeaders.map((header) => ({
+        name: header,
+        ...calculateStats(relevantData.map((point) => point[header])),
+      })),
+      pressure: pressureHeaders.map((header) => ({
+        name: header,
+        ...calculateStats(relevantData.map((point) => point[header])),
+      })),
+      temperature: temperatureHeaders.map((header) => ({
+        name: header,
+        ...calculateStats(relevantData.map((point) => point[header])),
+      })),
+    };
+
+    return {
+      partialIntegralDuration: endTime - startTime,
+      fullIntegralDuration: data[data.length - 1]['Timestamp (s)'] - data[0]['Timestamp (s)'],
+      integrals,
+      stats,
     };
   }, [data]);
-  
+
+  /**
+   * runAnalysis ties everything together and populates analysisResults for
+   * [src/components/AnalysisResults.jsx](src/components/AnalysisResults.jsx).
+   */
   const runAnalysis = () => {
     if (!data.length) return;
-  
     const thresholdBasedDelay = calculateIgnitionDelay(
       settings.ignitionPressureThreshold,
       settings.ignitionLoadThreshold
     );
     const engineEndTime = findEngineEndTime(
-      settings.endCriterion === 'pressure' ? 
-        settings.endPressureThreshold : 
-        settings.endLoadThreshold
+      settings.endCriterion === 'pressure'
+        ? settings.endPressureThreshold
+        : settings.endLoadThreshold
     );
-  
+
+    // Determine startTime
     let startTime;
     let startTimeLabel;
     switch (settings.integrationStart) {
@@ -254,29 +279,30 @@ const findEngineEndTime = useCallback((threshold) => {
         break;
       case 'pressure':
         startTime = thresholdBasedDelay ?? data[0]['Timestamp (s)'];
-        startTimeLabel = thresholdBasedDelay ? 
-          (settings.startCriterion === 'pressure' ? 'Pressure Rise' : 'Load Rise') :
-          'First Timestamp (Threshold not met)';
+        startTimeLabel = thresholdBasedDelay
+          ? (settings.startCriterion === 'pressure' ? 'Pressure Rise' : 'Load Rise')
+          : 'First Timestamp (Threshold not met)';
         break;
       case 'ignition':
         startTime = ignitionDelay ?? data[0]['Timestamp (s)'];
-        startTimeLabel = ignitionDelay ? 
-          'Real Ignition' : 
-          'First Timestamp (No ignition detected)';
+        startTimeLabel = ignitionDelay
+          ? 'Real Ignition'
+          : 'First Timestamp (No ignition detected)';
         break;
       default:
         startTime = data[0]['Timestamp (s)'];
         startTimeLabel = 'First Timestamp';
     }
-  
+
+    // Determine endTime
     let endTime;
     let endTimeLabel;
     switch (settings.integrationEnd) {
       case 'threshold':
         endTime = engineEndTime ?? data[data.length - 1]['Timestamp (s)'];
-        endTimeLabel = engineEndTime ? 
-          (settings.endCriterion === 'pressure' ? 'Pressure Drop' : 'Load Drop') :
-          'Last Timestamp (Threshold not met)';
+        endTimeLabel = engineEndTime
+          ? (settings.endCriterion === 'pressure' ? 'Pressure Drop' : 'Load Drop')
+          : 'Last Timestamp (Threshold not met)';
         break;
       case 'button':
         endTime = data[data.length - 1]['Timestamp (s)'];
@@ -286,82 +312,43 @@ const findEngineEndTime = useCallback((threshold) => {
         endTime = data[data.length - 1]['Timestamp (s)'];
         endTimeLabel = 'Last Timestamp';
     }
-  
 
-const results = calculateIntegrals(startTime, endTime);
-setAnalysisResults({
-  partialIntegrationStartPoint: startTimeLabel,
-  partialIntegrationEndPoint: endTimeLabel,      
-  partialIntegrationStartTime: startTime,
-  partialIntegrationEndTime: endTime,
-  ...results,
-ignitionDelay: ignitionDelay,
-  metadata: {
-    units: {
-      time: "seconds",
-      pressure: "bar",
-      load: "kg",
-      temperature: "°C",
-      pressureIntegral: "bar·s",
-      loadIntegral: "kg·s",
-      temperatureIntegral: "°C·s"
-    }
-  },
-  measurements: {
-    pressure: {
-      avg1: { value: results.avgPressure1, unit: "bar" },
-      avg2: { value: results.avgPressure2, unit: "bar" },
-      min1: { value: results.minPressure1, unit: "bar" },
-      max1: { value: results.maxPressure1, unit: "bar" },
-      min2: { value: results.minPressure2, unit: "bar" },
-      max2: { value: results.maxPressure2, unit: "bar" }
-    },
-    load: {
-      avg: { value: results.avgLoad, unit: "kg" },
-      min: { value: results.minLoad, unit: "kg" },
-      max: { value: results.maxLoad, unit: "kg" }
-    },
-    temperature: {
-      avg: { value: results.avgTemperature, unit: "°C" },
-      min: { value: results.minTemperature, unit: "°C" },
-      max: { value: results.maxTemperature, unit: "°C" }
-    },
-    integrals: {
-      partial: {
-        duration: { value: results.partialIntegralDuration, unit: "s" },
-        pressure1: { value: results.partialPressureIntegral1, unit: "bar·s" },
-        pressure2: { value: results.partialPressureIntegral2, unit: "bar·s" },
-        load: { value: results.partialLoadIntegral, unit: "kg·s" },
-        temperature: { value: results.partialTemperatureIntegral, unit: "°C·s" }
-      },
-      full: {
-        duration: { value: results.fullIntegralDuration, unit: "s" },
-        pressure1: { value: results.fullPressureIntegral1, unit: "bar·s" },
-        pressure2: { value: results.fullPressureIntegral2, unit: "bar·s" },
-        load: { value: results.fullLoadIntegral, unit: "kg·s" },
-        temperature: { value: results.fullTemperatureIntegral, unit: "°C·s" }
-      }
-    },
-    delays: {
-      ignitionDelay: { value: ignitionDelay, unit: "s" },
-      thresholdBasedDelay: { value: thresholdBasedDelay, unit: "s" },
-      engineEnd: { value: endTime, unit: "s" },
-      integrationStart: { value: startTime, unit: "s" }
-    },
-    integrationPoints: {
-      start: startTimeLabel,
-      end: endTimeLabel
-    }
-  }
-});
+    const results = calculateIntegrals(startTime, endTime);
+    if (!results) return;
+
+    // Keep these high-level items for displaying in AnalysisResults
+    setAnalysisResults({
+      partialIntegrationStartPoint: startTimeLabel,
+      partialIntegrationEndPoint: endTimeLabel,
+      partialIntegrationStartTime: startTime,
+      partialIntegrationEndTime: endTime,
+      partialIntegralDuration: results.partialIntegralDuration,
+      fullIntegralDuration: results.fullIntegralDuration,
+      ignitionDelay_RealIgnitionTimestamp: ignitionDelay,
+      integrals: results.integrals,
+      stats: results.stats,
+    });
+  };
+
+  const saveAnalysisResults = () => {
+    if (!analysisResults) return;
+    const now = new Date();
+    const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
+      .replace(' ', '_')
+      .replace(':', '-');
+    const filename = `analysis_results_${localDateTime}_from_${analysisResults.partialIntegrationStartPoint
+      .replace(/\s+/g, '_')}_
+      to_${analysisResults.partialIntegrationEndPoint.replace(/\s+/g, '_')}_#_
+      ignition_delay_${ignitionDelay?.toFixed(6) ?? 'none'}.json`;
+    const resultsBlob = new Blob([JSON.stringify(analysisResults, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(resultsBlob);
+    link.download = filename;
+    link.click();
   };
 
   return (
-    <Box 
-      p={[4, 6, 8]} 
-      maxW="1200px" 
-      mx="auto"
-    >
+    <Box p={[4, 6, 8]} maxW="1200px" mx="auto">
       <VStack spacing={8} align="stretch">
         <AnalysisControls
           settings={settings}
@@ -370,27 +357,19 @@ ignitionDelay: ignitionDelay,
           runAnalysis={runAnalysis}
           data={data}
         />
-        <Box
-          bg="white"
-          shadow="lg"
-          rounded="xl"
-          p={8}
-          w="full"
-        >
+        <Box bg="white" shadow="lg" rounded="xl" p={8} w="full">
           <AnalysisResults analysisResults={analysisResults} />
           {analysisResults && (
-          <Button
-            colorScheme="green"
-            size="lg"
-            w="full"
-            mt={4}
-            onClick={saveAnalysisResults}
-            _hover={{ transform: 'translateY(-2px)' }}
-            transition="all 0.2s"
-          >
-            Save Analysis Results
-          </Button>
-        )}
+            <Button
+              colorScheme="green"
+              size="lg"
+              w="full"
+              mt={4}
+              onClick={saveAnalysisResults}
+            >
+              Save Analysis Results
+            </Button>
+          )}
         </Box>
       </VStack>
     </Box>
