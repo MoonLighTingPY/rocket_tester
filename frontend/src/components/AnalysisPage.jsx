@@ -324,7 +324,7 @@ const AnalysisPage = () => {
       partialIntegrationEndTime: endTime,
       partialIntegralDuration: results.partialIntegralDuration,
       fullIntegralDuration: results.fullIntegralDuration,
-      ignitionDelay_RealIgnitionTimestamp: ignitionDelay,
+      ignitionDelay,
       integrals: results.integrals,
       stats: results.stats,
     });

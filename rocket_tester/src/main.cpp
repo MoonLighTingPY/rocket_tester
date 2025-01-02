@@ -56,14 +56,14 @@ struct SensorConfig {
 // Array of sensor configurations
 constexpr size_t SENSOR_COUNT = 8;
 SensorConfig sensorConfigs[SENSOR_COUNT] = {
-    {true, LOAD, 0, "LoadCell", 0.3025, 0},         // Channel 0: Load Cell 
-    {true, PRESSURE, 1, "Pressure1", 250.0, 0},     // Channel 1: Pressure Sensor 1
-    {true, PRESSURE, 2, "Pressure2", 250.0, 0},     // Channel 2: Pressure Sensor 2
-    {true, PRESSURE, 3, "Pressure3", 250.0, 0},     // Channel 3: Pressure Sensor 3
-    {true, PRESSURE, 4, "Pressure4", 250.0, 0},     // Channel 4: Pressure Sensor 4
-    {true, TEMPERATURE, 5, "Temperature1", 100.0, 0}, // Channel 5: Temperature Sensor 1
-    {true, TEMPERATURE, 6, "Temperature2", 100.0, 0}, // Channel 6: Temperature Sensor 2
-    {true, TEMPERATURE, 7, "Temperature3", 100.0, 0}  // Channel 7: Temperature Sensor 3
+    {true, LOAD, 0, "LoadCell1", 0.3025, 0},         // Channel 0: Load Cell 
+    {true, LOAD, 1, "LoadCell2", 0.3025, 0},         // Channel 1: Load Cell 2
+    {true, PRESSURE, 2, "Pressure1", 250.0, 0},     // Channel 2: Pressure Sensor 2
+    {false, PRESSURE, 3, "Pressure2", 250.0, 0},     // Channel 3: Pressure Sensor 3
+    {true, PRESSURE, 4, "Pressure3", 250.0, 0},     // Channel 4: Pressure Sensor 4
+    {false, TEMPERATURE, 5, "Temperature1", 100.0, 0}, // Channel 5: Temperature Sensor 1
+    {false, TEMPERATURE, 6, "Temperature2", 100.0, 0}, // Channel 6: Temperature Sensor 2
+    {false, TEMPERATURE, 7, "Temperature3", 100.0, 0}  // Channel 7: Temperature Sensor 3
 };
 
 // Updated sensor data structure
