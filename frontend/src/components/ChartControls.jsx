@@ -1,37 +1,35 @@
-// src/components/ChartControls.jsx
 import { HStack, IconButton } from '@chakra-ui/react';
 import { RepeatIcon, DownloadIcon, ViewIcon } from '@chakra-ui/icons';
 import PropTypes from 'prop-types';
 
 const ChartControls = ({ 
   chartRef, 
-  fullScreenRef, 
   title,
   onOpen,
-  setActiveChart 
+  setActiveChart,
+  onDownload,
+  onResetZoom 
 }) => {
-
   const handleDownload = () => {
-    const ref = fullScreenRef?.current ? fullScreenRef : chartRef;
-    if (!ref?.current) return;
-
-    const link = document.createElement('a');
-    const now = new Date();
-    const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
-      .replace(' ', '_')
-      .replace(':', '-');
-    link.download = `${title}-${localDateTime}.png`;
-    link.href = ref.current.toBase64Image();
-    link.click();
+    if (onDownload) {
+      onDownload();
+    } else if (chartRef?.current?.toBase64Image) {
+      const link = document.createElement('a');
+      const now = new Date();
+      const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
+        .replace(' ', '_')
+        .replace(':', '-');
+      link.download = `${title}-${localDateTime}.png`;
+      link.href = chartRef.current.toBase64Image();
+      link.click();
+    }
   };
 
   const handleResetZoom = () => {
-    // Reset both regular and fullscreen charts if they exist
-    if (chartRef?.current?.resetZoom) {
+    if (onResetZoom) {
+      onResetZoom();
+    } else if (chartRef?.current?.resetZoom) {
       chartRef.current.resetZoom();
-    }
-    if (fullScreenRef?.current?.resetZoom) {
-      fullScreenRef.current.resetZoom();  
     }
   };
 
@@ -72,13 +70,14 @@ const ChartControls = ({
 };
 
 ChartControls.propTypes = {
-  chartRef: PropTypes.shape({ current: PropTypes.object }),
-  fullScreenRef: PropTypes.shape({ current: PropTypes.object }),
+  chartRef: PropTypes.shape({
+    current: PropTypes.object
+  }),
   title: PropTypes.string.isRequired,
-  onDownload: PropTypes.func,
-  onResetZoom: PropTypes.func,
   onOpen: PropTypes.func.isRequired,
-  setActiveChart: PropTypes.func.isRequired
+  setActiveChart: PropTypes.func.isRequired,
+  onDownload: PropTypes.func,
+  onResetZoom: PropTypes.func
 };
 
 export default ChartControls;

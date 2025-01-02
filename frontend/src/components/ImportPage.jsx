@@ -36,9 +36,9 @@ const ImportPage = () => {
   }, [csvHeaders]);
 
   const handleDownloadChart = (header) => {
-    const chartInstance = chartRefs.current[header];
+    const chartInstance = chartRefs.current[header]?.current;
     if (!chartInstance) return;
-    
+      
     const link = document.createElement('a');
     const now = new Date();
     const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })

@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+
 import { 
   VStack, Heading, SimpleGrid, GridItem, Box, Text,
   useDisclosure, Modal, ModalOverlay, 
@@ -16,10 +16,12 @@ const HomePage = () => {
   const { testData, ignitionDelay, sensorConfig } = useContext(DataContext);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [activeChart, setActiveChart] = useState(null);
-  const chartRefs = {
-    fullScreen: useRef(),
-    regular: useRef()
-  };
+  const chartRefs = useRef({
+    0: { regular: null, fullScreen: null }, // Load Cell
+    1: { regular: null, fullScreen: null }, // Pressure
+    2: { regular: null, fullScreen: null }, // Temperature
+  });
+
 
   // Define sensor type labels and colors
   // Map numerical SensorType to string labels
@@ -62,20 +64,47 @@ const HomePage = () => {
         </Text>
       )}
 
-<SimpleGrid columns={1} spacing={8} w="full">
+      <SimpleGrid columns={1} spacing={8} w="full">
         {Object.keys(groupedSensors).map((type) => (
           <GridItem key={type}>
             <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
               <Heading size="md" mb={4}>{sensorTypeLabels[type]}</Heading>
               <ChartControls 
-                chartRef={chartRefs.regular}
-                fullScreenRef={chartRefs.fullScreen}
-                title={sensorTypeLabels[type]}
-                onOpen={onOpen}
-                setActiveChart={setActiveChart}
-              />
-              <Chart
-                ref={chartRefs.regular}
+  chartRef={chartRefs.current[type]?.regular?.current}  // Changed this line
+  title={sensorTypeLabels[type]}
+  onOpen={onOpen}
+  setActiveChart={() => setActiveChart(type)}
+  onResetZoom={() => {
+    const chart = chartRefs.current[type]?.regular?.current;  // Changed this line
+    if (chart?.resetZoom) {
+      chart.resetZoom();
+    }
+  }}
+  onDownload={() => {
+    const chart = chartRefs.current[type]?.regular?.current;  // Changed this line
+    if (chart?.toBase64Image) {
+      const link = document.createElement('a');
+      const now = new Date();
+      const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
+        .replace(' ', '_')
+        .replace(':', '-');
+      link.download = `${sensorTypeLabels[type]}-${localDateTime}.png`;
+      link.href = chart.toBase64Image();
+      link.click();
+    }
+  }}
+/>
+<Chart
+  ref={el => {
+    if (el) {
+      chartRefs.current[type] = {
+        ...chartRefs.current[type],
+        regular: {
+          current: el
+        }
+      };
+    }
+  }}
                 xAxis={testData.map(point => point.ignitionT ? point.ignitionT : point.readingsT)}
                 yAxis={groupedSensors[type].map(sensor => testData.map(point => point[sensor.name]))}
                 labels={groupedSensors[type].map(sensor => sensor.name)}
@@ -94,13 +123,22 @@ const HomePage = () => {
         <ModalContent>
           <ModalCloseButton />
           <ModalBody>
-          {activeChart && (
+            {activeChart !== null && (
               <Chart
-                ref={chartRefs.fullScreen}
+              ref={el => {
+                if (el) {
+                  chartRefs.current[activeChart] = {
+                    ...chartRefs.current[activeChart],
+                    fullScreen: el
+                  };
+                }
+              }}
                 xAxis={testData.map(point => point.ignitionT ? point.ignitionT : point.readingsT)}
                 yAxis={groupedSensors[activeChart].map(sensor => testData.map(point => point[sensor.name]))}
                 labels={groupedSensors[activeChart].map(sensor => sensor.name)}
-                colors={groupedSensors[activeChart].map((_, index) => sensorTypeColors[activeChart][index % sensorTypeColors[activeChart].length])}
+                colors={groupedSensors[activeChart].map((_, index) => 
+                  sensorTypeColors[activeChart][index % sensorTypeColors[activeChart].length]
+                )}
                 title={`${sensorTypeLabels[activeChart]} Sensors`}
               />
             )}
