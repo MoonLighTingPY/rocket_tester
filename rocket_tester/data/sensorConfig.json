@@ -1,52 +1,68 @@
 {
-    "config": [
-      {
-        "enabled": true,
-        "adcChannel": 0,
-        "conversionFactor": 0.3025,
-        "offset": 0
-      },
-      {
-        "enabled": true, 
-        "adcChannel": 1,
-        "conversionFactor": 0.3025,
-        "offset": 0
-      },
-      {
-        "enabled": true,
-        "adcChannel": 2,
-        "conversionFactor": 250.0,
-        "offset": 0
-      },
-      {
-        "enabled": false,
-        "adcChannel": 3,
-        "conversionFactor": 250.0,
-        "offset": 0
-      },
-      {
-        "enabled": true,
-        "adcChannel": 4,
-        "conversionFactor": 250.0,
-        "offset": 0
-      },
-      {
-        "enabled": false,
-        "adcChannel": 5,
-        "conversionFactor": 100.0,
-        "offset": 0
-      },
-      {
-        "enabled": false,
-        "adcChannel": 6,
-        "conversionFactor": 100.0,
-        "offset": 0
-      },
-      {
-        "enabled": false,
-        "adcChannel": 7,
-        "conversionFactor": 100.0,
-        "offset": 0
-      }
-    ]
-  }
+  "config": [
+    {
+      "enabled": true,
+      "type": 0,
+      "name": "LoadCell1",
+      "adcChannel": 0,
+      "conversionFactor": 0.3025,
+      "offset": 0
+    },
+    {
+      "enabled": true,
+      "type": 0,
+      "name": "LoadCell2", 
+      "adcChannel": 1,
+      "conversionFactor": 0.3025,
+      "offset": 0
+    },
+    {
+      "enabled": true,
+      "type": 1,
+      "name": "Pressure1",
+      "adcChannel": 2,
+      "conversionFactor": 250.0,
+      "offset": 0
+    },
+    {
+      "enabled": true,
+      "type": 1,
+      "name": "Pressure2",
+      "adcChannel": 3,
+      "conversionFactor": 250.0,
+      "offset": 0
+    },
+    {
+      "enabled": true,
+      "type": 1,
+      "name": "Pressure3",
+      "adcChannel": 4,
+      "conversionFactor": 250.0,
+      "offset": 0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "name": "Temperature1",
+      "adcChannel": 5,
+      "conversionFactor": 100.0,
+      "offset": 0
+    },
+    {
+      "enabled": true, 
+      "type": 2,
+      "name": "Temperature2",
+      "adcChannel": 6,
+      "conversionFactor": 100.0,
+      "offset": 0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "name": "Temperature3",
+      "adcChannel": 7,
+      "conversionFactor": 100.0,
+      "offset": 0
+    }
+  ]
+}

@@ -57,10 +57,10 @@ struct SensorConfig {
 constexpr size_t SENSOR_COUNT = 8;
 SensorConfig sensorConfigs[SENSOR_COUNT] = {
     {true, LOAD, 0, "LoadCell1", 0.3025, 0},         // Channel 0: Load Cell 
-    {true, LOAD, 1, "LoadCell2", 0.3025, 0},         // Channel 1: Load Cell 2
-    {true, PRESSURE, 2, "Pressure1", 250.0, 0},     // Channel 2: Pressure Sensor 2
+    {false, LOAD, 1, "LoadCell2", 0.3025, 0},         // Channel 1: Load Cell 2
+    {false, PRESSURE, 2, "Pressure1", 250.0, 0},     // Channel 2: Pressure Sensor 2
     {false, PRESSURE, 3, "Pressure2", 250.0, 0},     // Channel 3: Pressure Sensor 3
-    {true, PRESSURE, 4, "Pressure3", 250.0, 0},     // Channel 4: Pressure Sensor 4
+    {false, PRESSURE, 4, "Pressure3", 250.0, 0},     // Channel 4: Pressure Sensor 4
     {false, TEMPERATURE, 5, "Temperature1", 100.0, 0}, // Channel 5: Temperature Sensor 1
     {false, TEMPERATURE, 6, "Temperature2", 100.0, 0}, // Channel 6: Temperature Sensor 2
     {false, TEMPERATURE, 7, "Temperature3", 100.0, 0}  // Channel 7: Temperature Sensor 3
@@ -117,21 +117,34 @@ void loadSensorConfig() {
         Serial.println("SPIFFS Mount Failed");
         return;
     }
+
     File file = SPIFFS.open("/sensorConfig.json", "r");
     if (!file) {
         Serial.println("No config file found, using defaults");
         return;
     }
+
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, file);
     if (!error) {
         JsonArray arr = doc["config"].as<JsonArray>();
         for (size_t i = 0; i < arr.size() && i < SENSOR_COUNT; i++) {
-            sensorConfigs[i].enabled = arr[i]["enabled"];
-            sensorConfigs[i].adcChannel = arr[i]["adcChannel"]; // Add ADC channel
-            sensorConfigs[i].conversionFactor = arr[i]["conversionFactor"];
-            sensorConfigs[i].offset = arr[i]["offset"];
+            sensorConfigs[i].enabled = arr[i]["enabled"] | sensorConfigs[i].enabled;
+            sensorConfigs[i].type = (SensorType)(arr[i]["type"] | (int)sensorConfigs[i].type);
+            // Only update name if it exists in config
+            if (arr[i].containsKey("name")) {
+                // Allocate memory for the new name string
+                const char* newName = arr[i]["name"].as<const char*>();
+                if (newName) {
+                    sensorConfigs[i].name = strdup(newName);
+                }
+            }
+            sensorConfigs[i].adcChannel = arr[i]["adcChannel"] | sensorConfigs[i].adcChannel;
+            sensorConfigs[i].conversionFactor = arr[i]["conversionFactor"] | sensorConfigs[i].conversionFactor;
+            sensorConfigs[i].offset = arr[i]["offset"] | sensorConfigs[i].offset;
         }
+    } else {
+        Serial.println("Failed to parse config file");
     }
     file.close();
 }
@@ -140,8 +153,20 @@ void loadSensorConfig() {
 void saveSensorConfig(const JsonArray& arr) {
   File file = SPIFFS.open("/sensorConfig.json", "w");
   if (!file) return;
+  
   JsonDocument doc;
-  doc["config"] = arr;
+  JsonArray configArr = doc["config"].to<JsonArray>();
+  
+  for (size_t i = 0; i < SENSOR_COUNT; i++) {
+    JsonObject sensorObj = configArr.add<JsonObject>();
+    sensorObj["enabled"] = sensorConfigs[i].enabled;
+    sensorObj["type"] = (int)sensorConfigs[i].type;
+    sensorObj["name"] = sensorConfigs[i].name;
+    sensorObj["adcChannel"] = sensorConfigs[i].adcChannel;
+    sensorObj["conversionFactor"] = sensorConfigs[i].conversionFactor;
+    sensorObj["offset"] = sensorConfigs[i].offset;
+  }
+  
   serializeJson(doc, file);
   file.close();
 }
@@ -173,7 +198,17 @@ void handleUpdateConfig(uint8_t clientNum, JsonObject& data) {
     portENTER_CRITICAL(&bufferMux);
     for (size_t i = 0; i < arr.size() && i < SENSOR_COUNT; i++) {
         sensorConfigs[i].enabled = arr[i]["enabled"];
-        sensorConfigs[i].adcChannel = arr[i]["adcChannel"]; // Add ADC channel
+        sensorConfigs[i].type = (SensorType)(int)arr[i]["type"];
+        // Free old name if it exists
+        if (sensorConfigs[i].name) {
+            free((void*)sensorConfigs[i].name);
+        }
+        // Allocate and copy new name
+        const char* newName = arr[i]["name"].as<const char*>();
+        if (newName) {
+            sensorConfigs[i].name = strdup(newName);
+        }
+        sensorConfigs[i].adcChannel = arr[i]["adcChannel"];
         sensorConfigs[i].conversionFactor = arr[i]["conversionFactor"];
         sensorConfigs[i].offset = arr[i]["offset"];
     }
@@ -182,12 +217,7 @@ void handleUpdateConfig(uint8_t clientNum, JsonObject& data) {
     saveSensorConfig(arr);
 
     // Send back updated config
-    JsonDocument doc;
-    doc["type"] = "sensor_config";
-    doc["config"] = arr;
-    String json;
-    serializeJson(doc, json);
-    webSocket.sendTXT(clientNum, json);
+    sendSensorConfig(clientNum);
 }
 
 
