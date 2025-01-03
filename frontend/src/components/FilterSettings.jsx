@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import { VStack, FormControl, FormLabel, NumberInput, NumberInputField } from '@chakra-ui/react';
 
 const FilterSettings = ({ filterType, kalmanSettings, setKalmanSettings, gaussianSettings, setGaussianSettings }) => {

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { BiFilter} from 'react-icons/bi';
 import Papa from 'papaparse';
 import { Line } from 'react-chartjs-2';
 import { 
@@ -6,6 +7,8 @@ import {
   useDisclosure, FormControl, FormLabel, Select, Modal, ModalOverlay,
   ModalContent, ModalBody, ModalCloseButton
 } from '@chakra-ui/react';
+import { DownloadIcon } from '@chakra-ui/icons';
+import { Icon, HStack } from '@chakra-ui/react';
 import { applyKalmanFilter, applyGaussianFilter } from '../utils/filters';
 import { chartOptions } from '../config/chartConfig';
 import ChartControls from './ChartControls';
@@ -16,7 +19,7 @@ const ImportPage = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [importedData, setImportedData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
-  const [filterType, setFilterType] = useState('none');
+  const [filterType, setFilterType] = useState('kalman');
   const [filterTargets, setFilterTargets] = useState([]);
   const [kalmanSettings, setKalmanSettings] = useState({ Q: '0.0001', R: '0.01' });
   const [gaussianSettings, setGaussianSettings] = useState({ kernelSize: '5' });
@@ -95,7 +98,6 @@ const ImportPage = () => {
       dynamicTyping: true,
       complete: (results) => {
         setImportedData(results.data);
-        setFilteredData(results.data);
         setCsvHeaders(Object.keys(results.data[0]).filter(header => header !== 'Timestamp (s)'));
       },
     });
@@ -170,33 +172,41 @@ const ImportPage = () => {
   });
 
   return (
-    <Box className="import-page" p={8} w="full">
-      <Heading>Import CSV and Apply Filters</Heading>
-      <FormControl>
-        <FormLabel>Upload CSV File</FormLabel>
-        <input type="file" accept=".csv" onChange={handleFileUpload} />
-      </FormControl>
+<Box className="import-page" p={8} mx="auto">
+  <VStack spacing={8} align="stretch" bg="white" p={8} borderRadius="xl" boxShadow="lg">
+    <Heading textAlign="center" color="blue.600">Import and Filter CSV Data</Heading>
 
+    {/* File Upload Section */}
+    <Box bg="gray.50" p={6} borderRadius="md" border="2px dashed" borderColor="gray.200">
       <FormControl>
-        <FormLabel>Filter Type</FormLabel>
-        <Select value={filterType} onChange={handleFilterChange}>
-          <option value="none">None</option>
+        <FormLabel fontWeight="bold">Upload CSV File</FormLabel>
+        <input 
+          type="file" 
+          accept=".csv" 
+          onChange={handleFileUpload}
+          style={{
+            width: '100%',
+            padding: '10px',
+            cursor: 'pointer'
+          }}
+        />
+      </FormControl>
+    </Box>
+
+    {/* Filter Configuration Section */}
+    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
+      <FormControl>
+        <FormLabel fontWeight="bold">Filter Type</FormLabel>
+        <Select 
+          value={filterType} 
+          onChange={handleFilterChange}
+          bg="white"
+          size="lg"
+        >
           <option value="kalman">Kalman Filter</option>
           <option value="gaussian">Gaussian Filter</option>
         </Select>
-      </FormControl>
-
-      <FormControl>
-        <FormLabel>Filter Targets</FormLabel>
-        <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
-          <VStack align="start">
-            {csvHeaders.map(header => (
-              <Checkbox key={header} value={header}>{header}</Checkbox>
-            ))}
-          </VStack>
-        </CheckboxGroup>
-      </FormControl>
-
+        <Box bg="gray.50" p={6} borderRadius="md">
       <FilterSettings 
         filterType={filterType} 
         kalmanSettings={kalmanSettings} 
@@ -204,56 +214,141 @@ const ImportPage = () => {
         gaussianSettings={gaussianSettings} 
         setGaussianSettings={setGaussianSettings} 
       />
+    </Box>
+      </FormControl>
 
-      <Button colorScheme="blue" onClick={applyFilter} isDisabled={filterType === 'none'}>
+      <FormControl>
+  <FormLabel fontWeight="bold">Filter Targets</FormLabel>
+  <SimpleGrid columns={1} spacing={6}>
+    {/* Load Cell Section */}
+    <Box>
+      <Heading size="sm" mb={3} color="blue.600">Load Cell Sensors</Heading>
+      <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+        <HStack spacing={6} wrap="wrap">
+          {csvHeaders
+            .filter(header => header.toLowerCase().includes('loadcell'))
+            .map(header => (
+              <Checkbox key={header} value={header} colorScheme="blue">
+                {header}
+              </Checkbox>
+            ))}
+        </HStack>
+      </CheckboxGroup>
+    </Box>
+
+    {/* Pressure Section */}
+    <Box>
+      <Heading size="sm" mb={3} color="green.600">Pressure Sensors</Heading>
+      <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+        <HStack spacing={6} wrap="wrap">
+          {csvHeaders
+            .filter(header => header.toLowerCase().includes('pressure'))
+            .map(header => (
+              <Checkbox key={header} value={header} colorScheme="green">
+                {header}
+              </Checkbox>
+            ))}
+        </HStack>
+      </CheckboxGroup>
+    </Box>
+
+    {/* Temperature Section */}
+    <Box>
+      <Heading size="sm" mb={3} color="orange.600">Temperature Sensors</Heading>
+      <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+        <HStack spacing={6} wrap="wrap">
+          {csvHeaders
+            .filter(header => header.toLowerCase().includes('temperature'))
+            .map(header => (
+              <Checkbox key={header} value={header} colorScheme="orange">
+                {header}
+              </Checkbox>
+            ))}
+        </HStack>
+      </CheckboxGroup>
+    </Box>
+  </SimpleGrid>
+</FormControl>
+    </SimpleGrid>
+
+    {/* Filter Settings Section */}
+
+
+    {/* Action Buttons */}
+    <HStack spacing={4} justify="center">
+      <Button 
+        colorScheme="blue" 
+        onClick={applyFilter} 
+        isDisabled={filterType === 'none' || filterTargets.length === 0}
+        size="lg"
+        leftIcon={<Icon as={BiFilter} />}
+      >
         Apply Filter
       </Button>
-
-      <Button colorScheme="green" onClick={saveFilteredData} mt={4} mb={4} isDisabled={filteredData.length === 0}>
+      <Button 
+        colorScheme="green" 
+        onClick={saveFilteredData} 
+        isDisabled={filteredData.length === 0}
+        size="lg"
+        leftIcon={<DownloadIcon />}
+      >
         Save Filtered Data
       </Button>
+    </HStack>
 
-      {ignitionDelay !== null && (
-        <Text fontSize="xl" fontWeight="bold">
+    {/* Ignition Delay Display */}
+    {ignitionDelay !== null && (
+      <Box textAlign="center" p={4} bg="blue.50" borderRadius="md">
+        <Text fontSize="xl" fontWeight="bold" color="blue.600">
           Ignition Delay: {ignitionDelay.toFixed(6)} seconds
         </Text>
-      )}
-
-        {filteredData.length > 0 && (
-        <SimpleGrid columns={[1, null, 2]} spacing={8} w="full">
-          {csvHeaders.map((header, index) => (
-            <GridItem key={header}>
-              <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
-                <Heading size="md" mb={4}>{header}</Heading>
-                <ChartControls 
-                  chartRef={chartRefs.current[header]}
-                  title={header}
-                  onDownload={() => handleDownloadChart(header)}
-                  onResetZoom={() => safeResetZoom(header)} 
-                  onOpen={() => {
-                    setActiveChart(header);
-                    setActiveChartData(generateChartData(filteredData, header, index));
-                    onOpen();
-                  }}
-                  setActiveChart={setActiveChart}
-                />
-<Line 
-  ref={el => {
-    if (el) {
-      chartRefs.current[header] = {
-        current: el,
-        resetZoom: () => safeResetZoom(header)
-      };
-    }
-  }}
-  options={chartOptions(header, ignitionDelay)}
-  data={generateChartData(filteredData, header, index)}
-/>
-              </Box>
-            </GridItem>
-          ))}
-        </SimpleGrid>
-      )}
+      </Box>
+    )}
+  </VStack>
+{/* Charts Section */}
+  {(filteredData.length > 0 || importedData.length > 0) && (
+  <SimpleGrid columns={[1, null, 2]} spacing={8} w="full">
+    {csvHeaders.map((header, index) => (
+      <GridItem key={header}>
+        <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
+          <Heading size="md" mb={4}>{header}</Heading>
+          <ChartControls 
+            chartRef={chartRefs.current[header]}
+            title={header}
+            onDownload={() => handleDownloadChart(header)}
+            onResetZoom={() => safeResetZoom(header)} 
+            onOpen={() => {
+              setActiveChart(header);
+              setActiveChartData(generateChartData(
+                filteredData.length > 0 ? filteredData : importedData, 
+                header, 
+                index
+              ));
+              onOpen();
+            }}
+            setActiveChart={setActiveChart}
+          />
+          <Line 
+            ref={el => {
+              if (el) {
+                chartRefs.current[header] = {
+                  current: el,
+                  resetZoom: () => safeResetZoom(header)
+                };
+              }
+            }}
+            options={chartOptions(header, ignitionDelay)}
+            data={generateChartData(
+              filteredData.length > 0 ? filteredData : importedData, 
+              header, 
+              index
+            )}
+          />
+        </Box>
+      </GridItem>
+    ))}
+  </SimpleGrid>
+)}
 
 <Modal isOpen={isOpen} onClose={onClose} size="full">
   <ModalOverlay />
@@ -281,7 +376,7 @@ const ImportPage = () => {
     </ModalBody>
   </ModalContent>
 </Modal>
-    </Box>
+</Box>
   );
 };
 export default ImportPage;

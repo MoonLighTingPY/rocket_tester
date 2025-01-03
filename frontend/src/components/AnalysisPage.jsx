@@ -320,13 +320,61 @@ const AnalysisPage = () => {
     setAnalysisResults({
       partialIntegrationStartPoint: startTimeLabel,
       partialIntegrationEndPoint: endTimeLabel,
-      partialIntegrationStartTime: startTime,
-      partialIntegrationEndTime: endTime,
-      partialIntegralDuration: results.partialIntegralDuration,
-      fullIntegralDuration: results.fullIntegralDuration,
-      ignitionDelay,
-      integrals: results.integrals,
-      stats: results.stats,
+      partialIntegrationStartTime: `${startTime.toFixed(6)} s`, // Time in seconds
+      partialIntegrationEndTime: `${endTime.toFixed(6)} s`, // Time in seconds
+      partialIntegralDuration: `${results.partialIntegralDuration.toFixed(6)} s`, // Duration in seconds
+      fullIntegralDuration: `${results.fullIntegralDuration.toFixed(6)} s`, // Duration in seconds
+      ignitionDelay: ignitionDelay ? `${ignitionDelay.toFixed(6)} s` : null, // Delay in seconds
+      integrals: {
+        partial: {
+          load: results.integrals.partial.load.map(x => ({ 
+            ...x,
+            value: `${x.value.toFixed(3)} kg⋅s` // Load integral in kilogram-seconds
+          })),
+          pressure: results.integrals.partial.pressure.map(x => ({ 
+            ...x,
+            value: `${x.value.toFixed(3)} bar⋅s` // Pressure integral in bar-seconds  
+          })),
+          temperature: results.integrals.partial.temperature.map(x => ({ 
+            ...x,
+            value: `${x.value.toFixed(3)} °C⋅s` // Temperature integral in celsius-seconds
+          }))
+        },
+        full: {
+          load: results.integrals.full.load.map(x => ({ 
+            ...x,
+            value: `${x.value.toFixed(3)} kg⋅s`
+          })),
+          pressure: results.integrals.full.pressure.map(x => ({ 
+            ...x,
+            value: `${x.value.toFixed(3)} bar⋅s`
+          })),
+          temperature: results.integrals.full.temperature.map(x => ({ 
+            ...x,
+            value: `${x.value.toFixed(3)} °C⋅s`
+          }))
+        }
+      },
+      stats: {
+        load: results.stats.load.map(x => ({
+          ...x,
+          min: `${x.min.toFixed(3)} kg`,
+          max: `${x.max.toFixed(3)} kg`,
+          avg: `${x.avg.toFixed(3)} kg`
+        })),
+        pressure: results.stats.pressure.map(x => ({
+          ...x, 
+          min: `${x.min.toFixed(3)} bar`,
+          max: `${x.max.toFixed(3)} bar`,
+          avg: `${x.avg.toFixed(3)} bar`
+        })),
+        temperature: results.stats.temperature.map(x => ({
+          ...x,
+          min: `${x.min.toFixed(3)} °C`,
+          max: `${x.max.toFixed(3)} °C`, 
+          avg: `${x.avg.toFixed(3)} °C`
+        }))
+      }
     });
   };
 

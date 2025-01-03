@@ -131,6 +131,9 @@ const AnalysisResults = ({ analysisResults }) => {
 
       {/* Display stats */}
       <Heading size="sm" mt={6}>Sensor Statistics</Heading>
+      <Text mt={2} fontSize="sm">
+      (The statistics are computed only in bounds of the partial integral)
+      </Text>
       {Object.entries(stats).map(([sensorType, sensorArray]) => (
         <Box key={`stats-${sensorType}`} mt={3}>
           <Text fontWeight="bold">{sensorType.toUpperCase()}</Text>

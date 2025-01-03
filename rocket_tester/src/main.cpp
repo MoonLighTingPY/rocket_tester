@@ -167,7 +167,7 @@ void sendSensorConfig(uint8_t clientNum) {
 }
 
 void handleUpdateConfig(uint8_t clientNum, JsonObject& data) {
-    if (!data.containsKey("config")) return;
+    if (!data["config"].is<JsonArray>()) return;
 
     JsonArray arr = data["config"].as<JsonArray>();
     portENTER_CRITICAL(&bufferMux);
