@@ -7,15 +7,29 @@ export const useDataManager = () => {
   const [ignitionDelay, setIgnitionDelay] = useState(null);
   const [sensorConfig, setSensorConfig] = useState([]);
 
+  useEffect(() => {
+    // Request initial config when websocket connects
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'get_config' }));
+    }
+    
+    const handleOpen = () => {
+      socket.send(JSON.stringify({ type: 'get_config' }));
+    };
+    
+    socket.addEventListener('open', handleOpen);
+    return () => socket.removeEventListener('open', handleOpen);
+  }, []);
+
 
   const handleMessage = useCallback((event) => {
     const message = JSON.parse(event.data);
 
+    if (message.type === 'sensor_config') {
+      setSensorConfig(message.config);
+    }
+
     if (message.type === 'test_data') {
-        // Store sensor configuration from first message
-        if (message.sensors) {
-            setSensorConfig(message.sensors);
-        }
 
         const newTestData = message.data.map(point => ({
           readingsT: point.t1 / 1e6,
@@ -50,34 +64,43 @@ export const useDataManager = () => {
     return () => socket.removeEventListener('message', handleMessage);
   }, [handleMessage]);
 
+  const updateSensorConfig = (newConfig) => {
+    setSensorConfig(newConfig);
+    // Send updated config to ESP32 through WebSocket
+    socket.send(JSON.stringify({ type: 'update_config', config: newConfig }));
+  };
+
   const exportToCsv = useCallback(() => {
-            // Create headers based on sensor configuration
-            const headers = ['Timestamp (s)'];
-            for (const sensor of sensorConfig) {
-                let unit = '';
-                switch (sensor.type) {
-                    case 0: // LOAD
-                        unit = '(kg)';
-                        break;
-                    case 1: // PRESSURE  
-                        unit = '(bar)';
-                        break;
-                    case 2: // TEMPERATURE
-                        unit = '(°C)';
-                        break;
-                }
-                headers.push(`${sensor.name} ${unit}`);
+    // Create headers based on sensor configuration
+    const headers = ['Timestamp (s)'];
+    for (const sensor of sensorConfig) {
+        if (sensor.enabled) { // Only include enabled sensors
+            let unit = '';
+            switch (sensor.type) {
+                case 0: // LOAD
+                    unit = '(kg)';
+                    break;
+                case 1: // PRESSURE  
+                    unit = '(bar)';
+                    break;
+                case 2: // TEMPERATURE
+                    unit = '(°C)';
+                    break;
             }
-    
-            const data = csvData.map(point => {
-                const values = [point.ignitionT.toFixed(6)];
-                for (const sensor of sensorConfig) {
-                    values.push(point[sensor.name]);
-                }
-                return values.join(',');
-            });
-    
-            const csvContent = [headers.join(',')].concat(data).join('\n');
+            headers.push(`${sensor.name} ${unit}`);
+        }
+    }
+
+    const data = csvData.map(point => {
+        const values = [point.ignitionT.toFixed(6)];
+        for (const sensor of sensorConfig) {
+            if (sensor.enabled) { // Only include enabled sensors
+                values.push(point[sensor.name]);
+            }
+        }
+        return values.join(',');
+    });
+    const csvContent = [headers.join(',')].concat(data).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const now = new Date();
@@ -104,6 +127,7 @@ export const useDataManager = () => {
     sensorConfig,
     exportToCsv,
     clearCsvData,
-    clearTestData
+    clearTestData,
+    updateSensorConfig
   };
 };

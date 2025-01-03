@@ -1,0 +1,52 @@
+{
+    "config": [
+      {
+        "enabled": true,
+        "adcChannel": 0,
+        "conversionFactor": 0.3025,
+        "offset": 0
+      },
+      {
+        "enabled": true, 
+        "adcChannel": 1,
+        "conversionFactor": 0.3025,
+        "offset": 0
+      },
+      {
+        "enabled": true,
+        "adcChannel": 2,
+        "conversionFactor": 250.0,
+        "offset": 0
+      },
+      {
+        "enabled": false,
+        "adcChannel": 3,
+        "conversionFactor": 250.0,
+        "offset": 0
+      },
+      {
+        "enabled": true,
+        "adcChannel": 4,
+        "conversionFactor": 250.0,
+        "offset": 0
+      },
+      {
+        "enabled": false,
+        "adcChannel": 5,
+        "conversionFactor": 100.0,
+        "offset": 0
+      },
+      {
+        "enabled": false,
+        "adcChannel": 6,
+        "conversionFactor": 100.0,
+        "offset": 0
+      },
+      {
+        "enabled": false,
+        "adcChannel": 7,
+        "conversionFactor": 100.0,
+        "offset": 0
+      }
+    ]
+  }

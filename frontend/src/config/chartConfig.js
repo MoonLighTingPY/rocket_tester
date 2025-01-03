@@ -3,9 +3,10 @@ import { Chart as ChartJS } from 'chart.js';
 
 export const chartTheme = {
   colors: {
-    loadCell: ['#FF6384'],           // For Load Cell sensors
-    pressure: ['#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'], // For multiple Pressure sensors
-    temperature: ['#FF9F40', '#C9CBCF', '#FF6384', '#36A2EB'], // For multiple Temperature sensors
+    loadCell: ['#36A2EB', '#FFCE56' ],           // For Load Cell sensors
+
+    pressure: [ '#33AA21', '#4BC0C0', '#9966FF'], // For multiple Pressure sensors
+    temperature: ['#FF9F40', '#C9CBCF', '#FF6384'], // For multiple Temperature sensors
   },
   annotations: {
     ignitionLine: {

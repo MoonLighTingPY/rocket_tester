@@ -111,6 +111,86 @@ void clearBuffer() {
     portEXIT_CRITICAL(&bufferMux);
 }
 
+
+void loadSensorConfig() {
+    if(!SPIFFS.begin(true)) {
+        Serial.println("SPIFFS Mount Failed");
+        return;
+    }
+    File file = SPIFFS.open("/sensorConfig.json", "r");
+    if (!file) {
+        Serial.println("No config file found, using defaults");
+        return;
+    }
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, file);
+    if (!error) {
+        JsonArray arr = doc["config"].as<JsonArray>();
+        for (size_t i = 0; i < arr.size() && i < SENSOR_COUNT; i++) {
+            sensorConfigs[i].enabled = arr[i]["enabled"];
+            sensorConfigs[i].adcChannel = arr[i]["adcChannel"]; // Add ADC channel
+            sensorConfigs[i].conversionFactor = arr[i]["conversionFactor"];
+            sensorConfigs[i].offset = arr[i]["offset"];
+        }
+    }
+    file.close();
+}
+
+// Save sensor config to SPIFFS
+void saveSensorConfig(const JsonArray& arr) {
+  File file = SPIFFS.open("/sensorConfig.json", "w");
+  if (!file) return;
+  JsonDocument doc;
+  doc["config"] = arr;
+  serializeJson(doc, file);
+  file.close();
+}
+
+void sendSensorConfig(uint8_t clientNum) {
+    JsonDocument doc;
+    doc["type"] = "sensor_config";
+    JsonArray configArr = doc["config"].to<JsonArray>();
+    
+    for (size_t i = 0; i < SENSOR_COUNT; i++) {
+        JsonObject sensorObj = configArr.add<JsonObject>();
+        sensorObj["name"] = sensorConfigs[i].name;
+        sensorObj["enabled"] = sensorConfigs[i].enabled;
+        sensorObj["type"] = sensorConfigs[i].type;
+        sensorObj["adcChannel"] = sensorConfigs[i].adcChannel;
+        sensorObj["conversionFactor"] = sensorConfigs[i].conversionFactor;
+        sensorObj["offset"] = sensorConfigs[i].offset;
+    }
+    
+    String json;
+    serializeJson(doc, json);
+    webSocket.sendTXT(clientNum, json);
+}
+
+void handleUpdateConfig(uint8_t clientNum, JsonObject& data) {
+    if (!data.containsKey("config")) return;
+
+    JsonArray arr = data["config"].as<JsonArray>();
+    portENTER_CRITICAL(&bufferMux);
+    for (size_t i = 0; i < arr.size() && i < SENSOR_COUNT; i++) {
+        sensorConfigs[i].enabled = arr[i]["enabled"];
+        sensorConfigs[i].adcChannel = arr[i]["adcChannel"]; // Add ADC channel
+        sensorConfigs[i].conversionFactor = arr[i]["conversionFactor"];
+        sensorConfigs[i].offset = arr[i]["offset"];
+    }
+    portEXIT_CRITICAL(&bufferMux);
+
+    saveSensorConfig(arr);
+
+    // Send back updated config
+    JsonDocument doc;
+    doc["type"] = "sensor_config";
+    doc["config"] = arr;
+    String json;
+    serializeJson(doc, json);
+    webSocket.sendTXT(clientNum, json);
+}
+
+
 // High-speed sensor reading task
 void sensorTask(void *parameter) {
     SensorData data;
@@ -185,18 +265,6 @@ void webSocketTask(void *parameter) {
             portEXIT_CRITICAL(&bufferMux);
 
             if (count > 0) {
-                // Send sensor configuration on first message
-                if (dataCounter == 0) {
-                    JsonArray sensors = doc["sensors"].to<JsonArray>();
-                    for (size_t i = 0; i < SENSOR_COUNT; i++) {
-                        const SensorConfig& sensor = sensorConfigs[i];
-                        if (sensor.enabled) {
-                            JsonObject sensorObj = sensors.add<JsonObject>();
-                            sensorObj["name"] = sensor.name;
-                            sensorObj["type"] = sensor.type;
-                        }
-                    }
-                }
                 doc["type"] = "test_data";
                 String jsonString;
                 serializeJson(doc, jsonString);
@@ -220,12 +288,27 @@ void webSocketTask(void *parameter) {
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
     switch(type) {
-        case WStype_CONNECTED:
+        case WStype_CONNECTED: {
             Serial.printf("WebSocket client #%u connected\n", num);
+            // Send initial config automatically on connect
+            sendSensorConfig(num);
             break;
+        }
             
         case WStype_TEXT: {
             String message = String((char*)payload);
+            JsonDocument doc;
+            auto err = deserializeJson(doc, payload, length);
+            if(!err) {
+                if(doc["type"] == "get_config") {
+                    sendSensorConfig(num);
+                }
+                else if(doc["type"] == "update_config") {
+                    JsonObject obj = doc.as<JsonObject>();
+                    handleUpdateConfig(num, obj);
+                }
+            }
+
             
             if (message == "start_readings") {
                 isReading = true;
@@ -267,6 +350,8 @@ void setup() {
         Serial.println("SPIFFS Mount Failed");
         return;
     }
+
+    loadSensorConfig();
     
     // Initialize the ADS1115
     if (!ads.begin()) {
