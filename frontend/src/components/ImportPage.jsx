@@ -98,10 +98,14 @@ const ImportPage = () => {
       dynamicTyping: true,
       complete: (results) => {
         setImportedData(results.data);
-        setCsvHeaders(Object.keys(results.data[0]).filter(header => header !== 'Timestamp (s)'));
+        // Get all headers except timestamp
+        const headers = Object.keys(results.data[0]).filter(header => header !== 'Timestamp (s)');
+        setCsvHeaders(headers);
+        // Automatically select all sensor headers
+        setFilterTargets(headers);
       },
     });
-  };
+};
 
   const handleFilterChange = (event) => setFilterType(event.target.value);
 
