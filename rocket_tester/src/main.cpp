@@ -5,13 +5,25 @@
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
-#include <Adafruit_ADS1X15.h>
-
-// Create an instance of the ADS1115
-Adafruit_ADS1115 ads;
 #include "secret.h"
 #include <CircularBuffer.hpp>
 #include <ESPmDNS.h>
+#include <ADS1256.h>
+#include <SPI.h>
+
+// Define ADS1256 parameters
+const float ADS_CLOCK_MHZ = 7.68; // Crystal frequency
+const float ADS_VREF = 2.5;       // Voltage reference
+const bool ADS_USE_RESET = false; // If reset pin is tied to 3.3V
+
+// DRDY: GPIO 17
+// RST: GPIO 16
+// CS: GPIO 5
+// MOSI/MISO/SCK: Default SPI pins
+
+// Create ADS1256 instance
+// ADS1256 adc(ADS_CLOCK_MHZ, ADS_VREF, ADS_USE_RESET);
+
 
 // Network credentials
 const char* ssid = WIFI_SSID;
@@ -114,6 +126,8 @@ void loadSensorConfig() {
     if(!SPIFFS.begin(true)) {
         Serial.println("SPIFFS Mount Failed");
         return;
+    } else {
+        Serial.println("SPIFFS Mount Successful");
     }
 
     File file = SPIFFS.open("/sensorConfig.json", "r");
@@ -141,6 +155,7 @@ void loadSensorConfig() {
             sensorConfigs[i].conversionFactor = arr[i]["conversionFactor"] | sensorConfigs[i].conversionFactor;
             sensorConfigs[i].offset = arr[i]["offset"] | sensorConfigs[i].offset;
         }
+        Serial.println("Loaded sensor config");
     } else {
         Serial.println("Failed to parse config file");
     }
@@ -234,19 +249,39 @@ void sensorTask(void *parameter) {
             data.readingsTimestamp = currentTime - readingsStartTime;
             data.ignitionTimestamp = ingitedWire ? (currentTime - ingitionStartTime) : 0;
             
-            // Read enabled sensors
+            // Read enabled sensors more efficiently
+            bool firstChannel = true;
             for (size_t i = 0; i < SENSOR_COUNT; i++) {
                 const SensorConfig& sensor = sensorConfigs[i];
                 if (sensor.enabled) {
-                    if (sensor.adcChannel < 8) { // ADS1215 has 8 channels (0-7)
-                        float voltage = random(0, 1000); // Placeholder for actual voltage reading
-                        data.values[i] = voltage * sensor.conversionFactor + sensor.offset;
-                    } else {
-                        Serial.printf("ADC Channel %u out of bounds!\n", sensor.adcChannel);
-                        data.values[i] = 0.0f;
+                    // adc.waitDRDY(); // Wait for previous conversion
+                    
+                    if (!firstChannel) {
+                        // Read previous channel's conversion
+                        // float voltage = adc.readCurrentChannel();
+                        float voltage = dataCounter; // Temporary, to test data streaming
+                        data.values[i-1] = voltage * sensorConfigs[i-1].conversionFactor + sensorConfigs[i-1].offset;
                     }
+                    
+                    // Set next channel
+                    // adc.setChannel(sensor.adcChannel);
+                    firstChannel = false;
                 } else {
                     data.values[i] = 0.0f;
+                }
+            }
+            
+            // Read the last enabled channel
+            if (!firstChannel) {
+                // adc.waitDRDY();
+                // float voltage = adc.readCurrentChannel();
+                float voltage = dataCounter; // Temporary, to test data streaming   
+                // Find last enabled sensor
+                for (int i = SENSOR_COUNT-1; i >= 0; i--) {
+                    if (sensorConfigs[i].enabled) {
+                        data.values[i] = voltage * sensorConfigs[i].conversionFactor + sensorConfigs[i].offset;
+                        break;
+                    }
                 }
             }
 
@@ -384,28 +419,15 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
     }
 }
 
-void setup() {
-    Serial.begin(115200);
-    
-    if(!SPIFFS.begin(true)) {
-        Serial.println("SPIFFS Mount Failed");
-        return;
-    }
+void setupADC() {
+    // Initialize ADC with desired data rate and gain
+    // adc.begin(ADS1256_DRATE_1000SPS, ADS1256_GAIN_1, false);
+    // Wait for ADC to be ready
+    // adc.waitDRDY();
+    Serial.println("ADS1256 initialized");
+}
 
-    loadSensorConfig();
-    
-    // Initialize the ADS1115
-    if (!ads.begin()) {
-        Serial.println("Failed to initialize ADS.");
-    } else {
-        // Set ADC configuration
-        ads.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V
-        ads.setDataRate(RATE_ADS1115_860SPS); // Fastest sampling rate
-
-        Serial.println("ADS initialized.");
-    }
-
-
+void setupPins() {
     pinMode(ENGINE_OUT_PIN, OUTPUT);
     pinMode(ENGINE_IN_PIN, INPUT_PULLUP);
     pinMode(PYRO_PIN, OUTPUT);
@@ -414,7 +436,9 @@ void setup() {
     digitalWrite(PYRO_PIN, LOW);
     
     attachInterrupt(digitalPinToInterrupt(ENGINE_IN_PIN), engineStartISR, FALLING);
+}
 
+void setupWiFi() {
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(1000);
@@ -428,6 +452,15 @@ void setup() {
         Serial.println("mDNS responder started");
         Serial.println("http://" + String(hostname) + ".local");
     }
+}   
+
+void setup() {
+    Serial.begin(115200);
+
+    loadSensorConfig();
+    setupADC();
+    setupPins();
+    setupWiFi();
 
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send(SPIFFS, "/index.html", "text/html");
