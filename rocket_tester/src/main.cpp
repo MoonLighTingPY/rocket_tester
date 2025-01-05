@@ -81,7 +81,7 @@ struct SensorData {
 };
 
 // Circular buffer to store sensor data
-constexpr size_t BUFFER_SIZE = 1000; // Reduced from 2000 to 1000
+constexpr size_t BUFFER_SIZE = 1500; // Reduced from 2000 to 1000
 CircularBuffer<SensorData, BUFFER_SIZE> dataBuffer;
 
 
@@ -95,10 +95,8 @@ portMUX_TYPE bufferMux = portMUX_INITIALIZER_UNLOCKED;
 
 void IRAM_ATTR engineStartISR() {
     if (ingitedWire && !engineStarted) {
-        if (digitalRead(ENGINE_IN_PIN) == LOW) {
-            engineStartTime = micros();
-            engineStarted = true;
-        }
+        engineStartTime = micros();
+        engineStarted = true;
     }
 }
 
@@ -132,7 +130,7 @@ void loadSensorConfig() {
             sensorConfigs[i].enabled = arr[i]["enabled"] | sensorConfigs[i].enabled;
             sensorConfigs[i].type = (SensorType)(arr[i]["type"] | (int)sensorConfigs[i].type);
             // Only update name if it exists in config
-            if (arr[i].containsKey("name")) {
+            if (arr[i]["name"].is<const char*>()) {
                 // Allocate memory for the new name string
                 const char* newName = arr[i]["name"].as<const char*>();
                 if (newName) {
@@ -241,7 +239,7 @@ void sensorTask(void *parameter) {
                 const SensorConfig& sensor = sensorConfigs[i];
                 if (sensor.enabled) {
                     if (sensor.adcChannel < 8) { // ADS1215 has 8 channels (0-7)
-                        float voltage = random(0, 1000) / 1000.0f; // Placeholder for actual voltage reading
+                        float voltage = random(0, 1000); // Placeholder for actual voltage reading
                         data.values[i] = voltage * sensor.conversionFactor + sensor.offset;
                     } else {
                         Serial.printf("ADC Channel %u out of bounds!\n", sensor.adcChannel);
@@ -262,9 +260,9 @@ void sensorTask(void *parameter) {
 
 // WebSocket communication task
 void webSocketTask(void *parameter) {
-    const size_t BATCH_SIZE = 20;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(20);
+    const TickType_t xFrequency = pdMS_TO_TICKS(1);
+    size_t dataCounter = 0; // Temporary, to test data streaming
     
     while (true) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -275,8 +273,7 @@ void webSocketTask(void *parameter) {
             JsonArray array = doc["data"].to<JsonArray>();
 
             portENTER_CRITICAL(&bufferMux);
-            size_t count = 0;
-            while (!dataBuffer.isEmpty() && count < BATCH_SIZE) {
+            while (!dataBuffer.isEmpty()) {
                 SensorData data = dataBuffer.shift();
                 JsonObject reading = array.add<JsonObject>();
 
@@ -288,13 +285,16 @@ void webSocketTask(void *parameter) {
                     const SensorConfig& sensor = sensorConfigs[i];
                     if (sensor.enabled) {
                         reading[sensor.name] = data.values[i];
+                        if (sensor.type == LOAD) { // Temporary, to test data streaming
+                            reading[sensor.name] = dataCounter; // Temporary, to test data streaming
+                        } // Temporary, to test data streaming
                     }
                 }
-                count++;
+                dataCounter++; // Temporary, to test data streaming
             }
             portEXIT_CRITICAL(&bufferMux);
 
-            if (count > 0) {
+            if (array.size() >= 0) {
                 doc["type"] = "test_data";
                 String jsonString;
                 serializeJson(doc, jsonString);
@@ -322,6 +322,15 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             Serial.printf("WebSocket client #%u connected\n", num);
             // Send initial config automatically on connect
             sendSensorConfig(num);
+            break;
+        }
+        case WStype_DISCONNECTED: {
+            Serial.printf("WebSocket client #%u disconnected\n", num);
+            isReading = false;
+            ingitedWire = false;
+            engineStarted = false;
+            dataCounter = 0;
+            digitalWrite(PYRO_PIN, LOW);
             break;
         }
             
@@ -358,6 +367,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 ingitedWire = false;
                 engineStarted = false;
                 dataCounter = 0;
+                digitalWrite(PYRO_PIN, LOW);
+
                 clearBuffer(); // Clear the buffer when stopping the readings so that the next test starts with an empty buffer and no old data lmaooo
                 JsonDocument doc;
                 doc.clear(); // Good practice to clear the document before reuse
