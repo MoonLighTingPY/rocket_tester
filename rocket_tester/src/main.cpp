@@ -63,20 +63,20 @@ struct SensorConfig {
     uint8_t adcChannel;
     const char* name;
     float conversionFactor;  // For converting voltage to actual units
-    float offset;           // For calibration offset
+    float offset;            // For calibration offset
 };
 
 // Array of sensor configurations
 constexpr size_t SENSOR_COUNT = 8;
 SensorConfig sensorConfigs[SENSOR_COUNT] = {
-    {true, LOAD, 0, "LoadCell1", 0.3025, 0},         // Channel 0: Load Cell 
-    {false, LOAD, 1, "LoadCell2", 0.3025, 0},         // Channel 1: Load Cell 2
-    {false, PRESSURE, 2, "Pressure1", 250.0, 0},     // Channel 2: Pressure Sensor 2
-    {false, PRESSURE, 3, "Pressure2", 250.0, 0},     // Channel 3: Pressure Sensor 3
-    {false, PRESSURE, 4, "Pressure3", 250.0, 0},     // Channel 4: Pressure Sensor 4
-    {false, TEMPERATURE, 5, "Temperature1", 100.0, 0}, // Channel 5: Temperature Sensor 1
-    {false, TEMPERATURE, 6, "Temperature2", 100.0, 0}, // Channel 6: Temperature Sensor 2
-    {false, TEMPERATURE, 7, "Temperature3", 100.0, 0}  // Channel 7: Temperature Sensor 3
+    {true, LOAD, 0, "LoadCell1", 0.3025, 0},           // Channel 0: Load Cell conversionFactor = 600 kg / 2.5V = 0.3025 kg/V
+    {false, LOAD, 1, "LoadCell2", 0.3025, 0},          // Channel 1: Load Cell 2 conversionFactor = 600 kg / 2.5V = 0.3025 kg/V
+    {false, PRESSURE, 2, "Pressure1", 240.0, -16.0 },  // Channel 2: Pressure Sensor 2 conversionFactor = 600 bar / 2.5V = 240 bar/V
+    {false, PRESSURE, 3, "Pressure2", 240.0, -16.0 },  // Channel 3: Pressure Sensor 3 conversionFactor = 600 bar / 2.5V = 240 bar/V
+    {false, PRESSURE, 4, "Pressure3", 240.0, -16.0 },  // Channel 4: Pressure Sensor 4 conversionFactor = 600 bar / 2.5V = 240 bar/V
+    {false, TEMPERATURE, 5, "Temperature1", 320.0, 0}, // Channel 5: Temperature Sensor 1 conversionFactor = 800 deg C / 2.5V = 320 deg C/V
+    {false, TEMPERATURE, 6, "Temperature2", 320.0, 0}, // Channel 6: Temperature Sensor 2 conversionFactor = 800 deg C / 2.5V = 320 deg C/V
+    {false, TEMPERATURE, 7, "Temperature3", 320.0, 0}  // Channel 7: Temperature Sensor 3 conversionFactor = 800 deg C / 2.5V = 320 deg C/V
 };
 
 // Updated sensor data structure
