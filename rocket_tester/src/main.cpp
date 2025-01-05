@@ -5,9 +5,10 @@
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
-#include "secret.h"
 #include <CircularBuffer.hpp>
 #include <ESPmDNS.h>
+#include "secret.h"
+
 #include <ADS1256.h>
 #include <SPI.h>
 
@@ -123,13 +124,6 @@ void clearBuffer() {
 
 
 void loadSensorConfig() {
-    if(!SPIFFS.begin(true)) {
-        Serial.println("SPIFFS Mount Failed");
-        return;
-    } else {
-        Serial.println("SPIFFS Mount Successful");
-    }
-
     File file = SPIFFS.open("/sensorConfig.json", "r");
     if (!file) {
         Serial.println("No config file found, using defaults");
@@ -454,14 +448,16 @@ void setupWiFi() {
     }
 }   
 
-void setup() {
-    Serial.begin(115200);
+void setupSPIFFS() {
+    if (!SPIFFS.begin(true)) {
+        Serial.println("An Error has occurred while mounting SPIFFS");
+        ESP.restart();
+        return;
+    }
+    Serial.println("SPIFFS mounted successfully");
+}
 
-    loadSensorConfig();
-    setupADC();
-    setupPins();
-    setupWiFi();
-
+void setupWebServices() {
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send(SPIFFS, "/index.html", "text/html");
     });
@@ -470,6 +466,17 @@ void setup() {
 
     webSocket.begin();
     webSocket.onEvent(webSocketEvent);
+}
+
+void setup() {
+    Serial.begin(115200);
+
+    setupSPIFFS();
+    loadSensorConfig();
+    setupADC();
+    setupPins();
+    setupWiFi();
+    setupWebServices();
 
     // Create tasks on different cores
     xTaskCreatePinnedToCore(
