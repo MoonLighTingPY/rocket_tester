@@ -112,7 +112,7 @@ struct SensorData {
 };
 
 // Circular buffer to store sensor data
-constexpr size_t BUFFER_SIZE = 1500; // Reduced from 2000 to 1000
+constexpr size_t BUFFER_SIZE = 1600; // Reduced from 2000 to 1000
 CircularBuffer<SensorData, BUFFER_SIZE> dataBuffer;
 
 
@@ -271,24 +271,24 @@ void sensorTask(void *parameter) {
             for (size_t i = 0; i < SENSOR_COUNT; i++) {
                 const SensorConfig& sensor = sensorConfigs[i];
                 if (sensor.enabled) {
-                    digitalWrite(W5500_CS, HIGH);  // Deselect W5500
-                    digitalWrite(ADS_CS, LOW);     // Select ADS1256
+                    // digitalWrite(W5500_CS, HIGH);  // Deselect W5500
+                    // digitalWrite(ADS_CS, LOW);     // Select ADS1256
                     // adc.waitDRDY(); // Wait for previous conversion
                     if (!firstChannel) {
                         // Read previous channel's conversion
                         // float voltage = adc.readCurrentChannel();
-                        digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
-                        digitalWrite(W5500_CS, LOW);     // Re-select W5500
+                        // digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
+                        // digitalWrite(W5500_CS, LOW);     // Re-select W5500
                         float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming
                         data.values[i-1] = voltage * sensorConfigs[i-1].conversionFactor + sensorConfigs[i-1].offset;
                     }
                     
                     // Set next channel
-                    digitalWrite(W5500_CS, HIGH);    // Deselect W5500
-                    digitalWrite(ADS_CS, LOW);       // Select ADS1256
+                    // digitalWrite(W5500_CS, HIGH);    // Deselect W5500
+                    // digitalWrite(ADS_CS, LOW);       // Select ADS1256
                     // adc.setChannel(sensor.adcChannel);
-                    digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
-                    digitalWrite(W5500_CS, LOW);     // Re-select W5500
+                    // digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
+                    // digitalWrite(W5500_CS, LOW);     // Re-select W5500
                     firstChannel = false;
                 } else {
                     data.values[i] = 0.0f;
@@ -297,12 +297,12 @@ void sensorTask(void *parameter) {
             
             // Read the last enabled channel
             if (!firstChannel) {
-                digitalWrite(W5500_CS, HIGH);    // Deselect W5500
-                digitalWrite(ADS_CS, LOW);       // Select ADS1256
+                // digitalWrite(W5500_CS, HIGH);    // Deselect W5500
+                // digitalWrite(ADS_CS, LOW);       // Select ADS1256
                 // adc.waitDRDY();
                 // float voltage = adc.readCurrentChannel();
-                digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
-                digitalWrite(W5500_CS, LOW);     // Re-select W5500
+                // digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
+                // digitalWrite(W5500_CS, LOW);     // Re-select W5500
                 float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming   
                 // Find last enabled sensor
                 for (int i = SENSOR_COUNT-1; i >= 0; i--) {
@@ -316,9 +316,10 @@ void sensorTask(void *parameter) {
             if (!dataBuffer.isFull()) {
                 dataBuffer.push(data);
             }
-            digitalWrite(ADS_CS, HIGH); // Deselect ADS1256
-            digitalWrite(W5500_CS, LOW);
             portEXIT_CRITICAL(&bufferMux);
+
+            // digitalWrite(ADS_CS, HIGH); // Deselect ADS1256
+            // digitalWrite(W5500_CS, LOW);
         }
     }
 }
@@ -326,22 +327,22 @@ void sensorTask(void *parameter) {
 // WebSocket communication task
 void webSocketTask(void *parameter) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(2);
+    const TickType_t xFrequency = pdMS_TO_TICKS(1);
     
     while (true) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         webSocket.loop();
         ArduinoOTA.handle();
         // Always keep W5500 selected for network communication
-        digitalWrite(ADS_CS, HIGH);     // Ensure ADS1256 is deselected
-        digitalWrite(W5500_CS, LOW);    // Keep W5500 selected during network operations
+        // digitalWrite(ADS_CS, HIGH);     // Ensure ADS1256 is deselected
+        // digitalWrite(W5500_CS, LOW);    // Keep W5500 selected during network operations
 
 
         if (isReading && !dataBuffer.isEmpty()) {
             JsonDocument doc;
             JsonArray array = doc["data"].to<JsonArray>();
             size_t processedCount = 0;
-            const size_t MAX_BATCH = 50;
+            const size_t MAX_BATCH = 10;
 
             portENTER_CRITICAL(&bufferMux);
 
@@ -487,19 +488,47 @@ void setupEthernet() {
     digitalWrite(W5500_CS, HIGH); // Deselect W5500
 
     ETH.begin(W5500_CS, W5500_INT, W5500_RST);
+    digitalWrite(W5500_CS, LOW); // Select W5500
     Serial.println("Ethernet initialized");
 }
+
+
 
 void setupWiFi() {
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
     WiFi.persistent(true);
+    
+    // Connect to WiFi first using DHCP
     WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) {
+    unsigned long startAttemptTime = millis();
+    
+    while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) {
         delay(1000);
         Serial.println("Connecting to WiFi...");
     }
-    Serial.println(WiFi.localIP());
+
+    if (WiFi.status() == WL_CONNECTED) {
+        // Get router's subnet info
+        IPAddress routerIP = WiFi.gatewayIP();
+        IPAddress routerSubnet = WiFi.subnetMask();
+        
+        // Proposed static IP
+        IPAddress desiredIP(192, 168, 0, 69);
+        
+        // Check if desired IP is in same subnet as router
+        if ((routerIP & routerSubnet) == (desiredIP & routerSubnet)) {
+            if (WiFi.config(desiredIP, routerIP, routerSubnet)) {
+                Serial.println("Static IP configuration successful");
+            } else {
+                Serial.println("Failed to set static IP, staying with DHCP");
+            }
+        } else {
+            Serial.println("Desired IP not in router's subnet, staying with DHCP");
+        }
+    } else {
+        Serial.println("Failed to connect to WiFi, staying with DHCP");
+    }
 
     delay(1000);
 
