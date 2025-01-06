@@ -5,7 +5,7 @@
       "type": 0,
       "name": "LoadCell1",
       "adcChannel": 0,
-      "conversionFactor": 0.3025,
+      "conversionFactor": 240.0,
       "offset": 0.0
     },
     {
@@ -13,7 +13,7 @@
       "type": 0,
       "name": "LoadCell2", 
       "adcChannel": 1,
-      "conversionFactor": 0.3025,
+      "conversionFactor": 240.0,
       "offset": 0.0
     },
     {

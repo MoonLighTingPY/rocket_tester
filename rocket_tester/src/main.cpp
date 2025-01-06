@@ -69,8 +69,8 @@ struct SensorConfig {
 // Array of sensor configurations
 constexpr size_t SENSOR_COUNT = 8;
 SensorConfig sensorConfigs[SENSOR_COUNT] = {
-    {true, LOAD, 0, "LoadCell1", 0.3025, 0},           // Channel 0: Load Cell conversionFactor = 600 kg / 2.5V = 0.3025 kg/V
-    {false, LOAD, 1, "LoadCell2", 0.3025, 0},          // Channel 1: Load Cell 2 conversionFactor = 600 kg / 2.5V = 0.3025 kg/V
+    {true, LOAD, 0, "LoadCell1", 240.0, 0},           // Channel 0: Load Cell conversionFactor = 600 kg / 2.5V = 240.0 kg/V
+    {false, LOAD, 1, "LoadCell2", 240.0, 0},          // Channel 1: Load Cell 2 conversionFactor = 600 kg / 2.5V = 240.0 kg/V
     {false, PRESSURE, 2, "Pressure1", 240.0, -16.0 },  // Channel 2: Pressure Sensor 2 conversionFactor = 600 bar / 2.5V = 240 bar/V
     {false, PRESSURE, 3, "Pressure2", 240.0, -16.0 },  // Channel 3: Pressure Sensor 3 conversionFactor = 600 bar / 2.5V = 240 bar/V
     {false, PRESSURE, 4, "Pressure3", 240.0, -16.0 },  // Channel 4: Pressure Sensor 4 conversionFactor = 600 bar / 2.5V = 240 bar/V
