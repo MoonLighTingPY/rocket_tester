@@ -9,6 +9,7 @@
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
+#include <ETH.h>
 #include "secret.h"
 
 #include <ADS1256.h>
@@ -24,8 +25,24 @@ const bool ADS_USE_RESET = false; // If reset pin is tied to 3.3V
 // CS: GPIO 5
 // MOSI/MISO/SCK: Default SPI pins
 
+// ADS1256 pins
+#define ADS_CS    5    // Keep your current CS pin
+#define ADS_DRDY  17   // Keep your current DRDY pin
+#define ADS_RST   16   // Keep your current RST pin
+
+
 // Create ADS1256 instance
 // ADS1256 adc(ADS_CLOCK_MHZ, ADS_VREF, ADS_USE_RESET);
+
+#define VSPI_SCLK  18  // Default SPI pins for VSPI
+#define VSPI_MISO  19
+#define VSPI_MOSI  23
+
+
+// W5500 pins
+#define W5500_CS  4    // New CS pin for W5500
+#define W5500_INT 2    // Interrupt pin for W5500
+#define W5500_RST 15   // Reset pin for W5500
 
 
 // Network credentials
@@ -201,30 +218,33 @@ void sendSensorConfig(uint8_t clientNum) {
 
 void handleUpdateConfig(uint8_t clientNum, JsonObject& data) {
     if (!data["config"].is<JsonArray>()) return;
-
     JsonArray arr = data["config"].as<JsonArray>();
+    
     portENTER_CRITICAL(&bufferMux);
     for (size_t i = 0; i < arr.size() && i < SENSOR_COUNT; i++) {
-        sensorConfigs[i].enabled = arr[i]["enabled"];
-        sensorConfigs[i].type = (SensorType)(int)arr[i]["type"];
         // Free old name if it exists
         if (sensorConfigs[i].name) {
+            Serial.printf("Freeing old name for sensor %d: %s\n", i, sensorConfigs[i].name);
             free((void*)sensorConfigs[i].name);
+            sensorConfigs[i].name = nullptr;
         }
         // Allocate and copy new name
         const char* newName = arr[i]["name"].as<const char*>();
         if (newName) {
+            Serial.printf("Setting new name for sensor %d: %s\n", i, newName);
             sensorConfigs[i].name = strdup(newName);
         }
+        
+        // Update other fields
+        sensorConfigs[i].enabled = arr[i]["enabled"];
+        sensorConfigs[i].type = (SensorType)(int)arr[i]["type"];
         sensorConfigs[i].adcChannel = arr[i]["adcChannel"];
         sensorConfigs[i].conversionFactor = arr[i]["conversionFactor"];
         sensorConfigs[i].offset = arr[i]["offset"];
     }
     portEXIT_CRITICAL(&bufferMux);
-
+    
     saveSensorConfig(arr);
-
-    // Send back updated config
     sendSensorConfig(clientNum);
 }
 
@@ -240,26 +260,35 @@ void sensorTask(void *parameter) {
         
         if (isReading) {
             portENTER_CRITICAL(&bufferMux);
+
             uint32_t currentTime = micros();
             data.readingsTimestamp = currentTime - readingsStartTime;
             data.ignitionTimestamp = ingitedWire ? (currentTime - ingitionStartTime) : 0;
+            
             
             // Read enabled sensors more efficiently
             bool firstChannel = true;
             for (size_t i = 0; i < SENSOR_COUNT; i++) {
                 const SensorConfig& sensor = sensorConfigs[i];
                 if (sensor.enabled) {
+                    digitalWrite(W5500_CS, HIGH);  // Deselect W5500
+                    digitalWrite(ADS_CS, LOW);     // Select ADS1256
                     // adc.waitDRDY(); // Wait for previous conversion
-                    
                     if (!firstChannel) {
                         // Read previous channel's conversion
                         // float voltage = adc.readCurrentChannel();
+                        digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
+                        digitalWrite(W5500_CS, LOW);     // Re-select W5500
                         float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming
                         data.values[i-1] = voltage * sensorConfigs[i-1].conversionFactor + sensorConfigs[i-1].offset;
                     }
                     
                     // Set next channel
+                    digitalWrite(W5500_CS, HIGH);    // Deselect W5500
+                    digitalWrite(ADS_CS, LOW);       // Select ADS1256
                     // adc.setChannel(sensor.adcChannel);
+                    digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
+                    digitalWrite(W5500_CS, LOW);     // Re-select W5500
                     firstChannel = false;
                 } else {
                     data.values[i] = 0.0f;
@@ -268,8 +297,12 @@ void sensorTask(void *parameter) {
             
             // Read the last enabled channel
             if (!firstChannel) {
+                digitalWrite(W5500_CS, HIGH);    // Deselect W5500
+                digitalWrite(ADS_CS, LOW);       // Select ADS1256
                 // adc.waitDRDY();
                 // float voltage = adc.readCurrentChannel();
+                digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
+                digitalWrite(W5500_CS, LOW);     // Re-select W5500
                 float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming   
                 // Find last enabled sensor
                 for (int i = SENSOR_COUNT-1; i >= 0; i--) {
@@ -283,6 +316,8 @@ void sensorTask(void *parameter) {
             if (!dataBuffer.isFull()) {
                 dataBuffer.push(data);
             }
+            digitalWrite(ADS_CS, HIGH); // Deselect ADS1256
+            digitalWrite(W5500_CS, LOW);
             portEXIT_CRITICAL(&bufferMux);
         }
     }
@@ -291,19 +326,26 @@ void sensorTask(void *parameter) {
 // WebSocket communication task
 void webSocketTask(void *parameter) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(1);
+    const TickType_t xFrequency = pdMS_TO_TICKS(2);
     
     while (true) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         webSocket.loop();
         ArduinoOTA.handle();
+        // Always keep W5500 selected for network communication
+        digitalWrite(ADS_CS, HIGH);     // Ensure ADS1256 is deselected
+        digitalWrite(W5500_CS, LOW);    // Keep W5500 selected during network operations
+
 
         if (isReading && !dataBuffer.isEmpty()) {
             JsonDocument doc;
             JsonArray array = doc["data"].to<JsonArray>();
+            size_t processedCount = 0;
+            const size_t MAX_BATCH = 50;
 
             portENTER_CRITICAL(&bufferMux);
-            while (!dataBuffer.isEmpty()) {
+
+            while (!dataBuffer.isEmpty() && processedCount < MAX_BATCH) {
                 SensorData data = dataBuffer.shift();
                 JsonObject reading = array.add<JsonObject>();
 
@@ -321,8 +363,7 @@ void webSocketTask(void *parameter) {
                     }
                 }
                 dataCounter++; // Temporary, to test data streaming
-                dataCounter++; // Temporary, to test data streaming
-                dataCounter++; // Temporary, to test data streaming
+                processedCount++;
 
             }
             portEXIT_CRITICAL(&bufferMux);
@@ -416,13 +457,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
     }
 }
 
-void setupADC() {
-    // Initialize ADC with desired data rate and gain
-    // adc.begin(ADS1256_DRATE_1000SPS, ADS1256_GAIN_1, false);
-    // Wait for ADC to be ready
-    // adc.waitDRDY();
-    Serial.println("ADS1256 initialized");
-}
 
 void setupPins() {
     pinMode(ENGINE_OUT_PIN, OUTPUT);
@@ -435,7 +469,31 @@ void setupPins() {
     attachInterrupt(digitalPinToInterrupt(ENGINE_IN_PIN), engineStartISR, FALLING);
 }
 
+void setupADC() {
+    // Initialize ADC with desired data rate and gain
+    // SPI.begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI);
+    // pinMode(ADS_CS, OUTPUT);
+    // digitalWrite(ADS_CS, HIGH); // Deselect ADS1256
+
+    // adc.begin(ADS1256_DRATE_1000SPS, ADS1256_GAIN_1, false);
+    // Wait for ADC to be ready
+    // adc.waitDRDY();
+    Serial.println("ADS1256 initialized");
+}
+
+void setupEthernet() {
+    // W5500 will use the already initialized SPI bus
+    pinMode(W5500_CS, OUTPUT);
+    digitalWrite(W5500_CS, HIGH); // Deselect W5500
+
+    ETH.begin(W5500_CS, W5500_INT, W5500_RST);
+    Serial.println("Ethernet initialized");
+}
+
 void setupWiFi() {
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(true);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(1000);
@@ -443,13 +501,17 @@ void setupWiFi() {
     }
     Serial.println(WiFi.localIP());
 
+    delay(1000);
+
     if (!MDNS.begin(hostname)) {
         Serial.println("Error setting up MDNS responder!");
     } else {
         Serial.println("mDNS responder started");
         Serial.println("http://" + String(hostname) + ".local");
     }
-}   
+}
+
+
 
 void setupSPIFFS() {
     if (!SPIFFS.begin(true)) {
@@ -589,12 +651,14 @@ void setupOTA() {
 
 void setup() {
     Serial.begin(115200);
+    SPI.begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI); // Initialize SPI bus for VSPI
 
     setupSPIFFS();
     loadSensorConfig();
     setupADC();
     setupPins();
     setupWiFi();
+    // setupEthernet();
     setupWebServices();
     setupOTA();
 
@@ -602,9 +666,9 @@ void setup() {
     xTaskCreatePinnedToCore(
         sensorTask,
         "SensorTask",
-        10000,
+        16384,
         NULL,
-        configMAX_PRIORITIES - 1,  // Highest priority for sensor readings
+        5,  // Highest priority for sensor readings
         &sensorTaskHandle,
         0  // Core 0
     );
@@ -612,9 +676,9 @@ void setup() {
     xTaskCreatePinnedToCore(
         webSocketTask,
         "WebSocketTask",
-        10000,
+        16384,
         NULL,
-        configMAX_PRIORITIES - 2,  // High but lower than sensor task
+        4,  // High but lower than sensor task
         &webSocketTaskHandle,
         1  // Core 1
     );
