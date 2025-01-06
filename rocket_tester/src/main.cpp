@@ -461,56 +461,87 @@ void setupSPIFFS() {
 }
 
 void setupWebServices() {
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
+    
+
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send(SPIFFS, "/index.html", "text/html");
     });
     
+
+    // Handle OPTIONS preflight requests
+    server.onNotFound([](AsyncWebServerRequest *request) {
+        if (request->method() == HTTP_OPTIONS) {
+            request->send(200);
+        } else {
+            request->send(404);
+        }
+    });
+
+     // Update firmware endpoint
     server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
-        request->send(200);
-    }, [](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+        bool success = !Update.hasError();
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", 
+            success ? "Firmware update successful. Device will restart." : "Firmware update failed!");
+        response->addHeader("Connection", "close");
+        // Don't add CORS header here since it's already set globally
+        request->send(response);
+        if(success) {
+            delay(1000);
+            ESP.restart();
+        }
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
         if(!index) {
-            // Start firmware update
             Serial.println("Update Start");
             if(!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
                 Update.printError(Serial);
+                return;
             }
         }
-        
+
         if(Update.write(data, len) != len) {
             Update.printError(Serial);
+            return;
         }
-        
+
         if(final) {
             if(!Update.end(true)) {
                 Update.printError(Serial);
-            } else {
-                Serial.println("Update Success");
-                ESP.restart();
             }
         }
     });
-    
+
+    // Update SPIFFS endpoint  
     server.on("/updatefs", HTTP_POST, [](AsyncWebServerRequest *request) {
-        request->send(200);
-    }, [](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+        bool success = !Update.hasError();
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", 
+            success ? "SPIFFS update successful. Device will restart." : "SPIFFS update failed!");
+        response->addHeader("Connection", "close");
+        // Don't add CORS header here since it's already set globally
+        request->send(response);
+        if(success) {
+            delay(1000);
+            ESP.restart();
+        }
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
         if(!index) {
-            // Start SPIFFS update
             Serial.println("SPIFFS Update Start");
             if(!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
                 Update.printError(Serial);
+                return;
             }
         }
-        
+
         if(Update.write(data, len) != len) {
             Update.printError(Serial);
+            return;
         }
-        
+
         if(final) {
             if(!Update.end(true)) {
                 Update.printError(Serial);
-            } else {
-                Serial.println("SPIFFS Update Success");
-                ESP.restart();
             }
         }
     });

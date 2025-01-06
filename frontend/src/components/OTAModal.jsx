@@ -7,115 +7,159 @@ import {
 } from '@chakra-ui/react';
 
 const OTAModal = ({ isOpen, onClose }) => {
-  const [firmwareFile, setFirmwareFile] = useState(null);
-  const [spiffsFile, setSpiffsFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const toast = useToast();
-
-  const handleUpload = async () => {
-    try {
-      setUploading(true);
-      
-      if (firmwareFile) {
+    const [firmwareFile, setFirmwareFile] = useState(null);
+    const [spiffsFile, setSpiffsFile] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [currentOperation, setCurrentOperation] = useState('');
+    const toast = useToast();
+  
+    const uploadFile = async (file, endpoint, operation) => {
         const formData = new FormData();
-        formData.append('firmware', firmwareFile);
+        formData.append('file', file);
         
-        const response = await fetch('http://esp32-rockettester.local/update', {
-          method: 'POST',
-          body: formData
+        const xhr = new XMLHttpRequest();
+        
+        return new Promise((resolve, reject) => {
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    setProgress(percentComplete);
+                }
+            };
+    
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    toast({
+                        title: 'Update Successful',
+                        description: xhr.responseText,
+                        status: 'success',
+                        duration: 5000,
+                        isClosable: true
+                    });
+                    resolve(xhr.responseText);
+                } else {
+                    reject(new Error(`${operation} upload failed: ${xhr.status} - ${xhr.responseText}`));
+                }
+            };
+    
+            xhr.onerror = () => {
+                console.error('XHR Error:', xhr.statusText);
+                reject(new Error(`${operation} upload failed: Network error`));
+            };
+    
+            xhr.open('POST', `http://esp32-rockettester.local/${endpoint}`);
+            xhr.send(formData);
         });
-        
-        if (!response.ok) throw new Error('Firmware upload failed');
-      }
-      
-      if (spiffsFile) {
-        const formData = new FormData();
-        formData.append('spiffs', spiffsFile);
-        
-        const response = await fetch('http://esp32-rockettester.local/updatefs', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!response.ok) throw new Error('SPIFFS upload failed');
-      }
-
-      toast({
-        title: 'Update successful',
-        description: 'Device will restart automatically',
-        status: 'success',
-        duration: 5000
-      });
-      
-      onClose();
-    } catch (error) {
-      toast({
-        title: 'Update failed',
-        description: error.message,
-        status: 'error',
-        duration: 5000
-      });
-    } finally {
-      setUploading(false);
-      setProgress(0);
-    }
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>OTA Update</ModalHeader>
-        <ModalBody>
-          <VStack spacing={4}>
-            <FormControl>
-              <FormLabel>Firmware (.bin)</FormLabel>
-              <Input
-                type="file"
-                accept=".bin"
-                onChange={(e) => setFirmwareFile(e.target.files[0])}
-              />
-            </FormControl>
+    };
+    
+    const handleUpload = async () => {
+        try {
+            setUploading(true);
             
-            <FormControl>
-              <FormLabel>SPIFFS Image (.bin)</FormLabel>
-              <Input
-                type="file"
-                accept=".bin"
-                onChange={(e) => setSpiffsFile(e.target.files[0])}
-              />
-            </FormControl>
-
-            {uploading && (
-              <>
-                <Progress
-                  value={progress}
-                  size="sm"
-                  width="100%"
-                  colorScheme="blue"
+            if (firmwareFile) {
+                setCurrentOperation('Uploading firmware');
+                setProgress(0);
+                await uploadFile(firmwareFile, 'update', 'firmware');
+                
+                setCurrentOperation('Device is restarting...');
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                window.location.reload(); // Reload after firmware update
+            }
+            
+            if (spiffsFile) {
+                setCurrentOperation('Uploading SPIFFS');
+                setProgress(0);
+                await uploadFile(spiffsFile, 'updatefs', 'spiffs');
+                
+                setCurrentOperation('Device is restarting...');
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                window.location.reload(); // Reload after SPIFFS update
+            }
+    
+            toast({
+                title: 'Update Complete',
+                description: 'All updates completed successfully. Device has restarted.',
+                status: 'success',
+                duration: 5000,
+                isClosable: true
+            });
+            
+            onClose();
+        } catch (error) {
+            toast({
+                title: 'Update Failed',
+                description: error.message,
+                status: 'error',
+                duration: 5000,
+                isClosable: true
+            });
+        } finally {
+            setUploading(false);
+            setProgress(0);
+            setCurrentOperation('');
+        }
+    };
+  
+    return (
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>OTA Update</ModalHeader>
+          <ModalBody>
+            <VStack spacing={4}>
+              <FormControl>
+                <FormLabel>Firmware (.bin)</FormLabel>
+                <Input
+                  type="file"
+                  accept=".bin"
+                  onChange={(e) => setFirmwareFile(e.target.files[0])}
                 />
-                <Text>{progress}%</Text>
-              </>
-            )}
-          </VStack>
-        </ModalBody>
-
-        <ModalFooter>
-          <Button mr={3} onClick={onClose}>Cancel</Button>
-          <Button
-            colorScheme="blue"
-            onClick={handleUpload}
-            isLoading={uploading}
-            loadingText="Uploading"
-            isDisabled={!firmwareFile && !spiffsFile}
-          >
-            Upload
-          </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
-  );
-};
+              </FormControl>
+              
+              <FormControl>
+                <FormLabel>SPIFFS Image (.bin)</FormLabel>
+                <Input
+                  type="file"
+                  accept=".bin"
+                  onChange={(e) => setSpiffsFile(e.target.files[0])}
+                />
+              </FormControl>
+  
+              {uploading && (
+                <>
+                  <Text>{currentOperation}</Text>
+                  <Progress
+                    value={progress}
+                    size="sm"
+                    width="100%"
+                    colorScheme="blue"
+                    hasStripe
+                    isAnimated
+                  />
+                  <Text>{progress.toFixed(1)}%</Text>
+                </>
+              )}
+            </VStack>
+          </ModalBody>
+  
+          <ModalFooter>
+            <Button mr={3} onClick={onClose} isDisabled={uploading}>
+              Cancel
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={handleUpload}
+              isLoading={uploading}
+              loadingText={currentOperation}
+              isDisabled={(!firmwareFile && !spiffsFile) || uploading}
+            >
+              Upload
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    );
+  };
 
 export default OTAModal;

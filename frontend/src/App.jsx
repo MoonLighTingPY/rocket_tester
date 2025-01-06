@@ -1,14 +1,17 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Box, VStack, Flex, Button, ChakraProvider, ColorModeProvider, CSSReset } from '@chakra-ui/react';
 import { useDataManager } from './hooks/useDataManager';
-import DataContext from './hooks/DataContext';
 import { ReadingProvider } from './hooks/ReadingContext';
+import { useState } from 'react';
+import DataContext from './hooks/DataContext';
 import HomePage from './components/HomePage';
 import ImportPage from './components/ImportPage';
 import AnalysisPage from './components/AnalysisPage';
+import OTAModal from './components/OTAModal';
 import "./App.css"
 
 function App() {
+  const [isOTAModalOpen, setIsOTAModalOpen] = useState(false);
   const dataManager = useDataManager();
   return (
     <ChakraProvider>
@@ -29,6 +32,14 @@ function App() {
                     <Link to="/analysis">
                       <Button colorScheme="purple">Analysis</Button>
                     </Link>
+                    <Link onClick={() => setIsOTAModalOpen(true)}>
+                      <Button colorScheme="gray">OTA Update</Button>
+                    </Link>
+                    {/* Add OTA modal */}
+                    <OTAModal 
+                      isOpen={isOTAModalOpen} 
+                      onClose={() => setIsOTAModalOpen(false)} 
+                    />
                   </Flex>
                   <Routes>
                     <Route path="/" element={<HomePage />} />
