@@ -4,9 +4,9 @@ import {
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
   Button, FormControl, FormLabel, Input, Checkbox, VStack, SimpleGrid,
   Box, Text, Divider, FormErrorMessage, Badge, HStack, Select, Tooltip, InputGroup, InputRightAddon,
+  ButtonGroup
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
-
 
 const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   const [localConfig, setLocalConfig] = useState(sensorConfig || []);
@@ -34,49 +34,57 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
     }
   }, [sensorConfig]);
 
-    // Add preset management functions
-  const saveAsPreset = () => {
-    if (!presetName.trim()) {
-      setErrors(prev => ({ ...prev, preset: 'Preset name is required' }));
-      return;
-    }
+  const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
 
-    const newPresets = {
-      ...presets,
-      [presetName]: localConfig.map((sensor, index) => ({
-        ...sensor,
-        conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`]),
-        offset: parseFloat(editableValues[`${index}-offset`])
-      }))
+
+    // Add preset management functions
+    const loadPreset = (presetName) => {
+      if (!presets[presetName]) return;
+
+      const preset = deepClone(presets[presetName]); // Deep clone the preset
+      setLocalConfig(preset);
+      
+      const newEditableValues = {};
+      preset.forEach((sensor, index) => {
+        newEditableValues[`${index}-conversionFactor`] = sensor.conversionFactor?.toString() ?? '0.00';
+        newEditableValues[`${index}-offset`] = sensor.offset?.toString() ?? '0.00';
+      });
+      
+      setEditableValues(newEditableValues); // Replace entirely instead of merging
+      setErrors({});
     };
 
-    setPresets(newPresets);
-    localStorage.setItem('sensorConfigPresets', JSON.stringify(newPresets));
-    setPresetName('');
-    setErrors(prev => ({ ...prev, preset: null }));
-  };
 
-  const loadPreset = (presetName) => {
-    if (!presets[presetName]) return;
-  
-    const preset = presets[presetName];
-    // Update local config first
-    setLocalConfig(preset);
+    const saveAsPreset = () => {
+      if (!presetName.trim()) {
+        setErrors(prev => ({ ...prev, preset: { type: 'error', message: 'Preset name is required' } }));
+        return;
+      }
     
-    // Create new editable values object
-    const newEditableValues = {};
-    preset.forEach((sensor, index) => {
-      newEditableValues[`${index}-conversionFactor`] = sensor.conversionFactor?.toString() ?? '0.00';
-      newEditableValues[`${index}-offset`] = sensor.offset?.toString() ?? '0.00';
-    });
+      // Create a deep copy of the current configuration
+      const configToSave = localConfig.map((sensor, index) => ({
+        ...deepClone(sensor),
+        conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`]),
+        offset: parseFloat(editableValues[`${index}-offset`])
+      }));
     
-    setEditableValues(prev => ({
-      ...prev,
-      ...newEditableValues
-    }));
+      const newPresets = {
+        ...deepClone(presets),
+        [presetName]: configToSave
+      };
     
-    setErrors({});
-  };
+      setPresets(newPresets);
+      localStorage.setItem('sensorConfigPresets', JSON.stringify(newPresets));
+      
+      // Select the newly created preset
+      setSelectedPreset(presetName);
+      
+      setPresetName('');
+      setErrors(prev => ({ 
+        ...prev, 
+        preset: { type: 'success', message: 'Preset created successfully' } 
+      }));
+    };
 
   const deletePreset = (presetName) => {
     const newPresets = { ...presets };
@@ -89,15 +97,24 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   };
 
   const validateField = (field, value, sensorName, index) => {
+    // Early return if missing required params
+    if (index === undefined || !localConfig[index]) {
+      return `Invalid sensor reference`;
+    }
+  
+    const sensor = localConfig[index];
+  
     if (field === 'conversionFactor') {
       if (value.trim() === '') return `${sensorName}: Conversion factor cannot be empty`;
       if (isNaN(value)) return `${sensorName}: Conversion factor must be a number`;
       if (parseFloat(value) === 0) return `${sensorName}: Conversion factor cannot be zero`;
     }
+  
     if (field === 'offset') {
       if (value.trim() === '') return `${sensorName}: Offset cannot be empty`;
       if (isNaN(value)) return `${sensorName}: Offset must be a number`;
     }
+  
     if (field === 'adcChannel') {
       // Basic validation
       if (value === '') return `${sensorName}: ADC channel cannot be empty`;
@@ -106,7 +123,6 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
       if (channel < 0 || channel > 7) return `${sensorName}: ADC channel must be between 0 and 7`;
       
       // Only check for duplicates if the sensor is enabled
-      const sensor = localConfig[index];
       if (sensor.enabled) {
         const duplicateSensor = localConfig.find((s, i) => 
           i !== index && // Not the same sensor
@@ -120,6 +136,31 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
       }
     }
     return null;
+  };
+
+  const updatePreset = () => {
+    if (!selectedPreset) return;
+  
+    // Create updated config with current values
+    const updatedConfig = localConfig.map((sensor, index) => ({
+      ...deepClone(sensor),
+      conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`]),
+      offset: parseFloat(editableValues[`${index}-offset`])
+    }));
+  
+    const newPresets = {
+      ...deepClone(presets),
+      [selectedPreset]: updatedConfig // Override existing preset
+    };
+  
+    setPresets(newPresets);
+    localStorage.setItem('sensorConfigPresets', JSON.stringify(newPresets));
+    
+    // Show success message
+    setErrors(prev => ({ 
+      ...prev, 
+      preset: { type: 'success', message: 'Preset updated successfully' }
+    }));
   };
 
   const handleChange = (index, field, value) => {
@@ -154,33 +195,37 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   const handleSave = () => {
     let hasErrors = false;
     const newErrors = {};
-
+  
     localConfig.forEach((sensor, index) => {
+      if (!sensor) return; // Skip invalid sensors
+  
       // Validate each field
       const fields = ['adcChannel', 'conversionFactor', 'offset'];
       fields.forEach(field => {
         const value = field === 'adcChannel' 
           ? sensor[field] 
           : editableValues[`${index}-${field}`];
-        const error = validateField(field, value, sensor.name);
+        
+        const error = validateField(field, value, sensor.name, index);
         if (error) {
           hasErrors = true;
           newErrors[`${index}-${field}`] = error;
         }
       });
     });
-
+  
     if (hasErrors) {
       setErrors(newErrors);
       return;
     }
-
+  
     // If no errors, proceed with save
     const finalConfig = localConfig.map((sensor, index) => ({
       ...sensor,
       conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`]),
       offset: parseFloat(editableValues[`${index}-offset`])
     }));
+  
     onSave(finalConfig);
     onClose();
   };
@@ -312,75 +357,79 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
             ))}
           </VStack>
         </ModalBody>
-        <ModalFooter 
-      justifyContent="space-between" 
-      alignItems="center"
-      borderTopWidth={1}
-      pt={4}
-      
-    >
-      {/* Preset Management Section - Left Side */}
-      <HStack spacing={4} flex={1} maxW="60%">
-        <FormControl isInvalid={errors.preset} maxW="200px">
-          <Select
-            size="md"
-            value={selectedPreset}
-            onChange={(e) => setSelectedPreset(e.target.value)}
-            placeholder={Object.keys(presets).length === 0 ? "No presets" : "Select preset"}
-          >
-            {Object.keys(presets).map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </Select>
-        </FormControl>
+<ModalFooter justifyContent="space-between" alignItems="center" borderTopWidth={1} pt={4}>
+  {/* Preset Management Section - Left Side */}
+  <HStack spacing={4} flex={1} maxW="60%">
+    <FormControl isInvalid={errors.preset?.type === 'error'} maxW="200px">
+      <Select
+        size="md"
+        value={selectedPreset}
+        onChange={(e) => setSelectedPreset(e.target.value)}
+        placeholder={Object.keys(presets).length === 0 ? "No presets" : "Create preset"}
+      >
+        {Object.keys(presets).map(name => (
+          <option key={name} value={name}>{name}</option>
+        ))}
+      </Select>
+      {errors.preset?.type === 'error' && (
+        <FormErrorMessage>{errors.preset.message}</FormErrorMessage>
+      )}
+      {errors.preset?.type === 'success' && (
+        <Text color="green.500" fontSize="sm">{errors.preset.message}</Text>
+      )}
+    </FormControl>
 
+    {selectedPreset ? (
+      // Show these buttons only when a preset is selected
+      <ButtonGroup size="md" isAttached variant="outline">
         <Button
-          size="md"
           colorScheme="blue"
           onClick={() => loadPreset(selectedPreset)}
-          isDisabled={!selectedPreset}
         >
           Load
         </Button>
-
-        {selectedPreset && (
-          <Button
-            size="md"
-            colorScheme="red"
-            variant="outline"
-            onClick={() => deletePreset(selectedPreset)}
-          >
-            Delete
-          </Button>
-        )}
-
-        <Divider orientation="vertical" h="30px" />
-
-        <FormControl isInvalid={errors.preset} maxW="200px">
+        <Button
+          colorScheme="green"
+          onClick={updatePreset}
+        >
+          Update
+        </Button>
+        <Button
+          colorScheme="red"
+          onClick={() => deletePreset(selectedPreset)}
+        >
+          Delete
+        </Button>
+      </ButtonGroup>
+    ) : (
+      // Show save new preset section when no preset is selected
+      <>
+        <FormControl isInvalid={errors.preset?.type === 'error'}>
           <Input
             size="md"
             placeholder="New preset name"
             value={presetName}
             onChange={(e) => setPresetName(e.target.value)}
           />
-          <FormErrorMessage>{errors.preset}</FormErrorMessage>
         </FormControl>
-
         <Button
           size="md"
           colorScheme="green"
           onClick={saveAsPreset}
+          isDisabled={!presetName.trim()}
         >
           Save New
         </Button>
-      </HStack>
+      </>
+    )}
+  </HStack>
 
-      {/* Modal Actions - Right Side */}
-      <HStack spacing={4}>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button colorScheme="blue" onClick={handleSave}>Save</Button>
-      </HStack>
-    </ModalFooter>
+  {/* Modal Actions - Right Side */}
+  <HStack spacing={4}>
+    <Button onClick={onClose}>Cancel</Button>
+    <Button colorScheme="blue" onClick={handleSave}>Save</Button>
+  </HStack>
+</ModalFooter>
   </ModalContent>
 </Modal>
   );

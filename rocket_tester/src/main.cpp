@@ -253,7 +253,7 @@ void sensorTask(void *parameter) {
                     if (!firstChannel) {
                         // Read previous channel's conversion
                         // float voltage = adc.readCurrentChannel();
-                        float voltage = dataCounter; // Temporary, to test data streaming
+                        float voltage = random(0,1000); // Temporary, to test data streaming
                         data.values[i-1] = voltage * sensorConfigs[i-1].conversionFactor + sensorConfigs[i-1].offset;
                     }
                     
@@ -269,7 +269,7 @@ void sensorTask(void *parameter) {
             if (!firstChannel) {
                 // adc.waitDRDY();
                 // float voltage = adc.readCurrentChannel();
-                float voltage = dataCounter; // Temporary, to test data streaming   
+                float voltage = random(0,1000); // Temporary, to test data streaming   
                 // Find last enabled sensor
                 for (int i = SENSOR_COUNT-1; i >= 0; i--) {
                     if (sensorConfigs[i].enabled) {
@@ -278,7 +278,7 @@ void sensorTask(void *parameter) {
                     }
                 }
             }
-
+            
             if (!dataBuffer.isFull()) {
                 dataBuffer.push(data);
             }
@@ -328,7 +328,6 @@ void webSocketTask(void *parameter) {
                 String jsonString;
                 serializeJson(doc, jsonString);
                 webSocket.broadcastTXT(jsonString);
-                dataCounter++;
             }
         }
 
