@@ -47,8 +47,7 @@ bool engineStarted = false;
 unsigned long readingsStartTime = 0;
 unsigned long ingitionStartTime = 0;
 unsigned long engineStartTime = 0;
-unsigned long dataCounter = 0;
-const float SAMPLE_PERIOD = 1.0/1000.0;  // ~1.16ms per sample at 860Hz
+size_t dataCounter = 0;
 // Sensor types
 enum SensorType {
     LOAD = 0,
@@ -253,7 +252,7 @@ void sensorTask(void *parameter) {
                     if (!firstChannel) {
                         // Read previous channel's conversion
                         // float voltage = adc.readCurrentChannel();
-                        float voltage = random(0,1000); // Temporary, to test data streaming
+                        float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming
                         data.values[i-1] = voltage * sensorConfigs[i-1].conversionFactor + sensorConfigs[i-1].offset;
                     }
                     
@@ -269,7 +268,7 @@ void sensorTask(void *parameter) {
             if (!firstChannel) {
                 // adc.waitDRDY();
                 // float voltage = adc.readCurrentChannel();
-                float voltage = random(0,1000); // Temporary, to test data streaming   
+                float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming   
                 // Find last enabled sensor
                 for (int i = SENSOR_COUNT-1; i >= 0; i--) {
                     if (sensorConfigs[i].enabled) {
@@ -291,7 +290,6 @@ void sensorTask(void *parameter) {
 void webSocketTask(void *parameter) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(1);
-    size_t dataCounter = 0; // Temporary, to test data streaming
     
     while (true) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
