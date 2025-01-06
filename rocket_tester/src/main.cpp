@@ -321,6 +321,9 @@ void webSocketTask(void *parameter) {
                     }
                 }
                 dataCounter++; // Temporary, to test data streaming
+                dataCounter++; // Temporary, to test data streaming
+                dataCounter++; // Temporary, to test data streaming
+
             }
             portEXIT_CRITICAL(&bufferMux);
 
@@ -461,9 +464,59 @@ void setupWebServices() {
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send(SPIFFS, "/index.html", "text/html");
     });
+    
+    server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
+        request->send(200);
+    }, [](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+        if(!index) {
+            // Start firmware update
+            Serial.println("Update Start");
+            if(!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
+                Update.printError(Serial);
+            }
+        }
+        
+        if(Update.write(data, len) != len) {
+            Update.printError(Serial);
+        }
+        
+        if(final) {
+            if(!Update.end(true)) {
+                Update.printError(Serial);
+            } else {
+                Serial.println("Update Success");
+                ESP.restart();
+            }
+        }
+    });
+    
+    server.on("/updatefs", HTTP_POST, [](AsyncWebServerRequest *request) {
+        request->send(200);
+    }, [](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+        if(!index) {
+            // Start SPIFFS update
+            Serial.println("SPIFFS Update Start");
+            if(!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)) {
+                Update.printError(Serial);
+            }
+        }
+        
+        if(Update.write(data, len) != len) {
+            Update.printError(Serial);
+        }
+        
+        if(final) {
+            if(!Update.end(true)) {
+                Update.printError(Serial);
+            } else {
+                Serial.println("SPIFFS Update Success");
+                ESP.restart();
+            }
+        }
+    });
+
     server.serveStatic("/assets", SPIFFS, "/assets");
     server.begin();
-
     webSocket.begin();
     webSocket.onEvent(webSocketEvent);
 }

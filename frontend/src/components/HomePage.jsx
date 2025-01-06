@@ -11,12 +11,14 @@ import ChartControls from './ChartControls';
 import Controls from './Controls';
 import DataContext from '../hooks/DataContext';
 import SensorConfigModal from './SensorConfigModal';
+import OTAModal from './OTAModal';
 
 
 const HomePage = () => {
   const { testData, ignitionDelay, sensorConfig, updateSensorConfig } = useContext(DataContext);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isOTAModalOpen, setIsOTAModalOpen] = useState(false);
   const [activeChart, setActiveChart] = useState(null);
   const chartRefs = useRef({
     0: { regular: null, fullScreen: null }, // Load Cell
@@ -66,6 +68,18 @@ const HomePage = () => {
       >
         Edit Sensor Config
       </Button>
+      <Button 
+        colorScheme="purple"
+        onClick={() => setIsOTAModalOpen(true)}
+      >
+        OTA Update
+      </Button>
+
+      {/* Add OTA modal */}
+      <OTAModal 
+        isOpen={isOTAModalOpen} 
+        onClose={() => setIsOTAModalOpen(false)} 
+      />
       <Controls />
       
       {ignitionDelay !== null && (
