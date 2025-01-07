@@ -32,7 +32,7 @@ const bool ADS_USE_RESET = false; // If reset pin is tied to 3.3V
 
 
 // Create ADS1256 instance
-// ADS1256 adc(ADS_CLOCK_MHZ, ADS_VREF, ADS_USE_RESET);
+ADS1256 adc(ADS_CLOCK_MHZ, ADS_VREF, ADS_USE_RESET);
 
 #define VSPI_SCLK  18  // Default SPI pins for VSPI
 #define VSPI_MISO  19
@@ -274,20 +274,20 @@ void sensorTask(void *parameter) {
                 if (sensor.enabled) {
                     // digitalWrite(W5500_CS, HIGH);  // Deselect W5500
                     // digitalWrite(ADS_CS, LOW);     // Select ADS1256
-                    // adc.waitDRDY(); // Wait for previous conversion
+                    adc.waitDRDY(); // Wait for previous conversion
                     if (!firstChannel) {
                         // Read previous channel's conversion
-                        // float voltage = adc.readCurrentChannel();
+                        float voltage = adc.readCurrentChannel();
                         // digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
                         // digitalWrite(W5500_CS, LOW);     // Re-select W5500
-                        float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming
+                        // float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming
                         data.values[i-1] = voltage * sensorConfigs[i-1].conversionFactor + sensorConfigs[i-1].offset;
                     }
                     
                     // Set next channel
                     // digitalWrite(W5500_CS, HIGH);    // Deselect W5500
                     // digitalWrite(ADS_CS, LOW);       // Select ADS1256
-                    // adc.setChannel(sensor.adcChannel);
+                    adc.setChannel(sensor.adcChannel);
                     // digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
                     // digitalWrite(W5500_CS, LOW);     // Re-select W5500
                     firstChannel = false;
@@ -300,11 +300,11 @@ void sensorTask(void *parameter) {
             if (!firstChannel) {
                 // digitalWrite(W5500_CS, HIGH);    // Deselect W5500
                 // digitalWrite(ADS_CS, LOW);       // Select ADS1256
-                // adc.waitDRDY();
-                // float voltage = adc.readCurrentChannel();
+                adc.waitDRDY();
+                float voltage = adc.readCurrentChannel();
                 // digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
                 // digitalWrite(W5500_CS, LOW);     // Re-select W5500
-                float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming   
+                // float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming   
                 // Find last enabled sensor
                 for (int i = SENSOR_COUNT-1; i >= 0; i--) {
                     if (sensorConfigs[i].enabled) {
@@ -463,6 +463,8 @@ void setupPins() {
     pinMode(ENGINE_IN_PIN, INPUT_PULLUP);
     pinMode(PYRO_PIN, OUTPUT);
     
+
+    
     digitalWrite(ENGINE_OUT_PIN, HIGH);
     digitalWrite(PYRO_PIN, LOW);
     
@@ -470,14 +472,20 @@ void setupPins() {
 }
 
 void setupADC() {
-    // Initialize ADC with desired data rate and gain
-    // SPI.begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI);
-    // pinMode(ADS_CS, OUTPUT);
-    // digitalWrite(ADS_CS, HIGH); // Deselect ADS1256
+    // Set up ADS1256 pins
+    pinMode(ADS_CS, OUTPUT);
+    digitalWrite(ADS_CS, HIGH); // Deselect ADS1256
+    pinMode(ADS_DRDY, INPUT);
+    pinMode(ADS_RST, OUTPUT);
+    digitalWrite(ADS_RST, HIGH);
 
-    // adc.begin(ADS1256_DRATE_1000SPS, ADS1256_GAIN_1, false);
-    // Wait for ADC to be ready
-    // adc.waitDRDY();
+    SPI.begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI); 
+    delay(100);
+
+    // Now reliably begin ADC
+    adc.begin(ADS1256_DRATE_1000SPS, ADS1256_GAIN_1, false);
+    adc.waitDRDY();
+
     Serial.println("ADS1256 initialized");
 }
 
@@ -679,14 +687,17 @@ void setupOTA() {
 
 void setup() {
     Serial.begin(115200);
+    Serial.println("Rocket Tester ESP32");
     SPI.begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI); // Initialize SPI bus for VSPI
+
+    setupADC();
+    // setupEthernet();
+
 
     setupSPIFFS();
     loadSensorConfig();
-    setupADC();
     setupPins();
     setupWiFi();
-    // setupEthernet();
     setupWebServices();
     setupOTA();
 
