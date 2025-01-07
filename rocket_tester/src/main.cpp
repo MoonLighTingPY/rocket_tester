@@ -342,12 +342,11 @@ void webSocketTask(void *parameter) {
         if (isReading && !dataBuffer.isEmpty()) {
             JsonDocument doc;
             JsonArray array = doc["data"].to<JsonArray>();
-            size_t processedCount = 0;
-            const size_t MAX_BATCH = 10;
+
 
             portENTER_CRITICAL(&bufferMux);
 
-            while (!dataBuffer.isEmpty() && processedCount < MAX_BATCH) {
+            while (!dataBuffer.isEmpty()) {
                 SensorData data = dataBuffer.shift();
                 JsonObject reading = array.add<JsonObject>();
 
@@ -365,7 +364,6 @@ void webSocketTask(void *parameter) {
                     }
                 }
                 dataCounter++; // Temporary, to test data streaming
-                processedCount++;
 
             }
             portEXIT_CRITICAL(&bufferMux);
