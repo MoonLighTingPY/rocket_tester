@@ -236,7 +236,7 @@ void handleUpdateConfig(uint8_t clientNum, JsonObject& data) {
 void sensorTask(void *parameter) {
     SensorData data;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(1); // 1ms = 1000Hz target rate
+    const TickType_t xFrequency = pdMS_TO_TICKS(10); // 1ms = 1000Hz target rate
 
         while (true) {
         if (isReading) {
@@ -423,7 +423,7 @@ void setupADC() {
     SPI.begin();
     SPI.beginTransaction(SPISettings(7680000, MSBFIRST, SPI_MODE1));
     
-    adc.begin(ADS1256_DRATE_30000SPS, ADS1256_GAIN_1, false);
+    adc.begin(ADS1256_DRATE_1000SPS, ADS1256_GAIN_1, false);
     
     // Reset all channels
     for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
