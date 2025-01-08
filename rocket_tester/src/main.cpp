@@ -118,14 +118,13 @@ void IRAM_ATTR engineStartISR() {
 }
 
 // Function to clear the buffer
-void clearBuffer() {
+void clearDataBuffer() {
     portENTER_CRITICAL(&bufferMux);
     while (!dataBuffer.isEmpty()) {
-        dataBuffer.shift();
+        dataBuffer.pop();
     }
     portEXIT_CRITICAL(&bufferMux);
 }
-
 
 void loadSensorConfig() {
     File file = SPIFFS.open("/sensorConfig.json", "r");
@@ -346,6 +345,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         }
         case WStype_DISCONNECTED: {
             Serial.printf("WebSocket client #%u disconnected\n", num);
+            clearDataBuffer();
             isReading = false;
             ingitedWire = false;
             engineStarted = false;
@@ -370,6 +370,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
             
             if (message == "start_readings") {
+                clearDataBuffer();
                 isReading = true;
                 dataCounter = 0;
                 readingsStartTime = micros();
@@ -389,7 +390,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 dataCounter = 0;
                 digitalWrite(PYRO_PIN, LOW);
 
-                clearBuffer(); // Clear the buffer when stopping the readings so that the next test starts with an empty buffer and no old data lmaooo
+                clearDataBuffer(); // Clear the buffer when stopping the readings so that the next test starts with an empty buffer and no old data lmaooo
                 JsonDocument doc;
                 doc.clear(); // Good practice to clear the document before reuse
                 doc["type"] = "time_difference";
