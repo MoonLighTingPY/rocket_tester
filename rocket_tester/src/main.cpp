@@ -236,74 +236,44 @@ void handleUpdateConfig(uint8_t clientNum, JsonObject& data) {
 void sensorTask(void *parameter) {
     SensorData data;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(1);
-    
-    while (true) {
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
-        
-        if (isReading) {
-            portENTER_CRITICAL(&bufferMux);
+    const TickType_t xFrequency = pdMS_TO_TICKS(1); // 1ms = 1000Hz target rate
 
+        while (true) {
+        if (isReading) {
             uint32_t currentTime = micros();
             data.readingsTimestamp = currentTime - readingsStartTime;
             data.ignitionTimestamp = ingitedWire ? (currentTime - ingitionStartTime) : 0;
-            
-            
-            // Read enabled sensors more efficiently
-            bool firstChannel = true;
-            for (size_t i = 0; i < SENSOR_COUNT; i++) {
-                const SensorConfig& sensor = sensorConfigs[i];
-                if (sensor.enabled) {
-                    // digitalWrite(W5500_CS, HIGH);  // Deselect W5500
-                    // digitalWrite(ADS_CS, LOW);     // Select ADS1256
-                    adc.waitDRDY(); // Wait for previous conversion
-                    if (!firstChannel) {
-                        // Read previous channel's conversion
+
+            // Read all enabled channels in sequence
+            bool hasData = false;
+            for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
+                if (sensorConfigs[i].enabled) {
+                    // Quick non-blocking DRDY check
+                    if (adc.isDRDY()) {
                         float voltage = adc.readCurrentChannel();
-                        // digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
-                        // digitalWrite(W5500_CS, LOW);     // Re-select W5500
-                        // float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming
-                        data.values[i-1] = voltage * sensorConfigs[i-1].conversionFactor + sensorConfigs[i-1].offset;
+                        data.values[i] = voltage * sensorConfigs[i].conversionFactor + sensorConfigs[i].offset;
+                        hasData = true;
+                        
+                        // Setup next channel
+                        adc.setChannel(sensorConfigs[i].adcChannel);
                     }
-                    
-                    // Set next channel
-                    // digitalWrite(W5500_CS, HIGH);    // Deselect W5500
-                    // digitalWrite(ADS_CS, LOW);       // Select ADS1256
-                    adc.setChannel(sensor.adcChannel);
-                    // digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
-                    // digitalWrite(W5500_CS, LOW);     // Re-select W5500
-                    firstChannel = false;
                 } else {
                     data.values[i] = 0.0f;
                 }
             }
-            
-            // Read the last enabled channel
-            if (!firstChannel) {
-                // digitalWrite(W5500_CS, HIGH);    // Deselect W5500
-                // digitalWrite(ADS_CS, LOW);       // Select ADS1256
-                adc.waitDRDY();
-                float voltage = adc.readCurrentChannel();
-                // digitalWrite(ADS_CS, HIGH);      // Deselect ADS1256
-                // digitalWrite(W5500_CS, LOW);     // Re-select W5500
-                // float voltage = random(0, 2500) / 1000.0; // Temporary, to test data streaming   
-                // Find last enabled sensor
-                for (int i = SENSOR_COUNT-1; i >= 0; i--) {
-                    if (sensorConfigs[i].enabled) {
-                        data.values[i] = voltage * sensorConfigs[i].conversionFactor + sensorConfigs[i].offset;
-                        break;
-                    }
-                }
-            }
-            
-            if (!dataBuffer.isFull()) {
-                dataBuffer.push(data);
-            }
-            portEXIT_CRITICAL(&bufferMux);
 
-            // digitalWrite(ADS_CS, HIGH); // Deselect ADS1256
-            // digitalWrite(W5500_CS, LOW);
+            // Push data if we got readings
+            if (hasData) {
+                portENTER_CRITICAL(&bufferMux);
+                if (!dataBuffer.isFull()) {
+                    dataBuffer.push(data);
+                }
+                portEXIT_CRITICAL(&bufferMux);
+            }
         }
+
+        // Use proper RTOS timing
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
 
@@ -340,13 +310,8 @@ void webSocketTask(void *parameter) {
                     const SensorConfig& sensor = sensorConfigs[i];
                     if (sensor.enabled) {
                         reading[sensor.name] = data.values[i];
-                        if (sensor.type == LOAD) { // Temporary, to test data streaming
-                            reading[sensor.name] = dataCounter; // Temporary, to test data streaming
-                        } // Temporary, to test data streaming
                     }
                 }
-                dataCounter++; // Temporary, to test data streaming
-
             }
             portEXIT_CRITICAL(&bufferMux);
 
@@ -454,11 +419,23 @@ void setupPins() {
 }
 
 void setupADC() {
-    adc.begin(ADS1256_DRATE_100SPS,ADS1256_GAIN_1,false); 
-
-    Serial.println("ADS1256 initialized");
+    // Initialize SPI at max speed for ADS1256 (required before adc.begin)
+    SPI.begin();
+    SPI.beginTransaction(SPISettings(7680000, MSBFIRST, SPI_MODE1));
+    
+    // Initialize ADC with highest possible data rate and gain=1
+    adc.begin(ADS1256_DRATE_30000SPS, ADS1256_GAIN_1, false);
+    
+    // Send RDATAC command to enable continuous read mode
+    adc.sendCommand(ADS1256_CMD_RDATAC);
+    
+    // Configure all enabled channels
+    for (size_t i = 0; i < SENSOR_COUNT; i++) {
+        if (sensorConfigs[i].enabled) {
+            adc.setChannel(sensorConfigs[i].adcChannel);
+        }
+    }
 }
-
 
 
 void setupWiFi() {
@@ -653,9 +630,7 @@ void setup() {
     // Moved this from ADC1256.cpp. I fucking hate this library. It's 4 o'clock in the morning
     // The author of this library is a professional cock sucker and a balls licker. He should be executed with an A50 gun
     // And burn in hell afterwards
-    SPI.begin();
-    SPI.beginTransaction(
-    SPISettings(1000000, MSBFIRST, SPI_MODE1));
+
 
     setupADC();
     // setupEthernet();
@@ -672,7 +647,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         sensorTask,
         "SensorTask",
-        10000,
+        4096,
         NULL,
         configMAX_PRIORITIES - 1,  // Highest priority for sensor readings
         &sensorTaskHandle,
