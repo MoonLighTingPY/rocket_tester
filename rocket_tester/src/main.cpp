@@ -16,33 +16,19 @@
 #include <SPI.h>
 
 // Define ADS1256 parameters
-const float ADS_CLOCK_MHZ = 7.68; // Crystal frequency
+const float ADS_CLOCK_MHZ = 1; // Crystal frequency
 const float ADS_VREF = 2.5;       // Voltage reference
 const bool ADS_USE_RESET = false; // If reset pin is tied to 3.3V
 
 // DRDY: GPIO 17
 // RST: GPIO 16
 // CS: GPIO 5
-// MOSI/MISO/SCK: Default SPI pins
-
-// ADS1256 pins
-#define ADS_CS    5    // Keep your current CS pin
-#define ADS_DRDY  17   // Keep your current DRDY pin
-#define ADS_RST   16   // Keep your current RST pin
-
+// SCLK  18  // Default SPI pins for VSPI
+// MISO  19
+// MOSI  23
 
 // Create ADS1256 instance
 ADS1256 adc(ADS_CLOCK_MHZ, ADS_VREF, ADS_USE_RESET);
-
-#define VSPI_SCLK  18  // Default SPI pins for VSPI
-#define VSPI_MISO  19
-#define VSPI_MOSI  23
-
-
-// W5500 pins
-#define W5500_CS  4    // New CS pin for W5500
-#define W5500_INT 2    // Interrupt pin for W5500
-#define W5500_RST 15   // Reset pin for W5500
 
 
 // Network credentials
@@ -472,31 +458,9 @@ void setupPins() {
 }
 
 void setupADC() {
-    // Set up ADS1256 pins
-    pinMode(ADS_CS, OUTPUT);
-    digitalWrite(ADS_CS, HIGH); // Deselect ADS1256
-    pinMode(ADS_DRDY, INPUT);
-    pinMode(ADS_RST, OUTPUT);
-    digitalWrite(ADS_RST, HIGH);
-
-    SPI.begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI); 
-    delay(100);
-
-    // Now reliably begin ADC
-    adc.begin(ADS1256_DRATE_1000SPS, ADS1256_GAIN_1, false);
-    adc.waitDRDY();
+    adc.begin(ADS1256_DRATE_15SPS,ADS1256_GAIN_1,false); 
 
     Serial.println("ADS1256 initialized");
-}
-
-void setupEthernet() {
-    // W5500 will use the already initialized SPI bus
-    pinMode(W5500_CS, OUTPUT);
-    digitalWrite(W5500_CS, HIGH); // Deselect W5500
-
-    ETH.begin(W5500_CS, W5500_INT, W5500_RST);
-    digitalWrite(W5500_CS, LOW); // Select W5500
-    Serial.println("Ethernet initialized");
 }
 
 
@@ -688,7 +652,7 @@ void setupOTA() {
 void setup() {
     Serial.begin(115200);
     Serial.println("Rocket Tester ESP32");
-    SPI.begin(VSPI_SCLK, VSPI_MISO, VSPI_MOSI); // Initialize SPI bus for VSPI
+    dacWrite(25, 193); // Set pyro pin to low
 
     setupADC();
     // setupEthernet();
