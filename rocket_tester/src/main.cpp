@@ -41,9 +41,9 @@ AsyncWebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
 // Pin definitions
-const int ENGINE_OUT_PIN = 26;
-const int ENGINE_IN_PIN = 27;
-const int PYRO_PIN = 25;
+const int ENGINE_OUT_PIN = 99;
+const int ENGINE_IN_PIN = 99;
+const int PYRO_PIN = 99;
 
 // Global variables
 bool isReading = false;
@@ -637,7 +637,8 @@ void setupOTA() {
 void setup() {
     Serial.begin(115200);
     Serial.println("Rocket Tester ESP32");
-    dacWrite(25, 193); // Set pyro pin to low
+    dacWrite(25, 193);
+    dacWrite(26, 193);
 
     // Moved this from ADC1256.cpp. I fucking hate this library. It's 4 o'clock in the morning
     // The author of this library is a professional cock sucker and a balls licker. He should be executed with an A50 gun
