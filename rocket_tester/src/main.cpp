@@ -419,7 +419,10 @@ void setupPins() {
 }
 
 void setupADC() {
-    // Initialize SPI at max speed for ADS1256 (required before adc.begin)
+    
+    // Moved this from ADC1256.cpp. I fucking hate this library. It's 4 o'clock in the morning
+    // The author of this library is a professional cock sucker and a balls licker. He should be executed with an A50 gun
+    // And burn in hell afterwards while his ass cheeks melt from the devilous back shots
     SPI.begin();
     SPI.beginTransaction(SPISettings(7680000, MSBFIRST, SPI_MODE1));
     
@@ -640,9 +643,6 @@ void setup() {
     dacWrite(25, 193);
     dacWrite(26, 193);
 
-    // Moved this from ADC1256.cpp. I fucking hate this library. It's 4 o'clock in the morning
-    // The author of this library is a professional cock sucker and a balls licker. He should be executed with an A50 gun
-    // And burn in hell afterwards
 
 
     setupADC();
