@@ -101,6 +101,13 @@ struct SensorData {
 constexpr size_t BUFFER_SIZE = 1500; // Reduced from 2000 to 1000
 CircularBuffer<SensorData, BUFFER_SIZE> dataBuffer;
 
+struct BufferStats {
+    uint32_t overruns;
+    uint32_t samplesProcessed;
+    float sampleRate;
+};
+
+BufferStats stats = {0, 0, 0};
 
 // Task handles
 TaskHandle_t sensorTaskHandle = NULL;
@@ -331,6 +338,12 @@ void webSocketTask(void *parameter) {
                 portEXIT_CRITICAL(&bufferMux);
             }
         }
+        if (dataBuffer.isFull()) {
+            stats.overruns++;
+        } else {
+            stats.samplesProcessed++;
+            stats.sampleRate = stats.samplesProcessed / ((micros() - readingsStartTime) / 1e6);
+        }
     }
 }
 
@@ -397,6 +410,16 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 String jsonString;
                 serializeJson(doc, jsonString);
                 webSocket.broadcastTXT(jsonString);
+                // Send buffer stats (temporarily, for testing purposes)
+                JsonDocument doc2;
+                doc2.clear();
+                doc2["type"] = "buffer_stats";
+                doc2["overruns"] = stats.overruns;
+                doc2["samplesProcessed"] = stats.samplesProcessed;
+                doc2["sampleRate"] = stats.sampleRate;
+                String jsonString2;
+                serializeJson(doc2, jsonString2);
+                webSocket.broadcastTXT(jsonString2);
             }
 
             break;
@@ -660,7 +683,7 @@ void setup() {
     xTaskCreatePinnedToCore(
         sensorTask,
         "SensorTask",
-        4096,
+        10000,
         NULL,
         configMAX_PRIORITIES - 1,  // Highest priority for sensor readings
         &sensorTaskHandle,
