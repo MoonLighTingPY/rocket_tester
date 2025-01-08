@@ -16,7 +16,7 @@
 #include <SPI.h>
 
 // Define ADS1256 parameters
-const float ADS_CLOCK_MHZ = 1; // Crystal frequency
+const float ADS_CLOCK_MHZ = 7.68; // Crystal frequency
 const float ADS_VREF = 2.5;       // Voltage reference
 const bool ADS_USE_RESET = false; // If reset pin is tied to 3.3V
 
@@ -206,32 +206,28 @@ void handleUpdateConfig(uint8_t clientNum, JsonObject& data) {
     if (!data["config"].is<JsonArray>()) return;
 
     JsonArray arr = data["config"].as<JsonArray>();
-
     portENTER_CRITICAL(&bufferMux);
     for (size_t i = 0; i < arr.size() && i < SENSOR_COUNT; i++) {
+        sensorConfigs[i].enabled = arr[i]["enabled"];
+        sensorConfigs[i].type = (SensorType)(int)arr[i]["type"];
         // Free old name if it exists
         if (sensorConfigs[i].name) {
-            Serial.printf("Freeing old name for sensor %d: %s\n", i, sensorConfigs[i].name);
             free((void*)sensorConfigs[i].name);
-            sensorConfigs[i].name = nullptr;
         }
         // Allocate and copy new name
         const char* newName = arr[i]["name"].as<const char*>();
         if (newName) {
-            Serial.printf("Setting new name for sensor %d: %s\n", i, newName);
             sensorConfigs[i].name = strdup(newName);
         }
-        
-        // Update other fields
-        sensorConfigs[i].enabled = arr[i]["enabled"];
-        sensorConfigs[i].type = (SensorType)(int)arr[i]["type"];
         sensorConfigs[i].adcChannel = arr[i]["adcChannel"];
         sensorConfigs[i].conversionFactor = arr[i]["conversionFactor"];
         sensorConfigs[i].offset = arr[i]["offset"];
     }
     portEXIT_CRITICAL(&bufferMux);
-    
+
     saveSensorConfig(arr);
+
+    // Send back updated config
     sendSensorConfig(clientNum);
 }
 
@@ -458,7 +454,7 @@ void setupPins() {
 }
 
 void setupADC() {
-    adc.begin(ADS1256_DRATE_15SPS,ADS1256_GAIN_1,false); 
+    adc.begin(ADS1256_DRATE_100SPS,ADS1256_GAIN_1,false); 
 
     Serial.println("ADS1256 initialized");
 }
@@ -653,6 +649,13 @@ void setup() {
     Serial.begin(115200);
     Serial.println("Rocket Tester ESP32");
     dacWrite(25, 193); // Set pyro pin to low
+
+    // Moved this from ADC1256.cpp. I fucking hate this library. It's 4 o'clock in the morning
+    // The author of this library is a professional cock sucker and a balls licker. He should be executed with an A50 gun
+    // And burn in hell afterwards
+    SPI.begin();
+    SPI.beginTransaction(
+    SPISettings(1000000, MSBFIRST, SPI_MODE1));
 
     setupADC();
     // setupEthernet();
