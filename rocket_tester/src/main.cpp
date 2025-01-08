@@ -235,7 +235,7 @@ void handleUpdateConfig(uint8_t clientNum, JsonObject& data) {
 void sensorTask(void *parameter) {
     SensorData data;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(10); // 1ms = 1000Hz target rate
+    const TickType_t xFrequency = pdMS_TO_TICKS(10);
 
         while (true) {
         if (isReading) {
@@ -255,9 +255,10 @@ void sensorTask(void *parameter) {
                         
                         // Setup next channel
                         adc.setChannel(sensorConfigs[i].adcChannel);
+                        adc.waitDRDY();
                     }
                 } else {
-                    data.values[i] = 0.0f;
+                    data.values[i] = 1.0f;
                 }
             }
 
@@ -285,9 +286,7 @@ void webSocketTask(void *parameter) {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         webSocket.loop();
         ArduinoOTA.handle();
-        // Always keep W5500 selected for network communication
-        // digitalWrite(ADS_CS, HIGH);     // Ensure ADS1256 is deselected
-        // digitalWrite(W5500_CS, LOW);    // Keep W5500 selected during network operations
+
 
 
         if (isReading && !dataBuffer.isEmpty()) {
@@ -524,7 +523,7 @@ void setupWebServices() {
         if (request->method() == HTTP_OPTIONS) {
             request->send(200);
         } else {
-            request->send(404);
+            request->send(SPIFFS, "/index.html", "text/html");
         }
     });
 
