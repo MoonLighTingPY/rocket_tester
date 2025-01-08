@@ -423,17 +423,29 @@ void setupADC() {
     SPI.begin();
     SPI.beginTransaction(SPISettings(7680000, MSBFIRST, SPI_MODE1));
     
-    // Initialize ADC with highest possible data rate and gain=1
     adc.begin(ADS1256_DRATE_30000SPS, ADS1256_GAIN_1, false);
     
-    // Send RDATAC command to enable continuous read mode
-    adc.sendCommand(ADS1256_CMD_RDATAC);
-    
-    // Configure all enabled channels
-    for (size_t i = 0; i < SENSOR_COUNT; i++) {
+    // Reset all channels
+    for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
         if (sensorConfigs[i].enabled) {
             adc.setChannel(sensorConfigs[i].adcChannel);
+            delayMicroseconds(100);
         }
+    }
+    
+    // Calibrate ADC
+    adc.sendCommand(ADS1256_CMD_SELFCAL);
+    delayMicroseconds(100);
+     // Send RDATAC command to enable continuous read mode
+    adc.waitDRDY();
+    
+    adc.sendCommand(ADS1256_CMD_RDATAC);
+    delayMicroseconds(100);
+    adc.waitDRDY();
+
+    // Start with first channel
+    if (sensorConfigs[0].enabled) {
+        adc.setChannel(sensorConfigs[0].adcChannel);
     }
 }
 
