@@ -103,6 +103,23 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
     }
   
     const sensor = localConfig[index];
+
+    if (field === 'name') {
+      if (!value.trim()) return `Sensor name cannot be empty`;
+      
+      // Check for duplicate names
+      const duplicate = localConfig.find((s, i) => 
+        i !== index && // Not the same sensor
+        s.name === value.trim() // Same name
+      );
+      if (duplicate) return `This name is already used by another sensor`;
+      
+      // Optional: Add regex validation for valid characters
+      const validNameRegex = /^[a-zA-Z0-9_]+$/;
+      if (!validNameRegex.test(value)) {
+        return `Name can only contain letters, numbers, and underscores`;
+      }
+    }
   
     if (field === 'conversionFactor') {
       if (value.trim() === '') return `${sensorName}: Conversion factor cannot be empty`;
@@ -163,24 +180,28 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
     }));
   };
 
-  const handleChange = (index, field, value) => {
+const handleChange = (index, field, value) => {
     const sensor = localConfig[index];
     
     if (field === 'enabled') {
       const updated = [...localConfig];
       updated[index][field] = !updated[index][field];
       setLocalConfig(updated);
-    } else if (field === 'adcChannel') {
-      const error = validateField(field, value, sensor.name, index); // Pass index
+    } else if (field === 'name' || field === 'type' || field === 'adcChannel') { // Add name and type here
+      const error = validateField(field, value, sensor.name, index);
       setErrors(prev => ({
         ...prev,
         [`${index}-${field}`]: error
       }));
+      // Create a new array to trigger re-render
       const updated = [...localConfig];
-      updated[index][field] = value;
+      updated[index] = {
+        ...updated[index],
+        [field]: value
+      };
       setLocalConfig(updated);
     } else if (field === 'conversionFactor' || field === 'offset') {
-      const error = validateField(field, value, sensor.name, index); // Pass index
+      const error = validateField(field, value, sensor.name, index);
       setErrors(prev => ({
         ...prev,
         [`${index}-${field}`]: error
@@ -190,7 +211,7 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
         [`${index}-${field}`]: value
       }));
     }
-  };
+};
 
   const handleSave = () => {
     let hasErrors = false;
@@ -307,6 +328,44 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
                             Enable Sensor
                           </Checkbox>
                           <VStack spacing={2}>
+                        
+                          <FormControl isInvalid={errors[`${originalIndex}-name`]}>
+                            <Tooltip label="Unique name to identify the sensor">
+                              <FormLabel fontSize="sm" mb={1}>
+                                Sensor Name <InfoIcon ml={1} boxSize={3} />
+                              </FormLabel>
+                            </Tooltip>
+                            <Input
+                              type="text"
+                              value={sensor.name}
+                              size="sm"
+                              onChange={(e) => handleChange(originalIndex, 'name', e.target.value)}
+                              isDisabled={!sensor.enabled}
+                              bg={!sensor.enabled ? "gray.100" : "white"}
+                            />
+                            <FormErrorMessage>{errors[`${originalIndex}-name`]}</FormErrorMessage>
+                          </FormControl>
+
+                          <FormControl isInvalid={errors[`${originalIndex}-type`]}>
+                            <Tooltip label="Type of sensor for grouping and unit conversion">
+                              <FormLabel fontSize="sm" mb={1}>
+                                Sensor Type <InfoIcon ml={1} boxSize={3} />
+                              </FormLabel>
+                            </Tooltip>
+                            <Select
+                              value={sensor.type}
+                              size="sm"
+                              onChange={(e) => handleChange(originalIndex, 'type', parseInt(e.target.value))}
+                              isDisabled={!sensor.enabled}
+                              bg={!sensor.enabled ? "gray.100" : "white"}
+                            >
+                              <option value={0}>Load Cell</option>
+                              <option value={1}>Pressure</option>
+                              <option value={2}>Temperature</option>
+                            </Select>
+                            <FormErrorMessage>{errors[`${originalIndex}-type`]}</FormErrorMessage>
+                          </FormControl>
+
                           <FormControl isInvalid={errors[`${originalIndex}-adcChannel`]}>
                             <Tooltip label="Hardware channel number on the ADS1256 ADC (0-7). Each enabled sensor must have a unique channel.">
                               <FormLabel fontSize="sm" mb={1}>
