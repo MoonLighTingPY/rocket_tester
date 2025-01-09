@@ -685,7 +685,7 @@ void setup() {
         "SensorTask",
         10000,
         NULL,
-        configMAX_PRIORITIES - 1,  // Highest priority for sensor readings
+        7,  // Highest priority for sensor readings
         &sensorTaskHandle,
         0  // Core 0
     );
@@ -695,7 +695,7 @@ void setup() {
         "WebSocketTask",
         10000,
         NULL,
-        configMAX_PRIORITIES - 2,  // High but lower than sensor task
+        6,  // High but lower than sensor task
         &webSocketTaskHandle,
         1  // Core 1
     );
