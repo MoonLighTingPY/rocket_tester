@@ -442,15 +442,18 @@ void setupPins() {
 }
 
 void setupADC() {
-    
+    Serial.println("Setting up ADC");
     // Moved this from ADC1256.cpp. I fucking hate this library. It's 4 o'clock in the morning
     // The author of this library is a professional cock sucker and a balls licker. He should be executed with an A50 gun
     // And burn in hell afterwards while his ass cheeks melt from the devilous back shots
     SPI.begin();
+    Serial.println("Spi initialized");
     SPI.beginTransaction(SPISettings(7680000, MSBFIRST, SPI_MODE1));
-    
+    Serial.println("SPi settings set");
+
+    Serial.println("Calling adc.begin()");
     adc.begin(ADS1256_DRATE_1000SPS, ADS1256_GAIN_1, false);
-    
+    Serial.println("Suncess!");
     // Reset all channels
     for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
         if (sensorConfigs[i].enabled) {
@@ -665,7 +668,6 @@ void setup() {
     Serial.println("Rocket Tester ESP32");
     dacWrite(25, 193);
     dacWrite(26, 193);
-
 
 
     setupADC();

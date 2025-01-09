@@ -252,7 +252,28 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
       <ModalOverlay />
       <ModalContent maxW={{ base: "90%", md: "80%", lg: "70%" }} maxH="90vh">
         <ModalHeader>Sensor Configuration</ModalHeader>
-        <ModalBody display="flex" flexDir="column" overflow="hidden">
+        <ModalBody 
+  display="flex" 
+  flexDir="column" 
+  maxH="calc(90vh - 150px)" // Adjust for header and footer height
+  overflowY="auto" // Enable vertical scrolling
+  css={{
+    '&::-webkit-scrollbar': {
+      width: '8px',
+    },
+    '&::-webkit-scrollbar-track': {
+      background: '#f1f1f1',
+      borderRadius: '4px',
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: '#cbd5e0',
+      borderRadius: '4px',
+      '&:hover': {
+        background: '#a0aec0'
+      }
+    }
+  }}
+>
         <VStack spacing={4} align="stretch" minH="0">
 
             {Object.entries(groupedSensors).map(([type, sensors]) => (
