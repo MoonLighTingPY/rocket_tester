@@ -230,7 +230,7 @@ const ImportPage = () => {
       <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
         <HStack spacing={6} wrap="wrap">
           {csvHeaders
-            .filter(header => header.toLowerCase().includes('loadcell'))
+            .filter(header => header.toLowerCase().includes('(kg)'))
             .map(header => (
               <Checkbox key={header} value={header} colorScheme="blue">
                 {header}
@@ -246,7 +246,7 @@ const ImportPage = () => {
       <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
         <HStack spacing={6} wrap="wrap">
           {csvHeaders
-            .filter(header => header.toLowerCase().includes('pressure'))
+            .filter(header => header.toLowerCase().includes('(bar)'))
             .map(header => (
               <Checkbox key={header} value={header} colorScheme="green">
                 {header}
@@ -262,7 +262,7 @@ const ImportPage = () => {
       <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
         <HStack spacing={6} wrap="wrap">
           {csvHeaders
-            .filter(header => header.toLowerCase().includes('temperature'))
+            .filter(header => header.toLowerCase().includes('(°c)'))
             .map(header => (
               <Checkbox key={header} value={header} colorScheme="orange">
                 {header}

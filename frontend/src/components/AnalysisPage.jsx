@@ -46,27 +46,27 @@ const AnalysisPage = () => {
   const calculateIgnitionDelay = useCallback((pressureThreshold, loadThreshold) => {
     if (!data.length) return null;
     // Fallback if there aren't any recognized columns
-    const hasPressure = Object.keys(data[0]).some((col) => col.includes('Pressure'));
-    const hasLoad = Object.keys(data[0]).some((col) => col.includes('LoadCell'));
+    const hasPressure = Object.keys(data[0]).some((col) => col.includes('(bar)'));
+    const hasLoad = Object.keys(data[0]).some((col) => col.includes('(kg)'));
 
     let startIndex = -1;
     for (let i = 0; i < data.length - 1; i++) {
       const current = settings.startCriterion === 'pressure' && hasPressure
         ? Math.max(...Object.keys(data[i])
-            .filter((k) => k.includes('Pressure'))
+            .filter((k) => k.includes('(bar)'))
             .map((k) => data[i][k] || 0))
         : hasLoad
           ? Math.max(...Object.keys(data[i])
-              .filter((k) => k.includes('LoadCell'))
+              .filter((k) => k.includes('(kg)'))
               .map((k) => data[i][k] || 0))
           : 0;
       const next = settings.startCriterion === 'pressure' && hasPressure
         ? Math.max(...Object.keys(data[i + 1])
-            .filter((k) => k.includes('Pressure'))
+            .filter((k) => k.includes('(bar)'))
             .map((k) => data[i + 1][k] || 0))
         : hasLoad
           ? Math.max(...Object.keys(data[i + 1])
-              .filter((k) => k.includes('LoadCell'))
+              .filter((k) => k.includes('(kg)'))
               .map((k) => data[i + 1][k] || 0))
           : 0;
 
@@ -81,20 +81,20 @@ const AnalysisPage = () => {
     // Values around the threshold crossing
     const c1 = settings.startCriterion === 'pressure' && hasPressure
       ? Math.max(...Object.keys(data[startIndex])
-          .filter((k) => k.includes('Pressure'))
+          .filter((k) => k.includes('(bar)'))
           .map((k) => data[startIndex][k] || 0))
       : hasLoad
         ? Math.max(...Object.keys(data[startIndex])
-            .filter((k) => k.includes('LoadCell'))
+            .filter((k) => k.includes('(kg)'))
             .map((k) => data[startIndex][k] || 0))
         : 0;
     const c2 = settings.startCriterion === 'pressure' && hasPressure
       ? Math.max(...Object.keys(data[startIndex + 1])
-          .filter((k) => k.includes('Pressure'))
+          .filter((k) => k.includes('(bar)'))
           .map((k) => data[startIndex + 1][k] || 0))
       : hasLoad
         ? Math.max(...Object.keys(data[startIndex + 1])
-            .filter((k) => k.includes('LoadCell'))
+            .filter((k) => k.includes('(kg)'))
             .map((k) => data[startIndex + 1][k] || 0))
         : 0;
     const t1 = data[startIndex]['Timestamp (s)'];
@@ -111,7 +111,7 @@ const AnalysisPage = () => {
    */
   const findEngineEndTime = useCallback((threshold) => {
     if (!data.length) return null;
-    if (!Object.keys(data[0]).some((col) => col.includes('Pressure') || col.includes('LoadCell'))) {
+    if (!Object.keys(data[0]).some((col) => col.includes('(bar)') || col.includes('(kg)'))) {
       return null;
     }
     const ignitionIndex = data.findIndex((point) => point['Timestamp (s)'] >= (ignitionDelay || 0));
@@ -120,8 +120,8 @@ const AnalysisPage = () => {
     const CONSECUTIVE_POINTS = 5;
     const headers = Object.keys(data[0]).filter((key) => key !== 'Timestamp (s)');
     const relevantHeaders = settings.endCriterion === 'pressure'
-      ? headers.filter((h) => h.includes('Pressure'))
-      : headers.filter((h) => h.includes('LoadCell'));
+      ? headers.filter((h) => h.includes('(bar)'))
+      : headers.filter((h) => h.includes('(kg)'));
 
     if (!relevantHeaders.length) return null;
 
@@ -185,9 +185,9 @@ const AnalysisPage = () => {
     };
 
     const allHeaders = Object.keys(data[0]).filter((key) => key !== 'Timestamp (s)');
-    const loadHeaders = allHeaders.filter((h) => h.toLowerCase().includes('loadcell'));
-    const pressureHeaders = allHeaders.filter((h) => h.toLowerCase().includes('pressure'));
-    const temperatureHeaders = allHeaders.filter((h) => h.toLowerCase().includes('temperature'));
+    const loadHeaders = allHeaders.filter((h) => h.toLowerCase().includes('(kg)'));
+    const pressureHeaders = allHeaders.filter((h) => h.toLowerCase().includes('(bar)'));
+    const temperatureHeaders = allHeaders.filter((h) => h.toLowerCase().includes('(°c)'));
 
     const integrals = {
       partial: {

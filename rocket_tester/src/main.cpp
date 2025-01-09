@@ -152,6 +152,9 @@ void loadSensorConfig() {
                 // Allocate memory for the new name string
                 const char* newName = arr[i]["name"].as<const char*>();
                 if (newName) {
+                    if (sensorConfigs[i].name) {
+                        free((void*)sensorConfigs[i].name);
+                    }
                     sensorConfigs[i].name = strdup(newName);
                 }
             }
