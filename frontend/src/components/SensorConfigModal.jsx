@@ -4,7 +4,7 @@ import {
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
   Button, FormControl, FormLabel, Input, Checkbox, VStack, SimpleGrid,
   Box, Text, Divider, FormErrorMessage, Badge, HStack, Select, Tooltip, InputGroup, InputRightAddon,
-  ButtonGroup
+  ButtonGroup,
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
 
@@ -340,9 +340,9 @@ const handleSave = () => {
                             Enable Sensor
                           </Checkbox>
                           <VStack spacing={2}>
-                        
+                          <HStack spacing={2}>
                           <FormControl isInvalid={errors[`${originalIndex}-name`]}>
-                            <Tooltip label="Unique name to identify the sensor">
+                            <Tooltip label="Unique name to identify the sensor. Used for CSV headers of saved test data and UI(Chart labels, etc).">
                               <FormLabel fontSize="sm" mb={1}>
                                 Sensor Name <InfoIcon ml={1} boxSize={3} />
                               </FormLabel>
@@ -359,7 +359,7 @@ const handleSave = () => {
                           </FormControl>
 
                           <FormControl isInvalid={errors[`${originalIndex}-type`]}>
-                            <Tooltip label="Type of sensor for grouping and unit conversion">
+                            <Tooltip label="Type of sensor for grouping and unit conversion. Used to determine the unit of the sensor reading, for example: Pressure = bar. The unit is added to the sensor's name in the CSV header so the data can be interpreted correctly in the future"> 
                               <FormLabel fontSize="sm" mb={1}>
                                 Sensor Type <InfoIcon ml={1} boxSize={3} />
                               </FormLabel>
@@ -377,6 +377,7 @@ const handleSave = () => {
                             </Select>
                             <FormErrorMessage>{errors[`${originalIndex}-type`]}</FormErrorMessage>
                           </FormControl>
+                          </HStack>
 
                           <FormControl isInvalid={errors[`${originalIndex}-adcChannel`]}>
                             <Tooltip label="Hardware channel number on the ADS1256 ADC (0-7). Each enabled sensor must have a unique channel.">
