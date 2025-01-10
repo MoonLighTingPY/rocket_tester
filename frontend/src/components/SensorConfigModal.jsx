@@ -19,6 +19,7 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   });
   const [presetName, setPresetName] = useState('');
   const [selectedPreset, setSelectedPreset] = useState('');
+  
 
 
   useEffect(() => {
@@ -184,16 +185,28 @@ const handleChange = (index, field, value) => {
     const sensor = localConfig[index];
     
     if (field === 'enabled') {
+      // Toggle enabled state immediately
       const updated = [...localConfig];
       updated[index][field] = !updated[index][field];
       setLocalConfig(updated);
-    } else if (field === 'name' || field === 'type' || field === 'adcChannel') { // Add name and type here
+    } else if (field === 'name' || field === 'type') {
+      // For name and type, only validate but don't update localConfig
       const error = validateField(field, value, sensor.name, index);
       setErrors(prev => ({
         ...prev,
         [`${index}-${field}`]: error
       }));
-      // Create a new array to trigger re-render
+      // Store changes in editableValues instead
+      setEditableValues(prev => ({
+        ...prev,
+        [`${index}-${field}`]: value
+      }));
+    } else if (field === 'adcChannel') {
+      const error = validateField(field, value, sensor.name, index);
+      setErrors(prev => ({
+        ...prev,
+        [`${index}-${field}`]: error
+      }));
       const updated = [...localConfig];
       updated[index] = {
         ...updated[index],
@@ -213,43 +226,42 @@ const handleChange = (index, field, value) => {
     }
 };
 
-  const handleSave = () => {
-    let hasErrors = false;
-    const newErrors = {};
-  
-    localConfig.forEach((sensor, index) => {
-      if (!sensor) return; // Skip invalid sensors
-  
-      // Validate each field
-      const fields = ['adcChannel', 'conversionFactor', 'offset'];
-      fields.forEach(field => {
-        const value = field === 'adcChannel' 
-          ? sensor[field] 
-          : editableValues[`${index}-${field}`];
-        
-        const error = validateField(field, value, sensor.name, index);
-        if (error) {
-          hasErrors = true;
-          newErrors[`${index}-${field}`] = error;
-        }
-      });
+const handleSave = () => {
+  let hasErrors = false;
+  const newErrors = {};
+
+  localConfig.forEach((sensor, index) => {
+    if (!sensor) return;
+
+    // Validate all fields including name and type
+    const fields = ['name', 'type', 'adcChannel', 'conversionFactor', 'offset'];
+    fields.forEach(field => {
+      const value = editableValues[`${index}-${field}`] ?? sensor[field];
+      const error = validateField(field, value, sensor.name, index);
+      if (error) {
+        hasErrors = true;
+        newErrors[`${index}-${field}`] = error;
+      }
     });
-  
-    if (hasErrors) {
-      setErrors(newErrors);
-      return;
-    }
-  
-    // If no errors, proceed with save
-    const finalConfig = localConfig.map((sensor, index) => ({
-      ...sensor,
-      conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`]),
-      offset: parseFloat(editableValues[`${index}-offset`])
-    }));
-  
-    onSave(finalConfig);
-    onClose();
-  };
+  });
+
+  if (hasErrors) {
+    setErrors(newErrors);
+    return;
+  }
+
+  // If no errors, proceed with save
+  const finalConfig = localConfig.map((sensor, index) => ({
+    ...sensor,
+    name: editableValues[`${index}-name`] ?? sensor.name,
+    type: editableValues[`${index}-type`] ?? sensor.type,
+    conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`] ?? sensor.conversionFactor),
+    offset: parseFloat(editableValues[`${index}-offset`] ?? sensor.offset)
+  }));
+
+  onSave(finalConfig);
+  onClose();
+};
 
   // Group sensors by type
   const groupedSensors = localConfig.reduce((groups, sensor) => {
@@ -337,7 +349,7 @@ const handleChange = (index, field, value) => {
                             </Tooltip>
                             <Input
                               type="text"
-                              value={sensor.name}
+                              value={editableValues[`${originalIndex}-name`] ?? sensor.name}
                               size="sm"
                               onChange={(e) => handleChange(originalIndex, 'name', e.target.value)}
                               isDisabled={!sensor.enabled}
@@ -353,7 +365,7 @@ const handleChange = (index, field, value) => {
                               </FormLabel>
                             </Tooltip>
                             <Select
-                              value={sensor.type}
+                              value={editableValues[`${originalIndex}-type`] ?? sensor.type}
                               size="sm"
                               onChange={(e) => handleChange(originalIndex, 'type', parseInt(e.target.value))}
                               isDisabled={!sensor.enabled}
