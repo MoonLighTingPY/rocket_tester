@@ -1,2 +1,2 @@
-#define WIFI_SSID "pussyslayer47";
-#define WIFI_PASS "28021981";
+#define WIFI_SSID "UA";
+#define WIFI_PASS "12345678";

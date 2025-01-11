@@ -152,9 +152,6 @@ void loadSensorConfig() {
                 // Allocate memory for the new name string
                 const char* newName = arr[i]["name"].as<const char*>();
                 if (newName) {
-                    if (sensorConfigs[i].name) {
-                        free((void*)sensorConfigs[i].name);
-                    }
                     sensorConfigs[i].name = strdup(newName);
                 }
             }
@@ -258,19 +255,19 @@ void sensorTask(void *parameter) {
             for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
                 if (sensorConfigs[i].enabled) {
                     // Quick non-blocking DRDY check
-                    if (adc.isDRDY()) {
-                        float voltage = adc.readCurrentChannel();
+                    
+                        float voltage = dataCounter;
                         data.values[i] = voltage * sensorConfigs[i].conversionFactor + sensorConfigs[i].offset;
                         hasData = true;
                         
                         // Setup next channel
-                        adc.setChannel(sensorConfigs[i].adcChannel);
-                        adc.waitDRDY();
-                    }
+
+                    
                 } else {
                     data.values[i] = 1.0f;
                 }
             }
+            dataCounter++;
 
             // Push data if we got readings
             if (hasData) {
@@ -673,7 +670,7 @@ void setup() {
     dacWrite(26, 193);
 
 
-    setupADC();
+    // setupADC();
     // setupEthernet();
 
 
