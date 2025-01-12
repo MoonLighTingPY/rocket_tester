@@ -38,6 +38,8 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
 
 
+    
+
     // Add preset management functions
     const loadPreset = (presetName) => {
       if (!presets[presetName]) return;
@@ -49,6 +51,7 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
       preset.forEach((sensor, index) => {
         newEditableValues[`${index}-conversionFactor`] = sensor.conversionFactor?.toString() ?? '0.00';
         newEditableValues[`${index}-offset`] = sensor.offset?.toString() ?? '0.00';
+        
       });
       
       setEditableValues(newEditableValues); // Replace entirely instead of merging
@@ -159,29 +162,31 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   const updatePreset = () => {
     if (!selectedPreset) return;
   
-    // Create updated config with current values
+    // Create updated config with current values including name and type changes
     const updatedConfig = localConfig.map((sensor, index) => ({
       ...deepClone(sensor),
-      conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`]),
-      offset: parseFloat(editableValues[`${index}-offset`])
+      name: editableValues[`${index}-name`] ?? sensor.name,
+      type: editableValues[`${index}-type`] !== undefined 
+        ? parseInt(editableValues[`${index}-type`]) 
+        : sensor.type,
+      conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`] ?? sensor.conversionFactor),
+      offset: parseFloat(editableValues[`${index}-offset`] ?? sensor.offset)
     }));
   
     const newPresets = {
       ...deepClone(presets),
-      [selectedPreset]: updatedConfig // Override existing preset
+      [selectedPreset]: updatedConfig
     };
   
     setPresets(newPresets);
     localStorage.setItem('sensorConfigPresets', JSON.stringify(newPresets));
-    
-    // Show success message
     setErrors(prev => ({ 
       ...prev, 
       preset: { type: 'success', message: 'Preset updated successfully' }
     }));
   };
 
-const handleChange = (index, field, value) => {
+  const handleChange = (index, field, value) => {
     const sensor = localConfig[index];
     
     if (field === 'enabled') {
@@ -190,13 +195,12 @@ const handleChange = (index, field, value) => {
       updated[index][field] = !updated[index][field];
       setLocalConfig(updated);
     } else if (field === 'name' || field === 'type') {
-      // For name and type, only validate but don't update localConfig
+      // Only validate and store in editableValues
       const error = validateField(field, value, sensor.name, index);
       setErrors(prev => ({
         ...prev,
         [`${index}-${field}`]: error
       }));
-      // Store changes in editableValues instead
       setEditableValues(prev => ({
         ...prev,
         [`${index}-${field}`]: value
@@ -224,7 +228,7 @@ const handleChange = (index, field, value) => {
         [`${index}-${field}`]: value
       }));
     }
-};
+  };
 
 const handleSave = () => {
   let hasErrors = false;
@@ -508,7 +512,7 @@ const handleSave = () => {
   {/* Modal Actions - Right Side */}
   <HStack spacing={4}>
     <Button onClick={onClose}>Cancel</Button>
-    <Button colorScheme="blue" onClick={handleSave}>Save</Button>
+    <Button colorScheme="blue" onClick={handleSave}>Save Config</Button>
   </HStack>
 </ModalFooter>
   </ModalContent>
