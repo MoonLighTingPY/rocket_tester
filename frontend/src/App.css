@@ -19,7 +19,12 @@ nav a {
 }
 
 nav a:hover {
-  background-color: #646cff;
+  background-color: transparent;
+}
+nav a:focus,
+nav a:hover {
+  box-shadow: none;
+  outline: none;
 }
 
 .controls {
@@ -28,6 +33,7 @@ nav a:hover {
   gap: 10px;
   justify-content: center;
 }
+
 
 .controls button {
   padding: 10px 20px;

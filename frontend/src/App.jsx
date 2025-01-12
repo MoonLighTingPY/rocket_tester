@@ -1,18 +1,33 @@
+// src/App.jsx
+import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Box, VStack, Flex, Button, ChakraProvider, ColorModeProvider, CSSReset } from '@chakra-ui/react';
 import { useDataManager } from './hooks/useDataManager';
 import { ReadingProvider } from './hooks/ReadingContext';
-import { useState } from 'react';
 import DataContext from './hooks/DataContext';
 import HomePage from './components/HomePage';
 import ImportPage from './components/ImportPage';
 import AnalysisPage from './components/AnalysisPage';
 import OTAModal from './components/OTAModal';
-import "./App.css"
+import "./App.css";
+
+// Import DarkReader using named imports
+import { enable, disable } from 'darkreader';
 
 function App() {
+  useEffect(() => {
+    // Enable DarkReader
+    enable({
+    });
+    // Disable DarkReader on unmount
+    return () => {
+      disable();
+    };
+  }, []);
+
   const [isOTAModalOpen, setIsOTAModalOpen] = useState(false);
   const dataManager = useDataManager();
+
   return (
     <ChakraProvider>
       <ColorModeProvider>
@@ -37,9 +52,10 @@ function App() {
                     </Link>
                     {/* Add OTA modal */}
                     <OTAModal 
-                      isOpen={isOTAModalOpen} 
+                      isOpen={isOTAModalOpen}
                       onClose={() => setIsOTAModalOpen(false)} 
                     />
+                    
                   </Flex>
                   <Routes>
                     <Route path="/" element={<HomePage />} />
