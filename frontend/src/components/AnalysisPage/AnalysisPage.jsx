@@ -46,21 +46,21 @@ const AnalysisPage = () => {
     for (let i = 0; i < data.length - 1; i++) {
       const current = settings.startCriterion === 'pressure' && hasPressure
         ? Math.max(...Object.keys(data[i])
-            .filter((k) => k.includes('(bar)'))
-            .map((k) => data[i][k] || 0))
+          .filter((k) => k.includes('(bar)'))
+          .map((k) => data[i][k] || 0))
         : hasLoad
           ? Math.max(...Object.keys(data[i])
-              .filter((k) => k.includes('(kg)'))
-              .map((k) => data[i][k] || 0))
+            .filter((k) => k.includes('(kg)'))
+            .map((k) => data[i][k] || 0))
           : 0;
       const next = settings.startCriterion === 'pressure' && hasPressure
         ? Math.max(...Object.keys(data[i + 1])
-            .filter((k) => k.includes('(bar)'))
-            .map((k) => data[i + 1][k] || 0))
+          .filter((k) => k.includes('(bar)'))
+          .map((k) => data[i + 1][k] || 0))
         : hasLoad
           ? Math.max(...Object.keys(data[i + 1])
-              .filter((k) => k.includes('(kg)'))
-              .map((k) => data[i + 1][k] || 0))
+            .filter((k) => k.includes('(kg)'))
+            .map((k) => data[i + 1][k] || 0))
           : 0;
 
       const threshold = settings.startCriterion === 'pressure' ? pressureThreshold : loadThreshold;
@@ -74,21 +74,21 @@ const AnalysisPage = () => {
     // Values around the threshold crossing
     const c1 = settings.startCriterion === 'pressure' && hasPressure
       ? Math.max(...Object.keys(data[startIndex])
-          .filter((k) => k.includes('(bar)'))
-          .map((k) => data[startIndex][k] || 0))
+        .filter((k) => k.includes('(bar)'))
+        .map((k) => data[startIndex][k] || 0))
       : hasLoad
         ? Math.max(...Object.keys(data[startIndex])
-            .filter((k) => k.includes('(kg)'))
-            .map((k) => data[startIndex][k] || 0))
+          .filter((k) => k.includes('(kg)'))
+          .map((k) => data[startIndex][k] || 0))
         : 0;
     const c2 = settings.startCriterion === 'pressure' && hasPressure
       ? Math.max(...Object.keys(data[startIndex + 1])
-          .filter((k) => k.includes('(bar)'))
-          .map((k) => data[startIndex + 1][k] || 0))
+        .filter((k) => k.includes('(bar)'))
+        .map((k) => data[startIndex + 1][k] || 0))
       : hasLoad
         ? Math.max(...Object.keys(data[startIndex + 1])
-            .filter((k) => k.includes('(kg)'))
-            .map((k) => data[startIndex + 1][k] || 0))
+          .filter((k) => k.includes('(kg)'))
+          .map((k) => data[startIndex + 1][k] || 0))
         : 0;
     const t1 = data[startIndex]['Timestamp (s)'];
     const t2 = data[startIndex + 1]['Timestamp (s)'];
@@ -259,44 +259,44 @@ const AnalysisPage = () => {
     let startTime;
     let startTimeLabel;
     switch (settings.integrationStart) {
-      case 'button':
-        startTime = data[0]['Timestamp (s)'];
-        startTimeLabel = 'First Timestamp';
-        break;
-      case 'pressure':
-        startTime = thresholdBasedDelay ?? data[0]['Timestamp (s)'];
-        startTimeLabel = thresholdBasedDelay
-          ? (settings.startCriterion === 'pressure' ? 'Pressure Rise' : 'Load Rise')
-          : 'First Timestamp (Threshold not met)';
-        break;
-      case 'ignition':
-        startTime = ignitionDelay ?? data[0]['Timestamp (s)'];
-        startTimeLabel = ignitionDelay
-          ? 'Real Ignition'
-          : 'First Timestamp (No ignition detected)';
-        break;
-      default:
-        startTime = data[0]['Timestamp (s)'];
-        startTimeLabel = 'First Timestamp';
+    case 'button':
+      startTime = data[0]['Timestamp (s)'];
+      startTimeLabel = 'First Timestamp';
+      break;
+    case 'pressure':
+      startTime = thresholdBasedDelay ?? data[0]['Timestamp (s)'];
+      startTimeLabel = thresholdBasedDelay
+        ? (settings.startCriterion === 'pressure' ? 'Pressure Rise' : 'Load Rise')
+        : 'First Timestamp (Threshold not met)';
+      break;
+    case 'ignition':
+      startTime = ignitionDelay ?? data[0]['Timestamp (s)'];
+      startTimeLabel = ignitionDelay
+        ? 'Real Ignition'
+        : 'First Timestamp (No ignition detected)';
+      break;
+    default:
+      startTime = data[0]['Timestamp (s)'];
+      startTimeLabel = 'First Timestamp';
     }
 
     // Determine endTime
     let endTime;
     let endTimeLabel;
     switch (settings.integrationEnd) {
-      case 'threshold':
-        endTime = engineEndTime ?? data[data.length - 1]['Timestamp (s)'];
-        endTimeLabel = engineEndTime
-          ? (settings.endCriterion === 'pressure' ? 'Pressure Drop' : 'Load Drop')
-          : 'Last Timestamp (Threshold not met)';
-        break;
-      case 'button':
-        endTime = data[data.length - 1]['Timestamp (s)'];
-        endTimeLabel = 'Last Timestamp';
-        break;
-      default:
-        endTime = data[data.length - 1]['Timestamp (s)'];
-        endTimeLabel = 'Last Timestamp';
+    case 'threshold':
+      endTime = engineEndTime ?? data[data.length - 1]['Timestamp (s)'];
+      endTimeLabel = engineEndTime
+        ? (settings.endCriterion === 'pressure' ? 'Pressure Drop' : 'Load Drop')
+        : 'Last Timestamp (Threshold not met)';
+      break;
+    case 'button':
+      endTime = data[data.length - 1]['Timestamp (s)'];
+      endTimeLabel = 'Last Timestamp';
+      break;
+    default:
+      endTime = data[data.length - 1]['Timestamp (s)'];
+      endTimeLabel = 'Last Timestamp';
     }
 
     const results = calculateIntegrals(startTime, endTime);

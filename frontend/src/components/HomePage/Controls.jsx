@@ -153,9 +153,9 @@ const Controls = () => {
               There is still CSV data from the previous test. If you start the test, it will add on top of it. It is advised to clear the CSV data before starting a new test. Are you sure you want to continue?
             </Text>
             {csvData.length > 0 && (
-            <Text mt={4}>
+              <Text mt={4}>
               You can still start the test in {timer} seconds.
-            </Text>)}
+              </Text>)}
             {csvData.length === 0 && (
               <Text mt={4}>
                 CSV data cleared. You can start the test now.

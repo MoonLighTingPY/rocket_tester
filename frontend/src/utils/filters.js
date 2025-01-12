@@ -22,27 +22,27 @@ export const applyKalmanFilter = (data, settings, target) => {
   return filteredData;
 };
   
-  export const applyGaussianFilter = (data, settings, target) => {
-    const { kernelSize } = settings;
-    const gaussianKernel = Array(kernelSize).fill(1 / kernelSize);
-    const halfKernelSize = Math.floor(kernelSize / 2);
+export const applyGaussianFilter = (data, settings, target) => {
+  const { kernelSize } = settings;
+  const gaussianKernel = Array(kernelSize).fill(1 / kernelSize);
+  const halfKernelSize = Math.floor(kernelSize / 2);
   
-    const applyKernel = (arr, index) => {
-      let result = 0;
-      for (let i = 0; i < kernelSize; i++) {
-        const dataIndex = index + i - halfKernelSize;
-        if (dataIndex >= 0 && dataIndex < arr.length) {
-          result += arr[dataIndex] * gaussianKernel[i];
-        }
+  const applyKernel = (arr, index) => {
+    let result = 0;
+    for (let i = 0; i < kernelSize; i++) {
+      const dataIndex = index + i - halfKernelSize;
+      if (dataIndex >= 0 && dataIndex < arr.length) {
+        result += arr[dataIndex] * gaussianKernel[i];
       }
-      return result;
-    };
-  
-    const targetData = data.map(point => point[target]);
-    const filteredTarget = targetData.map((_, index) => applyKernel(targetData, index));
-  
-    return data.map((point, index) => ({
-      ...point,
-      [target]: filteredTarget[index],
-    }));
+    }
+    return result;
   };
+  
+  const targetData = data.map(point => point[target]);
+  const filteredTarget = targetData.map((_, index) => applyKernel(targetData, index));
+  
+  return data.map((point, index) => ({
+    ...point,
+    [target]: filteredTarget[index],
+  }));
+};

@@ -31,26 +31,26 @@ export const useDataManager = () => {
 
     if (message.type === 'test_data') {
 
-        const newTestData = message.data.map(point => ({
-          readingsT: point.t1 / 1e6,
-          ignitionT: point.t2 / 1e6,
-          ...point
+      const newTestData = message.data.map(point => ({
+        readingsT: point.t1 / 1e6,
+        ignitionT: point.t2 / 1e6,
+        ...point
       }));
 
       const newCsvData = message.data
-          .filter(point => point.t2 > 0)
-          .map(point => ({
-              ignitionT: point.t2 / 1e6,
-              ...point
-          }));
+        .filter(point => point.t2 > 0)
+        .map(point => ({
+          ignitionT: point.t2 / 1e6,
+          ...point
+        }));
 
-        if (newTestData.length > 0) {
-            setTestData(prev => [...prev, ...newTestData]);
-        }
+      if (newTestData.length > 0) {
+        setTestData(prev => [...prev, ...newTestData]);
+      }
 
-        if (newCsvData.length > 0) {
-            setCsvData(prev => [...prev, ...newCsvData]);
-        }
+      if (newCsvData.length > 0) {
+        setCsvData(prev => [...prev, ...newCsvData]);
+      }
     }
 
     if (message.type === 'time_difference') {
@@ -74,31 +74,31 @@ export const useDataManager = () => {
     // Create headers based on sensor configuration
     const headers = ['Timestamp (s)'];
     for (const sensor of sensorConfig) {
-        if (sensor.enabled) { // Only include enabled sensors
-            let unit = '';
-            switch (sensor.type) {
-                case 0: // LOAD
-                    unit = '(kg)';
-                    break;
-                case 1: // PRESSURE  
-                    unit = '(bar)';
-                    break;
-                case 2: // TEMPERATURE
-                    unit = '(°C)';
-                    break;
-            }
-            headers.push(`${sensor.name} ${unit}`);
+      if (sensor.enabled) { // Only include enabled sensors
+        let unit = '';
+        switch (sensor.type) {
+        case 0: // LOAD
+          unit = '(kg)';
+          break;
+        case 1: // PRESSURE  
+          unit = '(bar)';
+          break;
+        case 2: // TEMPERATURE
+          unit = '(°C)';
+          break;
         }
+        headers.push(`${sensor.name} ${unit}`);
+      }
     }
 
     const data = csvData.map(point => {
-        const values = [point.ignitionT.toFixed(6)];
-        for (const sensor of sensorConfig) {
-            if (sensor.enabled) { // Only include enabled sensors
-                values.push(point[sensor.name]);
-            }
+      const values = [point.ignitionT.toFixed(6)];
+      for (const sensor of sensorConfig) {
+        if (sensor.enabled) { // Only include enabled sensors
+          values.push(point[sensor.name]);
         }
-        return values.join(',');
+      }
+      return values.join(',');
     });
     const csvContent = [headers.join(',')].concat(data).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

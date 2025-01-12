@@ -77,59 +77,59 @@ const HomePage = () => {
         </Text>
       )}
 
-    <SimpleGrid columns={1} spacing={8} w="full">
-      {Object.entries(groupedSensors).map(([type, sensors]) => (
-        sensors.length > 0 && ( // Only render if there are sensors in this group
-          <GridItem key={type}>
-            <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
-              <Heading size="md" mb={4}>{sensorTypeLabels[type]}</Heading>
-              <ChartControls
-                chartRef={chartRefs.current[type]?.regular?.current}
-                title={sensorTypeLabels[type]}
-                onOpen={onOpen}
-                setActiveChart={() => setActiveChart(type)}
-                onResetZoom={() => {
-                  const chart = chartRefs.current[type]?.regular?.current;
-                  if (chart?.resetZoom) {
-                    chart.resetZoom();
-                  }
-                }}
-                onDownload={() => {
-                  const chart = chartRefs.current[type]?.regular?.current;
-                  if (chart?.toBase64Image) {
-                    const link = document.createElement('a');
-                    const now = new Date();
-                    const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
-                      .replace(' ', '_')
-                      .replace(':', '-');
-                    link.download = `${sensorTypeLabels[type]}-${localDateTime}.png`;
-                    link.href = chart.toBase64Image();
-                    link.click();
-                  }
-                }}
-              />
-              <Chart
-                ref={el => {
-                  if (el) {
-                    chartRefs.current[type] = {
-                      ...chartRefs.current[type],
-                      regular: {
-                        current: el
-                      }
-                    };
-                  }
-                }}
-                xAxis={testData.map(point => point.ignitionT ? point.ignitionT : point.readingsT)}
-                yAxis={groupedSensors[type].map(sensor => testData.map(point => point[sensor.name]))}
-                labels={groupedSensors[type].map(sensor => sensor.name)}
-                colors={groupedSensors[type].map((_, index) => 
-                  sensorTypeColors[type][index % sensorTypeColors[type].length]
-                )}
-                title={`${sensorTypeLabels[type]} Sensors`}
-              />
-            </Box>
-          </GridItem>
-        )
+      <SimpleGrid columns={1} spacing={8} w="full">
+        {Object.entries(groupedSensors).map(([type, sensors]) => (
+          sensors.length > 0 && ( // Only render if there are sensors in this group
+            <GridItem key={type}>
+              <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
+                <Heading size="md" mb={4}>{sensorTypeLabels[type]}</Heading>
+                <ChartControls
+                  chartRef={chartRefs.current[type]?.regular?.current}
+                  title={sensorTypeLabels[type]}
+                  onOpen={onOpen}
+                  setActiveChart={() => setActiveChart(type)}
+                  onResetZoom={() => {
+                    const chart = chartRefs.current[type]?.regular?.current;
+                    if (chart?.resetZoom) {
+                      chart.resetZoom();
+                    }
+                  }}
+                  onDownload={() => {
+                    const chart = chartRefs.current[type]?.regular?.current;
+                    if (chart?.toBase64Image) {
+                      const link = document.createElement('a');
+                      const now = new Date();
+                      const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
+                        .replace(' ', '_')
+                        .replace(':', '-');
+                      link.download = `${sensorTypeLabels[type]}-${localDateTime}.png`;
+                      link.href = chart.toBase64Image();
+                      link.click();
+                    }
+                  }}
+                />
+                <Chart
+                  ref={el => {
+                    if (el) {
+                      chartRefs.current[type] = {
+                        ...chartRefs.current[type],
+                        regular: {
+                          current: el
+                        }
+                      };
+                    }
+                  }}
+                  xAxis={testData.map(point => point.ignitionT ? point.ignitionT : point.readingsT)}
+                  yAxis={groupedSensors[type].map(sensor => testData.map(point => point[sensor.name]))}
+                  labels={groupedSensors[type].map(sensor => sensor.name)}
+                  colors={groupedSensors[type].map((_, index) => 
+                    sensorTypeColors[type][index % sensorTypeColors[type].length]
+                  )}
+                  title={`${sensorTypeLabels[type]} Sensors`}
+                />
+              </Box>
+            </GridItem>
+          )
         ))}
       </SimpleGrid>
 
@@ -140,14 +140,14 @@ const HomePage = () => {
           <ModalBody>
             {activeChart !== null && (
               <Chart
-              ref={el => {
-                if (el) {
-                  chartRefs.current[activeChart] = {
-                    ...chartRefs.current[activeChart],
-                    fullScreen: el
-                  };
-                }
-              }}
+                ref={el => {
+                  if (el) {
+                    chartRefs.current[activeChart] = {
+                      ...chartRefs.current[activeChart],
+                      fullScreen: el
+                    };
+                  }
+                }}
                 xAxis={testData.map(point => point.ignitionT ? point.ignitionT : point.readingsT)}
                 yAxis={groupedSensors[activeChart].map(sensor => testData.map(point => point[sensor.name]))}
                 labels={groupedSensors[activeChart].map(sensor => sensor.name)}
