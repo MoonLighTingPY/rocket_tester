@@ -14,9 +14,9 @@ import {
 } from 'chart.js';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import annotationPlugin from 'chartjs-plugin-annotation';
-import { chartOptions } from '../config/chartConfig';
-import DataContext from '../hooks/DataContext';
-import ReadingContext from '../hooks/ReadingContext';
+import { chartOptions } from '../../config/chartConfig';
+import DataContext from '../../hooks/DataContext';
+import ReadingContext from '../../hooks/ReadingContext';
 
 ChartJS.register(
   CategoryScale,

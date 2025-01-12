@@ -5,11 +5,11 @@ import {
   useDisclosure, Modal, ModalOverlay, 
   ModalContent, ModalBody, ModalCloseButton, Button
 } from '@chakra-ui/react';
-import { chartTheme } from '../config/chartConfig';
-import Chart from './Chart';
-import ChartControls from './ChartControls';
+import { chartTheme } from '../../config/chartConfig';
+import Chart from '../Chart/Chart';
+import ChartControls from '../Chart/ChartControls';
 import Controls from './Controls';
-import DataContext from '../hooks/DataContext';
+import DataContext from '../../hooks/DataContext';
 import SensorConfigModal from './SensorConfigModal';
 
 

@@ -9,9 +9,9 @@ import {
 } from '@chakra-ui/react';
 import { DownloadIcon } from '@chakra-ui/icons';
 import { Icon, HStack } from '@chakra-ui/react';
-import { applyKalmanFilter, applyGaussianFilter } from '../utils/filters';
-import { chartOptions } from '../config/chartConfig';
-import ChartControls from './ChartControls';
+import { applyKalmanFilter, applyGaussianFilter } from '../../utils/filters';
+import { chartOptions } from '../../config/chartConfig';
+import ChartControls from '../Chart/ChartControls';
 import FilterSettings from './FilterSettings';
 import './ImportPage.css';
 

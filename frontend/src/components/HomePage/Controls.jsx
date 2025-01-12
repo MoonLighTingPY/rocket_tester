@@ -1,9 +1,9 @@
 import { useContext, useState, useEffect } from 'react';
 import { HStack, VStack, Button, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, Text } from '@chakra-ui/react';
 import { useToast } from '@chakra-ui/toast';
-import { socket } from '../websocket';
-import DataContext from '../hooks/DataContext';
-import ReadingContext from '../hooks/ReadingContext';
+import { socket } from '../../websocket';
+import DataContext from '../../hooks/DataContext';
+import ReadingContext from '../../hooks/ReadingContext';
 
 const Controls = () => {
   const { clearTestData, exportToCsv, clearCsvData, csvData } = useContext(DataContext);

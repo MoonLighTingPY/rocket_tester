@@ -5,10 +5,10 @@ import { Box, VStack, Flex, Button, ChakraProvider, ColorModeProvider, CSSReset 
 import { useDataManager } from './hooks/useDataManager';
 import { ReadingProvider } from './hooks/ReadingContext';
 import DataContext from './hooks/DataContext';
-import HomePage from './components/HomePage';
-import ImportPage from './components/ImportPage';
-import AnalysisPage from './components/AnalysisPage';
-import OTAModal from './components/OTAModal';
+import HomePage from './components/HomePage/HomePage';
+import ImportPage from './components/ImportPage/ImportPage';
+import AnalysisPage from './components/AnalysisPage/AnalysisPage';
+import OTAModal from './components/HomePage/OTAModal';
 import "./App.css";
 
 // Import DarkReader using named imports
