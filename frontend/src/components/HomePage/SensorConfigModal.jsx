@@ -386,7 +386,7 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
 
   
                             <FormControl isInvalid={errors[`${originalIndex}-conversionFactor`]}>
-                              <Tooltip label="Factor to convert the ADC reading to a real unit. Factor euqals to how many units are represented by 1V. For example, a load cell with 2mV/V sensitivity will have a conversion factor of 0.002.">
+                              <Tooltip label="Factor to convert the ADC reading to a real unit. Represents units per 1V. For example, if loadcell reads 250kg at 2.5V, conversion factor is 100kg/V">
                                 <FormLabel fontSize="sm" mb={1}>
                                 Conversion Factor <InfoIcon ml={1} boxSize={3} />
                                 </FormLabel>
