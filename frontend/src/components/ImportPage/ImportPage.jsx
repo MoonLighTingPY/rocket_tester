@@ -30,6 +30,8 @@ const ImportPage = () => {
   const chartRefs = useRef({});
 
   // Initialize refs when csvHeaders change
+  // Fullscreen chart refs create a new object with the same keys so that they can be reset independently
+  // This is necessary because the chartjs-plugin-zoom plugin does not work with multiple charts using the same ref
   useEffect(() => {
     const newRefs = {};
     csvHeaders.forEach(header => {
@@ -101,7 +103,7 @@ const ImportPage = () => {
         // Get all headers except timestamp
         const headers = Object.keys(results.data[0]).filter(header => header !== 'Timestamp (s)');
         setCsvHeaders(headers);
-        // Automatically select all sensor headers
+        // Select all sensor headers
         setFilterTargets(headers);
       },
     });
@@ -180,7 +182,6 @@ const ImportPage = () => {
   <VStack spacing={8} align="stretch" bg="white" p={8} borderRadius="xl" boxShadow="lg">
     <Heading textAlign="center" color="blue.600">Import and Filter CSV Data</Heading>
 
-    {/* File Upload Section */}
     <Box bg="gray.50" p={6} borderRadius="md" border="2px dashed" borderColor="gray.200">
       <FormControl>
         <FormLabel fontWeight="bold">Upload CSV File</FormLabel>
@@ -197,85 +198,83 @@ const ImportPage = () => {
       </FormControl>
     </Box>
 
-    {/* Filter Configuration Section */}
+    {/* Filter Configuration*/}
     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
       <FormControl>
         <FormLabel fontWeight="bold">Filter Type</FormLabel>
-        <Select 
-          value={filterType} 
-          onChange={handleFilterChange}
-          bg="white"
-          size="lg"
-        >
+          <Select 
+            value={filterType} 
+            onChange={handleFilterChange}
+            bg="white"
+            size="lg"
+          >
           <option value="kalman">Kalman Filter</option>
           <option value="gaussian">Gaussian Filter</option>
-        </Select>
+          </Select>
         <Box bg="gray.50" p={6} borderRadius="md">
-      <FilterSettings 
-        filterType={filterType} 
-        kalmanSettings={kalmanSettings} 
-        setKalmanSettings={setKalmanSettings} 
-        gaussianSettings={gaussianSettings} 
-        setGaussianSettings={setGaussianSettings} 
-      />
-    </Box>
+          <FilterSettings 
+            filterType={filterType} 
+            kalmanSettings={kalmanSettings} 
+            setKalmanSettings={setKalmanSettings} 
+            gaussianSettings={gaussianSettings} 
+            setGaussianSettings={setGaussianSettings} 
+          />
+        </Box>
       </FormControl>
 
       <FormControl>
-  <FormLabel fontWeight="bold">Filter Targets</FormLabel>
-  <SimpleGrid columns={1} spacing={6}>
-    {/* Load Cell Section */}
-    <Box>
-      <Heading size="sm" mb={3} color="blue.600">Load Cell Sensors</Heading>
-      <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
-        <HStack spacing={6} wrap="wrap">
-          {csvHeaders
-            .filter(header => header.toLowerCase().includes('(kg)'))
-            .map(header => (
-              <Checkbox key={header} value={header} colorScheme="blue">
-                {header}
-              </Checkbox>
-            ))}
-        </HStack>
-      </CheckboxGroup>
-    </Box>
+        <FormLabel fontWeight="bold">Filter Targets</FormLabel>
+        <SimpleGrid columns={1} spacing={6}>
+          {/* Load */}
+          <Box>
+            <Heading size="sm" mb={3} color="blue.600">Load Cell Sensors</Heading>
+            <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+              <HStack spacing={6} wrap="wrap">
+                {csvHeaders
+                  .filter(header => header.toLowerCase().includes('(kg)'))
+                  .map(header => (
+                    <Checkbox key={header} value={header} colorScheme="blue">
+                      {header}
+                    </Checkbox>
+                  ))}
+              </HStack>
+            </CheckboxGroup>
+          </Box>
 
-    {/* Pressure Section */}
-    <Box>
-      <Heading size="sm" mb={3} color="green.600">Pressure Sensors</Heading>
-      <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
-        <HStack spacing={6} wrap="wrap">
-          {csvHeaders
-            .filter(header => header.toLowerCase().includes('(bar)'))
-            .map(header => (
-              <Checkbox key={header} value={header} colorScheme="green">
-                {header}
-              </Checkbox>
-            ))}
-        </HStack>
-      </CheckboxGroup>
-    </Box>
+        {/* Pressure */}
+        <Box>
+          <Heading size="sm" mb={3} color="green.600">Pressure Sensors</Heading>
+          <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+            <HStack spacing={6} wrap="wrap">
+              {csvHeaders
+                .filter(header => header.toLowerCase().includes('(bar)'))
+                .map(header => (
+                  <Checkbox key={header} value={header} colorScheme="green">
+                    {header}
+                  </Checkbox>
+                ))}
+            </HStack>
+          </CheckboxGroup>
+        </Box>
 
-    {/* Temperature Section */}
-    <Box>
-      <Heading size="sm" mb={3} color="orange.600">Temperature Sensors</Heading>
-      <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
-        <HStack spacing={6} wrap="wrap">
-          {csvHeaders
-            .filter(header => header.toLowerCase().includes('(°c)'))
-            .map(header => (
-              <Checkbox key={header} value={header} colorScheme="orange">
-                {header}
-              </Checkbox>
-            ))}
-        </HStack>
-      </CheckboxGroup>
-    </Box>
-  </SimpleGrid>
-</FormControl>
+        {/* Temperature */}
+        <Box>
+          <Heading size="sm" mb={3} color="orange.600">Temperature Sensors</Heading>
+          <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+            <HStack spacing={6} wrap="wrap">
+              {csvHeaders
+                .filter(header => header.toLowerCase().includes('(°c)'))
+                .map(header => (
+                  <Checkbox key={header} value={header} colorScheme="orange">
+                    {header}
+                  </Checkbox>
+                ))}
+            </HStack>
+          </CheckboxGroup>
+        </Box>
+      </SimpleGrid>
+    </FormControl>
     </SimpleGrid>
-
-    {/* Filter Settings Section */}
 
 
     {/* Action Buttons */}
@@ -309,7 +308,8 @@ const ImportPage = () => {
       </Box>
     )}
   </VStack>
-{/* Charts Section */}
+
+  {/* Charts */}
   {(filteredData.length > 0 || importedData.length > 0) && (
   <SimpleGrid columns={[1, null, 2]} spacing={8} w="full">
     {csvHeaders.map((header, index) => (

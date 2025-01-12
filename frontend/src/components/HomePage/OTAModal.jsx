@@ -22,12 +22,12 @@ const OTAModal = ({ isOpen, onClose }) => {
         if (type === 'firmware') {
             setFirmwareFile(null);
             if (firmwareInputRef.current) {
-                firmwareInputRef.current.value = '';  // Clear the input value
+                firmwareInputRef.current.value = '';
             }
         } else {
             setSpiffsFile(null);
             if (spiffsInputRef.current) {
-                spiffsInputRef.current.value = '';  // Clear the input value
+                spiffsInputRef.current.value = '';
             }
         }
     };
@@ -210,7 +210,7 @@ const OTAModal = ({ isOpen, onClose }) => {
                         <Text fontWeight="bold">SPIFFS Image (.bin)</Text>
                     </FormLabel>
                     <Input
-                        ref={spiffsInputRef}  // Add ref
+                        ref={spiffsInputRef}
                         type="file"
                         accept=".bin"
                         onChange={(e) => handleFileSelect('spiffs', e.target.files[0])}

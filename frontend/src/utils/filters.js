@@ -1,4 +1,3 @@
-// Kalman filter implementation
 export const applyKalmanFilter = (data, settings, target) => {
   const { Q, R } = settings;
   let P = 1;        // Estimation error covariance
@@ -23,10 +22,9 @@ export const applyKalmanFilter = (data, settings, target) => {
   return filteredData;
 };
   
-  // Gaussian filter implementation
   export const applyGaussianFilter = (data, settings, target) => {
     const { kernelSize } = settings;
-    const gaussianKernel = Array(kernelSize).fill(1 / kernelSize); // Simple moving average kernel
+    const gaussianKernel = Array(kernelSize).fill(1 / kernelSize);
     const halfKernelSize = Math.floor(kernelSize / 2);
   
     const applyKernel = (arr, index) => {

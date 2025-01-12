@@ -1,11 +1,7 @@
 /* eslint-disable react/prop-types */
 import { Heading, Text, Box, Table, Thead, Tbody, Tr, Th, Td, Badge } from '@chakra-ui/react';
 
-/**
- * AnalysisResults displays the results computed in
- * [src/components/AnalysisPage.jsx](src/components/AnalysisPage.jsx).
- * It dynamically shows partial and full integrals and stats for each sensor type.
- */
+// Display the results computed in AnalysisPage
 const AnalysisResults = ({ analysisResults }) => {
   if (!analysisResults) return null;
 

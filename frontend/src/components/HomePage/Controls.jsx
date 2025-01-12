@@ -18,7 +18,7 @@ const Controls = () => {
     const handleOpen = () => setIsSocketConnected(true);
     const handleClose = () => {
       setIsSocketConnected(false);
-      setIsReading(false); // Reset reading state when connection is lost
+      setIsReading(false); // Stop readings if connection is lost so after reconnecting, user can start again
     };
 
     socket.addEventListener('open', handleOpen);

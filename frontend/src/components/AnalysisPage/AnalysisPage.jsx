@@ -4,11 +4,7 @@ import Papa from 'papaparse';
 import AnalysisControls from './AnalysisControls';
 import AnalysisResults from './AnalysisResults';
 
-/**
- * AnalysisPage handles CSV data uploads, calculates ignition delay, engine end time,
- * integrates sensor data, and prepares results for display in
- * [src/components/AnalysisResults.jsx](src/components/AnalysisResults.jsx).
- */
+// Handle CSV data uploads, parse ignition delay, engine end time, and other bullshit, integrate sensor data, and prepare results for display in AnalysisResults 
 const AnalysisPage = () => {
   const [data, setData] = useState([]);
   const [analysisResults, setAnalysisResults] = useState(null);
@@ -39,10 +35,7 @@ const AnalysisPage = () => {
     });
   };
 
-  /**
-   * [`calculateIgnitionDelay`](src/components/AnalysisPage.jsx) finds the crossing time
-   * where the chosen sensor type rises above a threshold.
-   */
+  // Finds the crossing time where the chosen sensor type rises above a threshold.
   const calculateIgnitionDelay = useCallback((pressureThreshold, loadThreshold) => {
     if (!data.length) return null;
     // Fallback if there aren't any recognized columns
@@ -106,9 +99,7 @@ const AnalysisPage = () => {
     return interpolatedTime;
   }, [data, settings.startCriterion]);
 
-  /**
-   * [`findEngineEndTime`](src/components/AnalysisPage.jsx) finds when the chosen sensor type drops below a threshold.
-   */
+  // Finds when the chosen sensor type drops below a threshold.
   const findEngineEndTime = useCallback((threshold) => {
     if (!data.length) return null;
     if (!Object.keys(data[0]).some((col) => col.includes('(bar)') || col.includes('(kg)'))) {
@@ -158,10 +149,8 @@ const AnalysisPage = () => {
     return null;
   }, [data, settings.endCriterion, ignitionDelay]);
 
-  /**
-   * [`calculateIntegrals`](src/components/AnalysisPage.jsx) calculates partial and full integrals
-   * as well as min, max, and avg for each sensor type.
-   */
+  // Calculates partial and full integrals and stats (min max avg) for each sensor type.
+
   const calculateIntegrals = useCallback((startTime, endTime) => {
     if (!data.length) return null;
 
@@ -253,10 +242,7 @@ const AnalysisPage = () => {
     };
   }, [data]);
 
-  /**
-   * runAnalysis ties everything together and populates analysisResults for
-   * [src/components/AnalysisResults.jsx](src/components/AnalysisResults.jsx).
-   */
+  // runAnalysis ties everything together for analysisResults, so it will, you won't fucking believe me - displays the results of the analysis.
   const runAnalysis = () => {
     if (!data.length) return;
     const thresholdBasedDelay = calculateIgnitionDelay(
@@ -316,15 +302,14 @@ const AnalysisPage = () => {
     const results = calculateIntegrals(startTime, endTime);
     if (!results) return;
 
-    // Keep these high-level items for displaying in AnalysisResults
     setAnalysisResults({
       partialIntegrationStartPoint: startTimeLabel,
       partialIntegrationEndPoint: endTimeLabel,
-      partialIntegrationStartTime: `${startTime.toFixed(6)} s`, // Time in seconds
-      partialIntegrationEndTime: `${endTime.toFixed(6)} s`, // Time in seconds
-      partialIntegralDuration: `${results.partialIntegralDuration.toFixed(6)} s`, // Duration in seconds
-      fullIntegralDuration: `${results.fullIntegralDuration.toFixed(6)} s`, // Duration in seconds
-      ignitionDelay: ignitionDelay ? `${ignitionDelay.toFixed(6)} s` : null, // Delay in seconds
+      partialIntegrationStartTime: `${startTime.toFixed(6)} s`,
+      partialIntegrationEndTime: `${endTime.toFixed(6)} s`,
+      partialIntegralDuration: `${results.partialIntegralDuration.toFixed(6)} s`,
+      fullIntegralDuration: `${results.fullIntegralDuration.toFixed(6)} s`,
+      ignitionDelay: ignitionDelay ? `${ignitionDelay.toFixed(6)} s` : null,
       integrals: {
         partial: {
           load: results.integrals.partial.load.map(x => ({ 

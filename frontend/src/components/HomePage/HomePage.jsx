@@ -20,7 +20,7 @@ const HomePage = () => {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [activeChart, setActiveChart] = useState(null);
   const chartRefs = useRef({
-    0: { regular: null, fullScreen: null }, // Load Cell
+    0: { regular: null, fullScreen: null }, // Load
     1: { regular: null, fullScreen: null }, // Pressure
     2: { regular: null, fullScreen: null }, // Temperature
   });
@@ -42,7 +42,7 @@ const HomePage = () => {
     1: chartTheme.colors.pressure,
     2: chartTheme.colors.temperature,
 
-    default: '#000000', // Fallback color
+    default: '#000000', // Fallback color if new sensor will be added in the future
   };
 
   // Group sensors by type (numerical)
@@ -95,7 +95,7 @@ const HomePage = () => {
                   }
                 }}
                 onDownload={() => {
-                  const chart = chartRefs.current[type]?.regular?.current;  // Changed this line
+                  const chart = chartRefs.current[type]?.regular?.current;
                   if (chart?.toBase64Image) {
                     const link = document.createElement('a');
                     const now = new Date();
@@ -160,8 +160,6 @@ const HomePage = () => {
           </ModalBody>
         </ModalContent>
       </Modal>
-
-      {/* Sensor Config Modal */}
       <SensorConfigModal
         isOpen={isConfigModalOpen}
         onClose={() => setIsConfigModalOpen(false)}

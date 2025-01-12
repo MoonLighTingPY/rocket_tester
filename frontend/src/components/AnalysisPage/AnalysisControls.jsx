@@ -1,5 +1,4 @@
 /* eslint-disable react/prop-types */
-
 import { 
   VStack, HStack, Box, Heading,
   FormControl, FormLabel, RadioGroup, Radio,
@@ -59,7 +58,7 @@ return (
       </FormControl>
 
       <SimpleGrid columns={2} spacing={8}>
-        {/* Left Column - Start Settings */}
+        {/* Start Settings */}
         <VStack align="stretch" spacing={4}>
           <FormControl>
             <FormLabel>Integration Start Point</FormLabel>
@@ -112,7 +111,7 @@ return (
           )}
         </VStack>
 
-        {/* Right Column - End Settings */}
+        {/* End Settings */}
         <VStack align="stretch" spacing={4}>
           <FormControl>
             <FormLabel>Integration End Point</FormLabel>

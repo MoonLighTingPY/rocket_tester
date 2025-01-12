@@ -12,7 +12,7 @@ socket.onclose = () => {
   console.log('WebSocket connection closed');
 };
 
-//console log every messsage
+// Console log every messsage for test, remove in prod as it slows the client (buy a better computer nigga)
 socket.addEventListener('message', (event) => {
   console.log('Message from server ', event.data);
 });

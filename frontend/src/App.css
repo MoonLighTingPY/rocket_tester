@@ -1,7 +1,7 @@
 .app {
   padding: 20px;
   margin: 0 auto;
-  max-width: 100%; /* Use the whole screen width for PC */
+  max-width: 100%;
   width: 100%;
 }
 
@@ -115,16 +115,16 @@ nav a:hover {
 /* Media queries for larger screens */
 @media (min-width: 1024px) {
   .app {
-    max-width: 100%; /* Ensure the app uses the full width of the screen */
-    padding: 40px; /* Add more padding for larger screens */
+    max-width: 100%;
+    padding: 40px;
   }
   .charts {
-    flex-direction: row; /* Display charts in a row on larger screens */
-    flex-wrap: wrap; /* Allow charts to wrap to the next line */
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 20px;
   }
   .chart {
-    flex: 1 1 calc(50% - 20px); /* Ensure charts take up half the width with some gap */
+    flex: 1 1 calc(50% - 20px);
     padding: 20px;
   }
 }

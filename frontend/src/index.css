@@ -52,7 +52,7 @@ button:hover {
 
 button:focus,
 button:focus-visible {
-  outline: none; /* Removes the outline on focus */
+  outline: none; /* Removes the outline on focus. Spent an HOUR on this. dafuq */
 }
 
 @media (prefers-color-scheme: light) {

@@ -10,13 +10,11 @@ import ImportPage from './components/ImportPage/ImportPage';
 import AnalysisPage from './components/AnalysisPage/AnalysisPage';
 import OTAModal from './components/HomePage/OTAModal';
 import "./App.css";
-
-// Import DarkReader using named imports
 import { enable, disable } from 'darkreader';
 
 function App() {
   useEffect(() => {
-    // Enable DarkReader
+    // Dark theme for the app using DarkReader
     enable({
     });
     // Disable DarkReader on unmount
@@ -50,7 +48,6 @@ function App() {
                     <Link onClick={() => setIsOTAModalOpen(true)}>
                       <Button colorScheme="gray">OTA Update</Button>
                     </Link>
-                    {/* Add OTA modal */}
                     <OTAModal 
                       isOpen={isOTAModalOpen}
                       onClose={() => setIsOTAModalOpen(false)} 

@@ -13,7 +13,7 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   const [editableValues, setEditableValues] = useState({});
   const [errors, setErrors] = useState({});
   const [presets, setPresets] = useState(() => {
-    // Load presets from localStorage on init
+    // Load presets from localStorage on init or use empty object if no config in localstorage yet
     const saved = localStorage.getItem('sensorConfigPresets');
     return saved ? JSON.parse(saved) : {};
   });
@@ -37,10 +37,6 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
 
   const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
 
-
-    
-
-    // Add preset management functions
     const loadPreset = (presetName) => {
       if (!presets[presetName]) return;
 
@@ -118,7 +114,7 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
       );
       if (duplicate) return `This name is already used by another sensor`;
       
-      // Optional: Add regex validation for valid characters
+      // Regex validation for valid characters
       const validNameRegex = /^[a-zA-Z0-9_]+$/;
       if (!validNameRegex.test(value)) {
         return `Name can only contain letters, numbers, and underscores`;
@@ -137,7 +133,6 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
     }
   
     if (field === 'adcChannel') {
-      // Basic validation
       if (value === '') return `${sensorName}: ADC channel cannot be empty`;
       const channel = parseInt(value);
       if (isNaN(channel)) return `${sensorName}: ADC channel must be a number`;
@@ -237,7 +232,7 @@ const handleSave = () => {
   localConfig.forEach((sensor, index) => {
     if (!sensor) return;
 
-    // Validate all fields including name and type
+    // Validate everything
     const fields = ['name', 'type', 'adcChannel', 'conversionFactor', 'offset'];
     fields.forEach(field => {
       const value = editableValues[`${index}-${field}`] ?? sensor[field];
@@ -254,7 +249,7 @@ const handleSave = () => {
     return;
   }
 
-  // If no errors, proceed with save
+  // If no errors - save
   const finalConfig = localConfig.map((sensor, index) => ({
     ...sensor,
     name: editableValues[`${index}-name`] ?? sensor.name,
@@ -290,11 +285,11 @@ const handleSave = () => {
       <ModalContent maxW={{ base: "90%", md: "80%", lg: "70%" }} maxH="90vh">
         <ModalHeader>Sensor Configuration</ModalHeader>
         <ModalBody 
-  display="flex" 
-  flexDir="column" 
-  maxH="calc(90vh - 150px)" // Adjust for header and footer height
-  overflowY="auto" // Enable vertical scrolling
->
+          display="flex" 
+          flexDir="column" 
+          maxH="calc(90vh - 150px)" // Adjust for header and footer height
+          overflowY="auto" // Enable vertical scrolling
+        >
         <VStack spacing={4} align="stretch" minH="0">
 
             {Object.entries(groupedSensors).map(([type, sensors]) => (
@@ -379,7 +374,7 @@ const handleSave = () => {
                               value={sensor.adcChannel}
                               min={0}
                               max={7}
-                              // size very small to prevent input from wrapping
+                              // Size small to prevent input from wrapping
                               size="sm"
                               onChange={(e) => handleChange(originalIndex, 'adcChannel', e.target.value)}
                               isDisabled={!sensor.enabled}
@@ -443,7 +438,7 @@ const handleSave = () => {
           </VStack>
         </ModalBody>
 <ModalFooter justifyContent="space-between" alignItems="center" borderTopWidth={1} pt={4}>
-  {/* Preset Management Section - Left Side */}
+  {/* Presets */}
   <HStack spacing={4} flex={1} maxW="60%">
     <FormControl isInvalid={errors.preset?.type === 'error'} maxW="200px">
       <Select
@@ -509,7 +504,7 @@ const handleSave = () => {
     )}
   </HStack>
 
-  {/* Modal Actions - Right Side */}
+  {/* Modal Actions */}
   <HStack spacing={4}>
     <Button onClick={onClose}>Cancel</Button>
     <Button colorScheme="blue" onClick={handleSave}>Save Config</Button>

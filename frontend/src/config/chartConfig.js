@@ -3,9 +3,9 @@ import { Chart as ChartJS } from 'chart.js';
 
 export const chartTheme = {
   colors: {
-    loadCell: ['#36A2EB', '#FFCE56' ],           // For Load Cell sensors
+    loadCell: ['#36A2EB', '#FFCE56' ],              // For Load Cell sensors
 
-    pressure: [ '#33AA21', '#4BC0C0', '#9966FF'], // For multiple Pressure sensors
+    pressure: [ '#33AA21', '#4BC0C0', '#9966FF'],   // For multiple Pressure sensors
     temperature: ['#FF9F40', '#C9CBCF', '#FF6384'], // For multiple Temperature sensors
   },
   annotations: {
@@ -68,7 +68,7 @@ export const chartOptions = (title, ignitionDelay) => ({
         text: 'Time (s)',
       },
       ticks: {
-        callback: (value) => value.toFixed(3), // Format ticks to 3 decimal places
+        callback: (value) => value.toFixed(3),
       },
     },
     y: {
