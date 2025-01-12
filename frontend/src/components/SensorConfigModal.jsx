@@ -290,22 +290,6 @@ const handleSave = () => {
   flexDir="column" 
   maxH="calc(90vh - 150px)" // Adjust for header and footer height
   overflowY="auto" // Enable vertical scrolling
-  css={{
-    '&::-webkit-scrollbar': {
-      width: '8px',
-    },
-    '&::-webkit-scrollbar-track': {
-      background: '#f1f1f1',
-      borderRadius: '4px',
-    },
-    '&::-webkit-scrollbar-thumb': {
-      background: '#cbd5e0',
-      borderRadius: '4px',
-      '&:hover': {
-        background: '#a0aec0'
-      }
-    }
-  }}
 >
         <VStack spacing={4} align="stretch" minH="0">
 
@@ -314,33 +298,35 @@ const handleSave = () => {
                 <Text fontSize="lg" fontWeight="bold" mb={2}>
                   {typeLabels[type]}
                 </Text>
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={3} mb={4}>
+                <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={3} mb={4}>
                   {sensors.map((sensor) => {
                     const originalIndex = localConfig.findIndex(s => s.name === sensor.name);
                     return (
                       <Box key={sensor.name} p={3} borderWidth="1px" borderRadius="lg" bg="white">
                         <FormControl>
-                          <HStack justify="space-between" mb={2}>
-                            <FormLabel fontWeight="bold" mb={0}>{sensor.name}</FormLabel>
-                            <Badge 
-                              colorScheme={sensor.enabled ? "green" : "red"}
+                        <HStack mb={2} justifyContent="space-between">
+                          <FormLabel fontWeight="bold" mb={0}>
+                            {sensor.name}
+                          </FormLabel>
+                          <HStack>
+                            <Checkbox
+                              isChecked={sensor.enabled}
+                              onChange={() => handleChange(originalIndex, 'enabled')}
+                              colorScheme={sensor.enabled ? 'green' : 'red'}
+                            />
+                            <Badge
+                              colorScheme={sensor.enabled ? 'green' : 'red'}
                               variant="solid"
                               borderRadius="full"
                               px={2}
                             >
-                              {sensor.enabled ? "Enabled" : "Disabled"}
+                              {sensor.enabled ? 'Enabled' : 'Disabled'}
                             </Badge>
                           </HStack>
-                          <Checkbox
-                            isChecked={sensor.enabled}
-                            onChange={() => handleChange(originalIndex, 'enabled')}
-                            mb={2}
-                            colorScheme={sensor.enabled ? "green" : "red"}
-                          >
-                            Enable Sensor
-                          </Checkbox>
+                        </HStack>
+                          
                           <VStack spacing={2}>
-                          <HStack spacing={2}>
+
                           <FormControl isInvalid={errors[`${originalIndex}-name`]}>
                             <Tooltip label="Unique name to identify the sensor. Used for CSV headers of saved test data and UI(Chart labels, etc).">
                               <FormLabel fontSize="sm" mb={1}>
@@ -359,7 +345,7 @@ const handleSave = () => {
                           </FormControl>
 
                           <FormControl isInvalid={errors[`${originalIndex}-type`]}>
-                            <Tooltip label="Type of sensor for grouping and unit conversion. Used to determine the unit of the sensor reading, for example: Pressure = bar. The unit is added to the sensor's name in the CSV header so the data can be interpreted correctly in the future"> 
+                            <Tooltip label="Type of sensor for grouping and unit conversion. For example: If sensor type is Pressure - the unit will be in bar. The unit is added to the sensor's name in the CSV header so the data can be interpreted correctly in the future."> 
                               <FormLabel fontSize="sm" mb={1}>
                                 Sensor Type <InfoIcon ml={1} boxSize={3} />
                               </FormLabel>
@@ -370,16 +356,15 @@ const handleSave = () => {
                               onChange={(e) => handleChange(originalIndex, 'type', parseInt(e.target.value))}
                               isDisabled={!sensor.enabled}
                               bg={!sensor.enabled ? "gray.100" : "white"}
-                            >
+                            > 
                               <option value={0}>Load Cell</option>
                               <option value={1}>Pressure</option>
                               <option value={2}>Temperature</option>
                             </Select>
                             <FormErrorMessage>{errors[`${originalIndex}-type`]}</FormErrorMessage>
                           </FormControl>
-                          </HStack>
 
-                          <FormControl isInvalid={errors[`${originalIndex}-adcChannel`]}>
+                            <FormControl isInvalid={errors[`${originalIndex}-adcChannel`]}>
                             <Tooltip label="Hardware channel number on the ADS1256 ADC (0-7). Each enabled sensor must have a unique channel.">
                               <FormLabel fontSize="sm" mb={1}>
                                 ADC Channel <InfoIcon ml={1} boxSize={3} />
@@ -390,6 +375,7 @@ const handleSave = () => {
                               value={sensor.adcChannel}
                               min={0}
                               max={7}
+                              // size very small to prevent input from wrapping
                               size="sm"
                               onChange={(e) => handleChange(originalIndex, 'adcChannel', e.target.value)}
                               isDisabled={!sensor.enabled}
@@ -397,9 +383,11 @@ const handleSave = () => {
                             />
                             <FormErrorMessage>{errors[`${originalIndex}-adcChannel`]}</FormErrorMessage>
                           </FormControl>
+
+
   
                           <FormControl isInvalid={errors[`${originalIndex}-conversionFactor`]}>
-                            <Tooltip label="Factor to convert the ADC reading of the sensor to the real unit. Factor euqals to how many units are represented by 1V. For example, a load cell with 2mV/V sensitivity will have a conversion factor of 0.002.">
+                            <Tooltip label="Factor to convert the ADC reading to a real unit. Factor euqals to how many units are represented by 1V. For example, a load cell with 2mV/V sensitivity will have a conversion factor of 0.002.">
                               <FormLabel fontSize="sm" mb={1}>
                                 Conversion Factor <InfoIcon ml={1} boxSize={3} />
                               </FormLabel>
@@ -420,7 +408,7 @@ const handleSave = () => {
                           </FormControl>
 
                           <FormControl isInvalid={errors[`${originalIndex}-offset`]}>
-                            <Tooltip label="Calibration offset in V to adjust for sensor bias. Added to the converted reading. For example, if sensor reads 0.5V when it should be 0, the offset is -0.5.">
+                            <Tooltip label="Offset in real units to correct sensor bias. For example, if sensor reads 5kg at real 0kg, offset is -5.">
                               <FormLabel fontSize="sm" mb={1}>
                                 Offset <InfoIcon ml={1} boxSize={3} />
                               </FormLabel>

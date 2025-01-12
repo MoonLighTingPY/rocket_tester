@@ -1,2 +1,2 @@
-#define WIFI_SSID "UA";
-#define WIFI_PASS "12345678";
+#define WIFI_SSID "путін хуйло";
+#define WIFI_PASS "28021981";
