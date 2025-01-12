@@ -24,7 +24,7 @@ void loadSensorConfig() {
         Serial.println("No config file found, using defaults");
         return;
     }
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, file);
     if (!error) {
         JsonArray arr = doc["config"].as<JsonArray>();
@@ -52,11 +52,11 @@ void saveSensorConfig(const JsonArray& arr) {
     File file = SPIFFS.open("/sensorConfig.json", "w");
     if (!file) return;
 
-    StaticJsonDocument<1024> doc;
-    JsonArray configArr = doc.createNestedArray("config");
+    JsonDocument doc;
+    JsonArray configArr = doc["config"].to<JsonArray>();
 
     for (size_t i = 0; i < SENSOR_COUNT; i++) {
-        JsonObject sensorObj = configArr.createNestedObject();
+        JsonObject sensorObj = configArr.add<JsonObject>();
         sensorObj["enabled"] = sensorConfigs[i].enabled;
         sensorObj["type"] = sensorConfigs[i].type;
         sensorObj["name"] = sensorConfigs[i].name;
@@ -71,12 +71,12 @@ void saveSensorConfig(const JsonArray& arr) {
 
 // Send sensor configuration to client
 void sendSensorConfig(uint8_t clientNum) {
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     doc["type"] = "sensor_config";
-    JsonArray configArr = doc.createNestedArray("config");
+    JsonArray configArr = doc["config"].to<JsonArray>();
 
     for (size_t i = 0; i < SENSOR_COUNT; i++) {
-        JsonObject sensorObj = configArr.createNestedObject();
+        JsonObject sensorObj = configArr.add<JsonObject>();
         sensorObj["name"] = sensorConfigs[i].name;
         sensorObj["enabled"] = sensorConfigs[i].enabled;
         sensorObj["type"] = sensorConfigs[i].type;
