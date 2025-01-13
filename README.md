@@ -1,6 +1,6 @@
-# Model Rocket Engine Test Stand 🚀
+# Rocket Engine Test Firmware and Web Interface🚀
 
-Created for testing rocket engines. Captures thrust, pressure, and temperature readings during tests with high sampling rates and microsecond timing precision, controlled and configured using a web interface
+Created for testing rocket engines. Captures thrust, pressure, and temperature readings during tests with high sampling rates and microsecond timing precision, fully controlled and configured using a web interface hosted on microcontroller
 
 ## Overview
 
