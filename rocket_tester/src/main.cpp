@@ -72,6 +72,15 @@ struct SensorData {
     }
 };
 
+
+#pragma pack(push, 1)  // Ensure struct is packed with no padding
+struct BinarySensorPacket {
+    uint32_t readingsTimestamp;  // 4 bytes
+    uint32_t ignitionTimestamp;  // 4 bytes  
+    float sensorValues[SENSOR_COUNT];  // 4 bytes * SENSOR_COUNT
+};
+#pragma pack(pop)
+
 // Circular buffer to store sensor data so we can read data at high speed and avoid blocking tasks while sending data over websocket. FIFO
 constexpr size_t BUFFER_SIZE = 1500; // Yes, it's not going to use that much, but it's better to have bit more than less
 CircularBuffer<SensorData, BUFFER_SIZE> dataBuffer;
@@ -139,47 +148,31 @@ void sensorTask(void *parameter) {
 
 // WebSocket communication task
 void webSocketTask(void *parameter) {
+    static constexpr size_t MAX_PACKETS = 50; // Max packets per transmission
+    static BinarySensorPacket packets[MAX_PACKETS];
     
     while (true) {
-
-        webSocket.loop(); // Has to be here to handle the websocket connection constantly
-        ArduinoOTA.handle(); // Same for OTA
-
-        // Send data to clients if we are reading and have data in the buffer
+        webSocket.loop();
+        ArduinoOTA.handle();
+        
         if (isReading && !dataBuffer.isEmpty()) {
-            JsonDocument doc;
-            JsonArray array = doc["data"].to<JsonArray>();
+            size_t packetCount = 0;
             
-            // Using critial so we don't get interrupted while fucking arond with the buffer
             portENTER_CRITICAL(&bufferMux);
-            while (!dataBuffer.isEmpty()) {
-                // Shift data from buffer and add to JSON array
+            while (!dataBuffer.isEmpty() && packetCount < MAX_PACKETS) {
                 SensorData data = dataBuffer.shift();
-                JsonObject reading = array.add<JsonObject>();
-
-                reading["t1"] = data.readingsTimestamp;
-                reading["t2"] = data.ignitionTimestamp;
-
-                // Add only enabled sensors values to JSON with their names
-                for (size_t i = 0; i < SENSOR_COUNT; i++) {
-                    const SensorConfig& sensor = sensorConfigs[i];
-                    if (sensor.enabled) {
-                        reading[sensor.name] = data.values[i];
-                    }
-                }
+                packets[packetCount].readingsTimestamp = data.readingsTimestamp;
+                packets[packetCount].ignitionTimestamp = data.ignitionTimestamp;
+                memcpy(packets[packetCount].sensorValues, data.values, sizeof(float) * SENSOR_COUNT);
+                packetCount++;
             }
             portEXIT_CRITICAL(&bufferMux);
-            
-            // Send data to all connected clients. If no clients are connected, the data is lost. No session isolation.
-            // TO DO: Need to implement a way to store the data for backup and send it to clients in cases when connection was lost during test
-            if (array.size() >= 0) {
-                doc["type"] = "test_data";
-                String jsonString;
-                serializeJson(doc, jsonString);
-                webSocket.broadcastTXT(jsonString);
+
+            if (packetCount > 0) {
+                size_t totalSize = packetCount * sizeof(BinarySensorPacket);
+                webSocket.broadcastBIN(reinterpret_cast<uint8_t*>(packets), totalSize);
             }
         }
-
         vTaskDelay(1);
     }
 }

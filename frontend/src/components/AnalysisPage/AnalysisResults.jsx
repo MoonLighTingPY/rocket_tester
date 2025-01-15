@@ -39,7 +39,7 @@ const AnalysisResults = ({ analysisResults }) => {
           ml={3} 
           colorScheme="green"
         >
-          {`${partialIntegrationStartPoint} (${partialIntegrationStartTime} s)`}
+          {`${partialIntegrationStartPoint} (${partialIntegrationStartTime})`}
         </Badge>
         <Badge
           ml={3}
@@ -51,7 +51,7 @@ const AnalysisResults = ({ analysisResults }) => {
           ml={3} 
           colorScheme="green"
         >
-          {`${partialIntegrationEndPoint} (${partialIntegrationEndTime} s)`}
+          {`${partialIntegrationEndPoint} (${partialIntegrationEndTime})`}
         </Badge>
       </Heading>
 
