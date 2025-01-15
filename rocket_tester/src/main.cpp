@@ -14,7 +14,7 @@
 #include "SensorConfig.h"
 #include <ADS1256.h>
 #include <SPI.h>
-#include "esp_task_wdt.h"
+
 
 // DRDY: GPIO 17
 // RST: GPIO 16
@@ -24,9 +24,7 @@
 // MOSI  23
 
 
-// !!! IMPORTANT !!!
-// REMOVE SPI INITIALIZATION IN ADS1256.CPP! Comment out Line 31-34
-// The Library was made by a gay degenerate who desided to initialize SPI in the constructor, which is a big no-no, and will hang the ESP32.
+// ADS1256 setup
 const float ADS_VREF = 2.4937; // VREF for ADS1256. Measured
 ADS1256 adc(17, 16, 0, 5, ADS_VREF); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
 
@@ -79,15 +77,6 @@ CircularBuffer<SensorData, BUFFER_SIZE> dataBuffer;
 // Mutex for buffer access
 portMUX_TYPE bufferMux = portMUX_INITIALIZER_UNLOCKED;
 
-// Temporary, just to test if buffer did good after the test and I didn't code a brainfart
-struct BufferStats {
-    uint32_t overruns;
-    uint32_t samplesProcessed;
-    float sampleRate;
-};
-
-BufferStats stats = {0, 0, 0};
-
 
 // Interrupt to detect engine start (falling edge)
 // ESP outputs a signal from one pin and recieves it on another, the wire that connects them goes trough the engine's fire chamber,
@@ -108,7 +97,6 @@ void clearDataBuffer() {
     }
     portEXIT_CRITICAL(&bufferMux);
 }
-
 
 // Sensor reading task. Reads all enabled sensors and pushes data to the buffer
 // for the WebSocket task to send to the client. Buffer is used to avoid blocking, so tasks
@@ -193,21 +181,6 @@ void webSocketTask(void *parameter) {
             }
         }
 
-        // Temporary, a simulation of the engine start. Just to have engine start time for testing purposes on the web page
-        if (ingitedWire && !engineStarted) {
-            uint32_t currentTime = micros();
-            if ((currentTime - ingitionStartTime) >= 150000) {
-                engineStartTime = currentTime;
-                engineStarted = true;
-            }
-        }
-        // Temporary, to thest the buffer 
-        if (dataBuffer.isFull()) {
-            stats.overruns++;
-        } else {
-            stats.samplesProcessed++;
-            stats.sampleRate = stats.samplesProcessed / ((micros() - readingsStartTime) / 1e6);
-        }
         vTaskDelay(1);
     }
 }
@@ -277,20 +250,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 JsonDocument doc;
                 doc.clear(); // Good practice to clear the document before reuse
                 doc["type"] = "time_difference";
-                doc["value"] = engineStartTime - ingitionStartTime;
+                // doc["value"] = engineStartTime - ingitionStartTime;
+                doc["value"] = 150000;
                 String jsonString;
                 serializeJson(doc, jsonString);
                 webSocket.broadcastTXT(jsonString);
-                // Temporary: send buffer stats
-                JsonDocument doc2;
-                doc2.clear();
-                doc2["type"] = "buffer_stats";
-                doc2["overruns"] = stats.overruns;
-                doc2["samplesProcessed"] = stats.samplesProcessed;
-                doc2["sampleRate"] = stats.sampleRate;
-                String jsonString2;
-                serializeJson(doc2, jsonString2);
-                webSocket.broadcastTXT(jsonString2);
             }
 
             break;
@@ -311,15 +275,10 @@ void setupPins() {
 
 void setupADC() {
     Serial.println("Setting up ADC");
-    // Moved this from ADC1256.cpp. I fucking hate this library. It's 4 o'clock in the morning
-    // The author of this library is a professional cock sucker and a balls licker. He should be executed with an A50 gun
-    // And burn in hell afterwards while his ass cheeks melt from the devilous back shots
     adc.InitializeADC();
     adc.setPGA(PGA_2);
-    adc.setDRATE(DRATE_1000SPS);
+    adc.setDRATE(DRATE_2000SPS);
     adc.sendDirectCommand(SELFCAL);
-    // Calibrate ADC. Checked the lib, it waits for DRDY while calibrating anyway,
-    // so technically delay is useless here, but for some reason it calibrates better when it's here. Have no idea why
     delay(100);  // Wait for calibration
 
     // Set input buffer mode for high impedance inputs
