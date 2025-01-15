@@ -1,4 +1,4 @@
-const socket = new WebSocket(`ws://esp32-rockettester.local:81/ws`);
+const socket = new WebSocket(`ws://esp32-rockettester.local:81`);
 
 socket.onopen = () => {
   console.log('WebSocket connection established');

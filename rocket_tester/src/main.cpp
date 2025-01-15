@@ -24,13 +24,10 @@
 
 
 // !!! IMPORTANT !!!
-// REMOVE SPI INITIALIZATION IN ADS1256.CPP! Line 31-34
+// REMOVE SPI INITIALIZATION IN ADS1256.CPP! Comment out Line 31-34
 // The Library was made by a gay degenerate who desided to initialize SPI in the constructor, which is a big no-no, and will hang the ESP32.
-// If not for a guy that opened an issue on the library's GitHub with a fix, I would have never figured this out
-const float ADS_CLOCK_MHZ = 7.68;
-const float ADS_VREF = 2.5;
-const bool ADS_USE_RESET = false; // Reset pin is tied to 3.3V
-ADS1256 adc(ADS_CLOCK_MHZ, ADS_VREF, ADS_USE_RESET);
+const float ADS_VREF = 2.4937; // VREF for ADS1256. Measured
+ADS1256 adc(17, 16, 0, 5, ADS_VREF); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
 
 // Network credentials (Temporary, will be replaced with an ethernet connection)
 const char* ssid = WIFI_SSID;
@@ -118,33 +115,23 @@ void clearDataBuffer() {
 void sensorTask(void *parameter) {
     SensorData data;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(10); 
+    const TickType_t xFrequency = pdMS_TO_TICKS(10);
 
-        while (true) {
+    while (true) {
         if (isReading) {
-            // Even though task frequency is 10ms, the readings are still done at the ADC's sample per second rate set in setupADC(). Same for timestamps.
-            // Easily speaking, sensors are read at the same rate as the ADC, but the task is non-blocking and runs at a different rate so we can send data over websocket
             uint32_t currentTime = micros();
-            data.readingsTimestamp = currentTime - readingsStartTime; // Time since readings started (Pre-ignition)
-            data.ignitionTimestamp = ingitedWire ? (currentTime - ingitionStartTime) : 0; // Time since real ignition happened (Post-Ignition)
-
-            // Read all enabled channels in sequence
-            bool hasData = false; // hasData bool so we don't push empty data to the buffer 
+            data.readingsTimestamp = currentTime - readingsStartTime;
+            data.ignitionTimestamp = ingitedWire ? (currentTime - ingitionStartTime) : 0;
+            float voltage[SENSOR_COUNT];
+            bool hasData = false;
             for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
+                voltage[i] = adc.convertToVoltage(adc.cycleSingle());
+                
                 if (sensorConfigs[i].enabled) {
-                    // non-blocking DRDY check (just returns a bool).
-                    // If data is not ready yet, because the ADC is still converting, we just skip this channel.
-                    if (adc.isDRDY()) {
-                        float voltage = adc.readCurrentChannel();
-                        data.values[i] = voltage * sensorConfigs[i].conversionFactor + sensorConfigs[i].offset;
-                        hasData = true;
-                        
-                        // Setup next channel. By the thime we get to the last channel, the first one is ready for reading again.
-                        adc.setChannel(sensorConfigs[i].adcChannel);
-                        adc.waitDRDY();
-                    }
+                    data.values[i] = voltage[i] * sensorConfigs[i].conversionFactor + sensorConfigs[i].offset;
+                    hasData = true;
+                
                 } else {
-                    // If sensor is disabled, set value of that channel to 0
                     data.values[i] = 0.0f;
                 }
             }
@@ -323,37 +310,41 @@ void setupPins() {
     attachInterrupt(digitalPinToInterrupt(ENGINE_IN_PIN), engineStartISR, FALLING);
 }
 
+
 void setupADC() {
     Serial.println("Setting up ADC");
     // Moved this from ADC1256.cpp. I fucking hate this library. It's 4 o'clock in the morning
     // The author of this library is a professional cock sucker and a balls licker. He should be executed with an A50 gun
     // And burn in hell afterwards while his ass cheeks melt from the devilous back shots
-    SPI.begin();
-    SPI.beginTransaction(SPISettings(7680000, MSBFIRST, SPI_MODE1));
-    adc.begin(ADS1256_DRATE_1000SPS, ADS1256_GAIN_1, false);
+    adc.InitializeADC();
+    adc.setPGA(PGA_2);
+    adc.setDRATE(DRATE_1000SPS);
+    adc.sendDirectCommand(SELFCAL);
+    // Calibrate ADC. Checked the lib, it waits for DRDY while calibrating anyway,
+    // so technically delay is useless here, but for some reason it calibrates better when it's here. Have no idea why
+    delay(100);  // Wait for calibration
 
-    // Reset all channels 
+    // Set input buffer mode for high impedance inputs
+    adc.setBuffer(BUFFER_ENABLED);
+
+        // Configure all enabled channels
     for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
         if (sensorConfigs[i].enabled) {
-            adc.setChannel(sensorConfigs[i].adcChannel);
+            // Set MUX for single-ended measurement relative to AINCOM
+            uint8_t mux = SING_0 + sensorConfigs[i].adcChannel;
+            adc.setMUX(mux);
             delayMicroseconds(100);
         }
     }
     
-    // Calibrate ADC. Checked the lib, it waits for DRDY while calibrating anyway,
-    // so technically delay is useless here, but for some reason it calibrates better when it's here. Have no idea why
-    adc.sendCommand(ADS1256_CMD_SELFCAL);   
-    delayMicroseconds(100); 
-    adc.waitDRDY();
 
-    // Send RDATAC command to enable continuous read mode
-    adc.sendCommand(ADS1256_CMD_RDATAC);
-    delayMicroseconds(100);
-    adc.waitDRDY();
-
-    // Start with first channel
-    if (sensorConfigs[0].enabled) {
-        adc.setChannel(sensorConfigs[0].adcChannel);
+    // Initialize with first enabled channel
+    for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
+        if (sensorConfigs[i].enabled) {
+            uint8_t mux = SING_0 + sensorConfigs[i].adcChannel;
+            adc.setMUX(mux);
+            break;
+        }
     }
 }
 
@@ -400,8 +391,13 @@ void setupWiFi() {
     if (!MDNS.begin(hostname)) {
         Serial.println("Error setting up MDNS responder!");
     } else {
+        // Web serber service
+        MDNS.addService("http", "tcp", 80);
+        // WebSocket service
+        MDNS.addService("ws", "tcp", 81);
         Serial.println("mDNS responder started");
         Serial.println("http://" + String(hostname) + ".local");
+
     }
 }
 
@@ -547,12 +543,10 @@ void setupOTA() {
     Serial.println("OTA ready");
 }
 
+
 void setup() {
     Serial.begin(115200);
     Serial.println("Rocket Tester ESP32"); 
-    // Temporary, to test ADC
-    dacWrite(25, 193);
-    dacWrite(26, 193);
 
     setupPins();
     setupADC();
@@ -562,6 +556,7 @@ void setup() {
     // setupEthernet(); will replace WiFi
     setupWebServices();
     setupOTA();
+
 
     // Sensor and WebSocket tasks on separate cores so they can run independently
     xTaskCreatePinnedToCore(
