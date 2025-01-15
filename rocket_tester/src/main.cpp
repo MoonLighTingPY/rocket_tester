@@ -14,6 +14,7 @@
 #include "SensorConfig.h"
 #include <ADS1256.h>
 #include <SPI.h>
+#include "esp_task_wdt.h"
 
 // DRDY: GPIO 17
 // RST: GPIO 16
@@ -114,8 +115,6 @@ void clearDataBuffer() {
 // can run independently and at different speeds (reading is faster than sending)
 void sensorTask(void *parameter) {
     SensorData data;
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(10);
 
     while (true) {
         if (isReading) {
@@ -147,17 +146,15 @@ void sensorTask(void *parameter) {
         }
 
         // RTOS wake up delay
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+        vTaskDelay(1);
     }
 }
 
 // WebSocket communication task
 void webSocketTask(void *parameter) {
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(1);
     
     while (true) {
-        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
         webSocket.loop(); // Has to be here to handle the websocket connection constantly
         ArduinoOTA.handle(); // Same for OTA
 
@@ -211,6 +208,7 @@ void webSocketTask(void *parameter) {
             stats.samplesProcessed++;
             stats.sampleRate = stats.samplesProcessed / ((micros() - readingsStartTime) / 1e6);
         }
+        vTaskDelay(1);
     }
 }
 
