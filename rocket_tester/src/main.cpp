@@ -15,6 +15,11 @@
 #include <ADS1256.h>
 #include <SPI.h>
 
+// Pin definitions for W5500 ethernet module
+#define ETH_SPI_SCK     14  // HSPI Clock
+#define ETH_SPI_MISO    12  // HSPI MISO 
+#define ETH_SPI_MOSI    13  // HSPI MOSI
+#define ETH_SPI_CS      15  // Ethernet chip select
 
 // DRDY: GPIO 17
 // RST: GPIO 16
@@ -25,8 +30,7 @@
 
 
 // ADS1256 setup
-const float ADS_VREF = 2.4937; // VREF for ADS1256. Measured
-ADS1256 adc(17, 16, 0, 5, ADS_VREF); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
+ADS1256 adc(17, 16, 0, 5, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
 
 // Network credentials (Temporary, will be replaced with an ethernet connection)
 const char* ssid = WIFI_SSID;
@@ -42,18 +46,16 @@ TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t webSocketTaskHandle = NULL;
 
 // Pin definitions
-const int ENGINE_OUT_PIN = 99;
-const int ENGINE_IN_PIN = 99;
-const int PYRO_PIN = 99;
+const int ENGINE_OUT_PIN = 25;
+const int ENGINE_IN_PIN = 26;
+const int PYRO_PIN = 27;
 
 // Global variables
 bool isReading = false;
 bool ingitedWire = false;
-bool engineStarted = false;
 unsigned long readingsStartTime = 0;
 unsigned long ingitionStartTime = 0;
 unsigned long engineStartTime = 0;
-size_t dataCounter = 0;
 
 
 // Sensor data structure to store readings and timestamps for each sensor
@@ -83,10 +85,7 @@ portMUX_TYPE bufferMux = portMUX_INITIALIZER_UNLOCKED;
 // so when the engine starts - the connection breaks, we do not recieve the signal anymore, and the interrupt is triggered,
 // and the engine start time is captured
 void IRAM_ATTR engineStartISR() {
-    if (ingitedWire && !engineStarted) {
         engineStartTime = micros();
-        engineStarted = true;
-    }
 }
 
 // Function to clear the buffer
@@ -200,8 +199,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             clearDataBuffer();
             isReading = false;
             ingitedWire = false;
-            engineStarted = false;
-            dataCounter = 0;
             digitalWrite(PYRO_PIN, LOW);
             break;
         }
@@ -226,13 +223,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             if (message == "start_readings") {
                 clearDataBuffer(); // Clear the buffer before starting a new test
                 isReading = true;
-                dataCounter = 0;
                 readingsStartTime = micros();
             }
 
             else if (message == "start_ignition") {
                 ingitedWire = true;
-                engineStarted = false;
                 ingitionStartTime = micros();
                 digitalWrite(PYRO_PIN, HIGH); // Ignite the engine
             }
@@ -241,8 +236,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 // Set flags to initial states and clear buffer after the test is done
                 isReading = false;
                 ingitedWire = false;
-                engineStarted = false;
-                dataCounter = 0;
                 digitalWrite(PYRO_PIN, LOW);
                 clearDataBuffer();
 
