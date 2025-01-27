@@ -15,11 +15,6 @@
 #include <ADS1256.h>
 #include <SPI.h>
 
-// Pin definitions for W5500 ethernet module
-#define ETH_SPI_SCK     14  // HSPI Clock
-#define ETH_SPI_MISO    12  // HSPI MISO 
-#define ETH_SPI_MOSI    13  // HSPI MOSI
-#define ETH_SPI_CS      15  // Ethernet chip select
 
 // DRDY: GPIO 17
 // RST: GPIO 16
@@ -29,8 +24,8 @@
 // MOSI  23
 
 
-// ADS1256 setup
-ADS1256 adc(17, 16, 0, 5, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
+// ADS1256 setup (set custom spi pins in ADS1256.cpp init if using WT-32_ETH01)
+ADS1256 adc(39, 15, 0, 14, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
 
 // Network credentials (Temporary, will be replaced with an ethernet connection)
 const char* ssid = WIFI_SSID;
@@ -120,7 +115,8 @@ void sensorTask(void *parameter) {
             float voltage[SENSOR_COUNT];
             bool hasData = false;
             for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
-                voltage[i] = adc.convertToVoltage(adc.cycleSingle());
+                // voltage[i] = adc.convertToVoltage(adc.cycleSingle());
+                voltage[i] = i * 0.1f; // Temporary, will be replaced with ADC readings
                 
                 if (sensorConfigs[i].enabled) {
                     data.values[i] = voltage[i] * sensorConfigs[i].conversionFactor + sensorConfigs[i].offset;
@@ -279,7 +275,7 @@ void setupADC() {
             delayMicroseconds(100);
         }
     }
-    
+
 
     // Initialize with first enabled channel
     for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
@@ -487,16 +483,48 @@ void setupOTA() {
 }
 
 
+void setupEthernet() {
+    // WT32-ETH01 Default Pins
+    #define ETH_CLK_MODE    ETH_CLOCK_GPIO0_IN  // ETH_CLOCK_GPIO0_IN / ETH_CLOCK_GPIO0_OUT / ETH_CLOCK_GPIO16_OUT / ETH_CLOCK_GPIO17_OUT
+    #define ETH_POWER_PIN   16                   // Do not use it, it is for testing
+    #define ETH_TYPE        ETH_PHY_LAN8720     // ETH_PHY_LAN8720 / ETH_PHY_TLK110 / ETH_PHY_RTL8201 / ETH_PHY_DP83848
+    #define ETH_ADDR        1                    // I²C-address of Ethernet PHY (0 or 1 for LAN8720)
+    #define ETH_MDC_PIN     23                   // I²C clock pin
+    #define ETH_MDIO_PIN    18                   // I²C IO pin
+
+    ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
+
+    // Static IP Configuration - Optional (otherwise uses DHCP)
+    // ETH.config(IPAddress(192, 168, 0, 214),    // Device IP
+    //            IPAddress(192, 168, 0, 1),       // Gateway
+    //            IPAddress(255, 255, 255, 0),     // Subnet Mask
+    //            IPAddress(8, 8, 8, 8));          // DNS1
+
+
+    // Wait for connection
+    while (!ETH.linkUp()) {
+        Serial.print(".");
+        delay(500);
+    }
+
+    Serial.println();
+    Serial.print("Ethernet IP: ");
+    Serial.println(ETH.localIP());
+
+    ETH.setHostname(hostname);
+    
+}
+
 void setup() {
     Serial.begin(115200);
     Serial.println("Rocket Tester ESP32"); 
 
     setupPins();
-    setupADC();
+    // setupADC();
     setupSPIFFS();
     loadSensorConfig();
-    setupWiFi();
-    // setupEthernet(); will replace WiFi
+    // setupWiFi();
+    setupEthernet();
     setupWebServices();
     setupOTA();
 

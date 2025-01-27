@@ -1,2 +1,2 @@
-#define WIFI_SSID "путін хуйло";
-#define WIFI_PASS "28021981";
+#define WIFI_SSID "TP-Link_7A8D";
+#define WIFI_PASS "40263076";
