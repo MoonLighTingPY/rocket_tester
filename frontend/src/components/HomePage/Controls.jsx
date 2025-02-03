@@ -4,6 +4,7 @@ import { useToast } from '@chakra-ui/toast';
 import { socket } from '../../websocket';
 import DataContext from '../../hooks/DataContext';
 import ReadingContext from '../../hooks/ReadingContext';
+import ConnectionLostModal from './ConnectionLostModal';
 
 const Controls = () => {
   const { clearTestData, exportToCsv, clearCsvData, csvData } = useContext(DataContext);
@@ -11,6 +12,8 @@ const Controls = () => {
   const [isIgnited, setIsIgnited] = useState(false);
   const [isSocketConnected, setIsSocketConnected] = useState(socket.readyState === WebSocket.OPEN);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showConnectionLostModal, setShowConnectionLostModal] = useState(false);
+  
   const [timer, setTimer] = useState(10);
   const toast = useToast();
 
@@ -18,8 +21,14 @@ const Controls = () => {
     const handleOpen = () => setIsSocketConnected(true);
     const handleClose = () => {
       setIsSocketConnected(false);
-      setIsReading(false); // Stop readings if connection is lost so after reconnecting, user can start again
+      if (isReading) {
+        // Only show modal if we were actively reading when connection was lost
+        setShowConnectionLostModal(true);
+        setIsReading(false);
+        setIsIgnited(false);
+      }
     };
+
 
     socket.addEventListener('open', handleOpen);
     socket.addEventListener('close', handleClose);
@@ -28,7 +37,17 @@ const Controls = () => {
       socket.removeEventListener('open', handleOpen);
       socket.removeEventListener('close', handleClose);
     };
-  }, [setIsReading]);
+  }, [isReading, setIsReading]);
+
+  const handleConnectionLostExport = () => {
+    exportToCsv();
+    setShowConnectionLostModal(false);
+    toast({
+      title: 'Data exported successfully',
+      status: 'success',
+      duration: 2000,
+    });
+  };
 
   const handleStartReadings = () => {
     if (csvData.length > 0) {
@@ -104,6 +123,7 @@ const Controls = () => {
 
   return (
     <VStack spacing={4}>
+      
       <HStack spacing={4}>
         <Button
           colorScheme="green"
@@ -143,6 +163,11 @@ const Controls = () => {
           Clear CSV Data
         </Button>
       </HStack>
+      <ConnectionLostModal 
+        isOpen={showConnectionLostModal}
+        onClose={() => setShowConnectionLostModal(false)}
+        onExport={handleConnectionLostExport}
+      />
 
       <Modal isOpen={isModalOpen} onClose={handleModalCancel}>
         <ModalOverlay />
