@@ -82,7 +82,10 @@ export const useDataManager = () => {
 
 
     if (message.type === 'time_difference') {
-      const delay = message.value / 1e6;
+      let delay = message.value / 1e6;
+      if (delay > 10) {
+        delay = 0.0;
+      }
       setIgnitionDelay(delay);
     }
   }, [sensorConfig]);

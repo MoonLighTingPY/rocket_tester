@@ -15,7 +15,7 @@
 #include <ADS1256.h>
 #include <SPI.h>
 
-
+// ESP32 Dev Module
 // DRDY: GPIO 17
 // RST: GPIO 16
 // CS: GPIO 5
@@ -41,9 +41,9 @@ TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t webSocketTaskHandle = NULL;
 
 // Pin definitions
-const int ENGINE_OUT_PIN = 25;
-const int ENGINE_IN_PIN = 26;
-const int PYRO_PIN = 27;
+const int ENGINE_OUT_PIN = 17;
+const int ENGINE_IN_PIN = 35;
+const int PYRO_PIN = 5;
 
 // Global variables
 bool isReading = false;
@@ -115,8 +115,8 @@ void sensorTask(void *parameter) {
             float voltage[SENSOR_COUNT];
             bool hasData = false;
             for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
-                // voltage[i] = adc.convertToVoltage(adc.cycleSingle());
-                voltage[i] = i * 0.1f; // Temporary, will be replaced with ADC readings
+                voltage[i] = adc.convertToVoltage(adc.cycleSingle());
+                // voltage[i] = i * 0.1f; // Temporary, will be replaced with ADC readings
                 
                 if (sensorConfigs[i].enabled) {
                     data.values[i] = voltage[i] * sensorConfigs[i].conversionFactor + sensorConfigs[i].offset;
@@ -232,8 +232,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 JsonDocument doc;
                 doc.clear(); // Good practice to clear the document before reuse
                 doc["type"] = "time_difference";
-                // doc["value"] = engineStartTime - ingitionStartTime;
-                doc["value"] = 150000;
+                doc["value"] = engineStartTime - ingitionStartTime;
                 String jsonString;
                 serializeJson(doc, jsonString);
                 webSocket.broadcastTXT(jsonString);
@@ -495,10 +494,10 @@ void setupEthernet() {
     ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
 
     // Static IP Configuration - Optional (otherwise uses DHCP)
-    // ETH.config(IPAddress(192, 168, 0, 214),    // Device IP
-    //            IPAddress(192, 168, 0, 1),       // Gateway
-    //            IPAddress(255, 255, 255, 0),     // Subnet Mask
-    //            IPAddress(8, 8, 8, 8));          // DNS1
+    ETH.config(IPAddress(169, 254, 1, 1),     // Device IP
+               IPAddress(169, 254, 1, 1),      // Gateway (same as IP)
+               IPAddress(255, 255, 255, 0),      // Subnet mask for link-local
+               IPAddress(169, 254, 1, 1));     // DNS (same as IP)
 
 
     // Wait for connection
@@ -511,7 +510,23 @@ void setupEthernet() {
     Serial.print("Ethernet IP: ");
     Serial.println(ETH.localIP());
 
-    ETH.setHostname(hostname);
+    // Does not work with a cross-over cable (direct connection to PC)
+    // Hostname to connect using esp32-rockettester.local instead of IP
+    // ETH.setHostname(hostname);
+    // Serial.print("Hostname: ");
+    // Serial.println(ETH.getHostname());
+
+    // optional: mDNS, also does not work with cross-over cable. 
+    // if (!MDNS.begin(hostname)) {
+    //     Serial.println("Error setting up MDNS responder!");
+    // } else {
+    //     // Web server service
+    //     MDNS.addService("http", "tcp", 80);
+    //     // WebSocket service
+    //     MDNS.addService("ws", "tcp", 81);
+    //     Serial.println("mDNS responder started");
+    // }
+
     
 }
 
@@ -520,7 +535,7 @@ void setup() {
     Serial.println("Rocket Tester ESP32"); 
 
     setupPins();
-    // setupADC();
+    setupADC();
     setupSPIFFS();
     loadSensorConfig();
     // setupWiFi();

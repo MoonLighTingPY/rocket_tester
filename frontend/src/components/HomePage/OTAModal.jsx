@@ -94,7 +94,7 @@ const OTAModal = ({ isOpen, onClose }) => {
         reject(new Error(`${operation} upload failed: Network error`));
       };
     
-      xhr.open('POST', `http://esp32-rockettester.local/${endpoint}`);
+      xhr.open('POST', `http://${window.location.hostname}/${endpoint}`);
       xhr.send(formData);
     });
   };

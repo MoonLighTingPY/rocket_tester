@@ -72,10 +72,12 @@ const HomePage = () => {
       <Controls />
       
       {ignitionDelay !== null && (
-        <Text fontSize="xl" fontWeight="bold">
-          Ignition Delay: {ignitionDelay.toFixed(6)} seconds
-        </Text>
-      )}
+      <Text fontSize="xl" fontWeight="bold">
+        {ignitionDelay === 0.0 
+          ? "Ignition Delay: 0.00000 (detection failed)" 
+          : `Ignition Delay: ${ignitionDelay.toFixed(6)} seconds`}
+      </Text>
+)}
 
       <SimpleGrid columns={1} spacing={8} w="full">
         {Object.entries(groupedSensors).map(([type, sensors]) => (
