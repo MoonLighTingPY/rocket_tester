@@ -88,10 +88,23 @@ const OTAModal = ({ isOpen, onClose }) => {
           reject(new Error(`${operation} upload failed: ${xhr.status} - ${xhr.responseText}`));
         }
       };
-    
+      
       xhr.onerror = () => {
-        console.error('XHR Error:', xhr.statusText);
-        reject(new Error(`${operation} upload failed: Network error`));
+        // For firmware updates, this might be normal as the device reboots
+        if (endpoint === 'update') {
+          console.log('Connection closed during firmware update - this is normal');
+          toast({
+            title: 'Firmware Update In Progress',
+            description: 'Update is being applied and device is restarting...',
+            status: 'info',
+            duration: 5000,
+            isClosable: true
+          });
+          resolve('Firmware update in progress');
+        } else {
+          console.error('XHR Error:', xhr.statusText);
+          reject(new Error(`${operation} upload failed: Network error`));
+        }
       };
     
       xhr.open('POST', `http://${window.location.hostname}/${endpoint}`);

@@ -535,13 +535,16 @@ void setupEthernet() {
 
     Serial.println("Ethernet PHY Link status: " + String(ETH.linkUp() ? "UP" : "DOWN"));
 
-    // Does not work with a cross-over cable (direct connection to PC)
-    // Hostname to connect using esp32-rockettester.local instead of IP
-    // ETH.setHostname(hostname);
-    // Serial.print("Hostname: ");
-    // Serial.println(ETH.getHostname());
+    // Auto MDI/MDIX required (most modern pc's support it)
+    // If you don't have auto MDI/MDIX, use a cross-over cable (A to B wiring)
+    // Allows to connect by hostname.local instead of IP
+    ETH.setHostname(hostname);
+    Serial.print("Hostname: ");
+    Serial.println(ETH.getHostname());
 
-    // optional: mDNS, also does not work with cross-over cable. 
+    // optional: mDNS responder. Allows to connect by hostname.local instead of IP (WiFi only)
+    // Requires bonjour service to be installed on Windows. On Linux and Mac it works out of the box
+
     // if (!MDNS.begin(hostname)) {
     //     Serial.println("Error setting up MDNS responder!");
     // } else {

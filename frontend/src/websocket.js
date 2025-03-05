@@ -1,4 +1,5 @@
-const socket = new WebSocket(`ws://169.254.1.1:81`);
+const host = window.location.hostname;
+const socket = new WebSocket(`ws://${host}:81`);
 
 socket.onopen = () => {
   console.log('WebSocket connection established');
