@@ -337,8 +337,18 @@ const ImportPage = () => {
                         )}
                       </VStack>
                     </Box>
+                    
                   </FormControl>
                 </Box>
+                <Button 
+                  colorScheme="blue" 
+                  onClick={applyFilter} 
+                  isDisabled={filterType === 'none' || filterTargets.length === 0}
+                  size="lg"
+                  leftIcon={<Icon as={BiFilter} />}
+                >
+    Apply Filter
+                </Button>
               </SimpleGrid>
             </Box>
           </SimpleGrid>
@@ -351,15 +361,7 @@ const ImportPage = () => {
 
         {/* Action Buttons */}
         <HStack spacing={4} justify="center">
-          <Button 
-            colorScheme="blue" 
-            onClick={applyFilter} 
-            isDisabled={filterType === 'none' || filterTargets.length === 0}
-            size="lg"
-            leftIcon={<Icon as={BiFilter} />}
-          >
-    Apply Filter
-          </Button>
+          
           <Button 
             colorScheme="orange" 
             onClick={() => setFilteredData([])} 
@@ -367,7 +369,7 @@ const ImportPage = () => {
             size="lg"
             leftIcon={<Icon as={RepeatIcon} />}
           >
-    Revert Filtering
+    Revert Everything
           </Button>
           <Button 
             colorScheme="green" 

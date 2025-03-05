@@ -256,6 +256,7 @@ const DataConversionOptions = ({
           <HStack spacing={4}>
             <Button 
               colorScheme="blue" 
+              size="lg"
               onClick={handleApplyConversion} 
               isDisabled={filterTargets.length === 0 || !enableConversion}
             >
