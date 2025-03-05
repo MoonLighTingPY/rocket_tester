@@ -7,7 +7,7 @@ import {
   useDisclosure, FormControl, FormLabel, Select, Modal, ModalOverlay,
   ModalContent, ModalBody, ModalCloseButton
 } from '@chakra-ui/react';
-import { DownloadIcon } from '@chakra-ui/icons';
+import { DownloadIcon, RepeatIcon } from '@chakra-ui/icons';
 import { Icon, HStack } from '@chakra-ui/react';
 import { applyKalmanFilter, applyGaussianFilter } from '../../utils/filters';
 import { chartOptions } from '../../config/chartConfig';
@@ -286,7 +286,16 @@ const ImportPage = () => {
             size="lg"
             leftIcon={<Icon as={BiFilter} />}
           >
-        Apply Filter
+    Apply Filter
+          </Button>
+          <Button 
+            colorScheme="orange" 
+            onClick={() => setFilteredData([])} 
+            isDisabled={filteredData.length === 0}
+            size="lg"
+            leftIcon={<Icon as={RepeatIcon} />}
+          >
+    Revert Filtering
           </Button>
           <Button 
             colorScheme="green" 
@@ -295,7 +304,7 @@ const ImportPage = () => {
             size="lg"
             leftIcon={<DownloadIcon />}
           >
-        Save Filtered Data
+    Save Filtered Data
           </Button>
         </HStack>
 
