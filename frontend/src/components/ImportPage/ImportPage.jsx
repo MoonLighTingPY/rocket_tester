@@ -5,7 +5,7 @@ import { Line } from 'react-chartjs-2';
 import { 
   Box, Heading, Checkbox, CheckboxGroup, Button, Text, SimpleGrid, GridItem, VStack,
   useDisclosure, FormControl, FormLabel, Select, Modal, ModalOverlay,
-  ModalContent, ModalBody, ModalCloseButton
+  ModalContent, ModalBody, ModalCloseButton, useToast
 } from '@chakra-ui/react';
 import { DownloadIcon, RepeatIcon } from '@chakra-ui/icons';
 import { Icon, HStack } from '@chakra-ui/react';
@@ -13,6 +13,7 @@ import { applyKalmanFilter, applyGaussianFilter } from '../../utils/filters';
 import { chartOptions } from '../../config/chartConfig';
 import ChartControls from '../Chart/ChartControls';
 import FilterSettings from './FilterSettings';
+import DataConversionOptions from './DataConversionOptions';
 import './ImportPage.css';
 
 const ImportPage = () => {
@@ -27,6 +28,7 @@ const ImportPage = () => {
   const [activeChart, setActiveChart] = useState(null);
   const [activeChartData, setActiveChartData] = useState(null);
   const [csvHeaders, setCsvHeaders] = useState([]);
+  const toast = useToast();
   const chartRefs = useRef({});
 
   // Initialize refs when csvHeaders change
@@ -39,6 +41,35 @@ const ImportPage = () => {
     });
     chartRefs.current = newRefs;
   }, [csvHeaders]);
+
+  const applyDataConversion = (conversionData) => {
+    if (!importedData.length || !filterTargets.length || !conversionData.enableConversion) return;
+  
+    const { conversionFactor, offset } = conversionData;
+    
+    // Track if we're working with filtered or original data
+    const baseData = filteredData.length > 0 ? filteredData : importedData;
+    
+    const convertedData = baseData.map(point => {
+      const newPoint = { ...point };
+      filterTargets.forEach(target => {
+        // Apply conversion: multiply by factor then add offset
+        newPoint[target] = (point[target] * conversionFactor) + offset;
+      });
+      return newPoint;
+    });
+  
+    // Store the converted data
+    setFilteredData(convertedData);
+    
+    toast({
+      title: "Data conversion applied",
+      description: `Applied factor ${conversionFactor} and offset ${offset} to ${filterTargets.length} channel(s)`,
+      status: "success",
+      duration: 3000,
+      isClosable: true,
+    });
+  };
 
   const handleDownloadChart = (header) => {
     const chartInstance = chartRefs.current[header]?.current;
@@ -114,7 +145,11 @@ const ImportPage = () => {
   const handleFilterTargetsChange = (values) => setFilterTargets(values);
 
   const applyFilter = () => {
-    let data = importedData;
+    // Use filteredData as a base if it exists, otherwise use importedData
+    const baseData = filteredData.length > 0 ? filteredData : importedData;
+    
+    let data = [...baseData]; // Create a copy to avoid mutating the source
+    
     filterTargets.forEach(target => {
       if (filterType === 'kalman') {
         data = applyKalmanFilter(data, { Q: parseFloat(kalmanSettings.Q), R: parseFloat(kalmanSettings.R) }, target);
@@ -122,6 +157,7 @@ const ImportPage = () => {
         data = applyGaussianFilter(data, { kernelSize: parseInt(gaussianSettings.kernelSize) }, target);
       }
     });
+    
     // Format filtered data to 6 decimal points
     const formattedData = data.map(point => {
       const formattedPoint = { ...point };
@@ -130,6 +166,7 @@ const ImportPage = () => {
       });
       return formattedPoint;
     });
+    
     setFilteredData(formattedData);
   };
 
@@ -195,86 +232,121 @@ const ImportPage = () => {
                 cursor: 'pointer'
               }}
             />
+            
           </FormControl>
+          
         </Box>
-
-        {/* Filter Configuration*/}
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
-          <FormControl>
-            <FormLabel fontWeight="bold">Filter Type</FormLabel>
-            <Select 
-              value={filterType} 
-              onChange={handleFilterChange}
-              bg="white"
-              size="lg"
-            >
-              <option value="kalman">Kalman Filter</option>
-              <option value="gaussian">Gaussian Filter</option>
-            </Select>
-            <Box bg="gray.50" p={6} borderRadius="md">
-              <FilterSettings 
-                filterType={filterType} 
-                kalmanSettings={kalmanSettings} 
-                setKalmanSettings={setKalmanSettings} 
-                gaussianSettings={gaussianSettings} 
-                setGaussianSettings={setGaussianSettings} 
+        <Box bg="gray.50" p={6} borderRadius="md" border="1px solid" borderColor="gray.200">
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+            {/* Left Column - Data Conversion */}
+            <Box borderRight={{ base: "none", md: "1px solid" }} borderColor="gray.200" pr={{ base: 0, md: 6 }}>
+              <Heading size="md" mb={4} color="teal.600">Data Conversion</Heading>
+              <DataConversionOptions 
+                onApplyConversion={applyDataConversion} 
+                filterTargets={filterTargets}
               />
             </Box>
-          </FormControl>
 
-          <FormControl>
-            <FormLabel fontWeight="bold">Filter Targets</FormLabel>
-            <SimpleGrid columns={1} spacing={6}>
-              {/* Load */}
-              <Box>
-                <Heading size="sm" mb={3} color="blue.600">Load Cell Sensors</Heading>
-                <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
-                  <HStack spacing={6} wrap="wrap">
-                    {csvHeaders
-                      .filter(header => header.toLowerCase().includes('(kg)'))
-                      .map(header => (
-                        <Checkbox key={header} value={header} colorScheme="blue">
-                          {header}
-                        </Checkbox>
-                      ))}
-                  </HStack>
-                </CheckboxGroup>
-              </Box>
+            {/* Right Column */}
+            <Box pl={{ base: 0, md: 6 }}>
+              <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
+                {/* Filter Settings Column */}
+                <Box>
+                  <Heading size="md" mb={4} color="blue.600">Filter Settings</Heading>
+                  <FormControl mb={4}>
+                    <FormLabel fontWeight="bold">Filter Type</FormLabel>
+                    <Select 
+                      value={filterType} 
+                      onChange={handleFilterChange}
+                      bg="white"
+                      size="lg"
+                    >
+                      <option value="kalman">Kalman Filter</option>
+                      <option value="gaussian">Gaussian Filter</option>
+                    </Select>
+                    <Box bg="white" p={4} borderRadius="md" mt={3} boxShadow="sm">
+                      <FilterSettings 
+                        filterType={filterType} 
+                        kalmanSettings={kalmanSettings} 
+                        setKalmanSettings={setKalmanSettings} 
+                        gaussianSettings={gaussianSettings} 
+                        setGaussianSettings={setGaussianSettings} 
+                      />
+                    </Box>
+                  </FormControl>
+                </Box>
+        
+                {/* Filter Targets Column */}
+                <Box>
+                  <Heading size="md" mb={4} color="purple.600">Filter Targets</Heading>
+                  <FormControl>
+                    <Box bg="white" p={4} borderRadius="md" boxShadow="sm">
+                      <VStack align="start" spacing={4} w="100%">
+                        {/* Load */}
+                        {csvHeaders.filter(header => header.toLowerCase().includes('(kg)')).length > 0 && (
+                          <Box w="100%">
+                            <Heading size="sm" mb={3} color="blue.600">Load Cell Sensors</Heading>
+                            <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+                              <HStack spacing={6} wrap="wrap">
+                                {csvHeaders
+                                  .filter(header => header.toLowerCase().includes('(kg)'))
+                                  .map(header => (
+                                    <Checkbox key={header} value={header} colorScheme="blue">
+                                      {header}
+                                    </Checkbox>
+                                  ))}
+                              </HStack>
+                            </CheckboxGroup>
+                          </Box>
+                        )}
 
-              {/* Pressure */}
-              <Box>
-                <Heading size="sm" mb={3} color="green.600">Pressure Sensors</Heading>
-                <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
-                  <HStack spacing={6} wrap="wrap">
-                    {csvHeaders
-                      .filter(header => header.toLowerCase().includes('(bar)'))
-                      .map(header => (
-                        <Checkbox key={header} value={header} colorScheme="green">
-                          {header}
-                        </Checkbox>
-                      ))}
-                  </HStack>
-                </CheckboxGroup>
-              </Box>
+                        {/* Pressure */}
+                        {csvHeaders.filter(header => header.toLowerCase().includes('(bar)')).length > 0 && (
+                          <Box w="100%">
+                            <Heading size="sm" mb={3} color="green.600">Pressure Sensors</Heading>
+                            <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+                              <HStack spacing={6} wrap="wrap">
+                                {csvHeaders
+                                  .filter(header => header.toLowerCase().includes('(bar)'))
+                                  .map(header => (
+                                    <Checkbox key={header} value={header} colorScheme="green">
+                                      {header}
+                                    </Checkbox>
+                                  ))}
+                              </HStack>
+                            </CheckboxGroup>
+                          </Box>
+                        )}
 
-              {/* Temperature */}
-              <Box>
-                <Heading size="sm" mb={3} color="orange.600">Temperature Sensors</Heading>
-                <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
-                  <HStack spacing={6} wrap="wrap">
-                    {csvHeaders
-                      .filter(header => header.toLowerCase().includes('(°c)'))
-                      .map(header => (
-                        <Checkbox key={header} value={header} colorScheme="orange">
-                          {header}
-                        </Checkbox>
-                      ))}
-                  </HStack>
-                </CheckboxGroup>
-              </Box>
-            </SimpleGrid>
-          </FormControl>
-        </SimpleGrid>
+                        {/* Temperature */}
+                        {csvHeaders.filter(header => header.toLowerCase().includes('(°c)')).length > 0 && (
+                          <Box w="100%">
+                            <Heading size="sm" mb={3} color="orange.600">Temperature Sensors</Heading>
+                            <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+                              <HStack spacing={6} wrap="wrap">
+                                {csvHeaders
+                                  .filter(header => header.toLowerCase().includes('(°c)'))
+                                  .map(header => (
+                                    <Checkbox key={header} value={header} colorScheme="orange">
+                                      {header}
+                                    </Checkbox>
+                                  ))}
+                              </HStack>
+                            </CheckboxGroup>
+                          </Box>
+                        )}
+                      </VStack>
+                    </Box>
+                  </FormControl>
+                </Box>
+              </SimpleGrid>
+            </Box>
+          </SimpleGrid>
+        </Box>
+
+          
+
+
 
 
         {/* Action Buttons */}
