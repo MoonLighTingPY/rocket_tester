@@ -14,18 +14,19 @@
 #include "SensorConfig.h"
 #include <ADS1256.h>
 #include <SPI.h>
+#include <dhcpserver/dhcpserver.h>
 
-// ESP32 Dev Module
-// DRDY: GPIO 17
-// RST: GPIO 16
-// CS: GPIO 5
-// SCLK  18  // Default SPI pins for VSPI
-// MISO  19
-// MOSI  23
+//WT-32_ETH01
 
+// DRDY: GPIO 39
+// RST: GPIO 4
+// CS: GPIO 14
+// SCLK 32   
+// SPI_MISO 33    // DOUT on adc
+// SPI_MOSI 2     // DIN on adc
 
-// ADS1256 setup (set custom spi pins in ADS1256.cpp init if using WT-32_ETH01)
-ADS1256 adc(39, 15, 0, 14, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
+// ADS1256 setup (set custom spi pins in ADS1256.cpp init if WT-32_ETH01 is used)
+ADS1256 adc(39, 4, 0, 14, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
 
 // Network credentials (Temporary, will be replaced with an ethernet connection)
 const char* ssid = WIFI_SSID;
@@ -41,9 +42,13 @@ TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t webSocketTaskHandle = NULL;
 
 // Pin definitions
-const int ENGINE_OUT_PIN = 17;
-const int ENGINE_IN_PIN = 35;
-const int PYRO_PIN = 5;
+
+// Pin labels on this board were done by a degenerate dyslexic,
+// so GPIO 35 is labeled as GPIO 5 and vice versa. 
+// Be careful, as GPIO 5 (labeled 35) is INPUT ONLY!
+const int ENGINE_OUT_PIN = 35; // (GPIO 5)
+const int ENGINE_IN_PIN = 5; // (GPIO 35)
+const int PYRO_PIN = 17;
 
 // Global variables
 bool isReading = false;
@@ -273,8 +278,9 @@ void setupPins() {
 void setupADC() {
     Serial.println("Setting up ADC");
     adc.InitializeADC();
+    Serial.println("ADC initialized");
     adc.setPGA(PGA_2);
-    adc.setDRATE(DRATE_2000SPS);
+    adc.setDRATE(DRATE_30000SPS);
     adc.sendDirectCommand(SELFCAL);
     delay(100);  // Wait for calibration
 
@@ -395,7 +401,7 @@ void setupWebServices() {
             success ? "Firmware update successful. Device will restart." : "Firmware update failed!"); 
         response->addHeader("Connection", "close");
         request->send(response);
-        // Restart ESP32 if update is successful
+        // Restart microcontroller if update is successful
         if(success) {
             delay(1000);
             ESP.restart(); 
@@ -509,11 +515,12 @@ void setupEthernet() {
 
     ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
 
-    // Static IP Configuration - Optional (otherwise uses DHCP)
-    ETH.config(IPAddress(169, 254, 1, 1),     // Device IP
-               IPAddress(169, 254, 1, 1),      // Gateway (same as IP)
-               IPAddress(255, 255, 255, 0),      // Subnet mask for link-local
-               IPAddress(169, 254, 1, 1));     // DNS (same as IP)
+    // Use a static IP in the link-local range to match what you're seeing
+    ETH.config(IPAddress(169, 254, 1, 1),    // Device IP
+               IPAddress(169, 254, 1, 100),  // Gateway (can be anything in same subnet)
+               IPAddress(255, 255, 0, 0),    // Subnet mask
+               IPAddress(8, 8, 8, 8));       // DNS
+
 
 
     // Wait for connection
@@ -525,6 +532,8 @@ void setupEthernet() {
     Serial.println();
     Serial.print("Ethernet IP: ");
     Serial.println(ETH.localIP());
+
+    Serial.println("Ethernet PHY Link status: " + String(ETH.linkUp() ? "UP" : "DOWN"));
 
     // Does not work with a cross-over cable (direct connection to PC)
     // Hostname to connect using esp32-rockettester.local instead of IP
@@ -548,7 +557,7 @@ void setupEthernet() {
 
 void setup() {
     Serial.begin(115200);
-    Serial.println("Rocket Tester ESP32"); 
+    Serial.println("Rocket Tester WT32-ETH01"); 
 
     setupPins();
     setupADC();
