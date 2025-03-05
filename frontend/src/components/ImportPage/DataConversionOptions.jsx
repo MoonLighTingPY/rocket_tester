@@ -13,7 +13,6 @@ import {
   RadioGroup,
   Radio,
   Text,
-  Select,
   useToast,
   Switch,
   FormHelperText,
@@ -41,20 +40,6 @@ const DataConversionOptions = ({
   const [calculatedFactor, setCalculatedFactor] = useState(null);
   const [enableConversion, setEnableConversion] = useState(false);
 
-  // Update default range max based on sensorType
-  const updateRangeByType = (type) => {
-    const ranges = {
-      pressure: 600,
-      load: 400,
-      temperature: 600,
-    };
-    
-    setRangeSettings(prev => ({
-      ...prev,
-      sensorType: type,
-      sensorMax: ranges[type]
-    }));
-  };
 
   const calculateFactor = () => {
     const { voltageMin, voltageMax, sensorMin, sensorMax } = rangeSettings;
@@ -122,22 +107,26 @@ const DataConversionOptions = ({
       
       {enableConversion && (
         <VStack align="start" spacing={4}>
-          <RadioGroup 
-            value={conversionType} 
-            onChange={setConversionType}
-            colorScheme="blue"
-          >
-            <HStack spacing={5}>
-              <Radio value="manual">Manual Entry</Radio>
-              <Radio value="range">Calculate from Range</Radio>
-            </HStack>
-          </RadioGroup>
           
           <Box w="full" p={4} borderWidth="1px" borderRadius="md">
-            {conversionType === 'manual' ? (
-              <HStack spacing={6}>
-                <FormControl>
-                  <FormLabel>Conversion Factor</FormLabel>
+            <VStack spacing={4} align="stretch">
+              {/* Conversion Factor Section */}
+              <FormControl>
+                <FormLabel fontWeight="bold">Conversion Factor</FormLabel>
+      
+                <RadioGroup 
+                  value={conversionType} 
+                  onChange={setConversionType}
+                  colorScheme="blue"
+                  mb={3}
+                >
+                  <HStack spacing={5}>
+                    <Radio value="manual">Manual Entry</Radio>
+                    <Radio value="range">Calculate from Range</Radio>
+                  </HStack>
+                </RadioGroup>
+      
+                {conversionType === 'manual' ? (
                   <NumberInput 
                     value={manualSettings.conversionFactor}
                     onChange={(_, value) => setManualSettings(prev => ({ ...prev, conversionFactor: value }))}
@@ -146,112 +135,100 @@ const DataConversionOptions = ({
                   >
                     <NumberInputField />
                   </NumberInput>
-                  <FormHelperText>Multiply readings by this value</FormHelperText>
-                </FormControl>
-                
-                <FormControl>
-                  <FormLabel>Offset</FormLabel>
-                  <NumberInput 
-                    value={manualSettings.offset}
-                    onChange={(_, value) => setManualSettings(prev => ({ ...prev, offset: value }))}
-                    precision={4}
-                  >
-                    <NumberInputField />
-                  </NumberInput>
-                  <FormHelperText>Add this value after multiplication</FormHelperText>
-                </FormControl>
-              </HStack>
-            ) : (
-              <VStack spacing={4} align="stretch">
-                <FormControl>
-                  <FormLabel>Sensor Type</FormLabel>
-                  <Select 
-                    value={rangeSettings.sensorType}
-                    onChange={(e) => updateRangeByType(e.target.value)}
-                  >
-                    <option value="pressure">Pressure Sensor</option>
-                    <option value="load">Load Cell</option>
-                    <option value="temperature">Temperature Sensor</option>
-                  </Select>
-                </FormControl>
-                
-                <HStack spacing={6}>
-                  <FormControl>
-                    <FormLabel>Voltage Range (V)</FormLabel>
+                ) : (
+                  <VStack spacing={3} align="stretch">
+                    <HStack spacing={6}>
+                      <FormControl>
+                        <FormLabel size="sm">Voltage Range (V)</FormLabel>
+                        <HStack>
+                          <NumberInput 
+                            value={rangeSettings.voltageMin}
+                            onChange={(_, value) => setRangeSettings(prev => ({ ...prev, voltageMin: value }))}
+                            step={0.1}
+                            precision={2}
+                            min={0}
+                            size="sm"
+                          >
+                            <NumberInputField placeholder="Min" />
+                          </NumberInput>
+                          <Text>to</Text>
+                          <NumberInput 
+                            value={rangeSettings.voltageMax}
+                            onChange={(_, value) => setRangeSettings(prev => ({ ...prev, voltageMax: value }))}
+                            step={0.1}
+                            precision={2}
+                            min={0}
+                            size="sm"
+                          >
+                            <NumberInputField placeholder="Max" />
+                          </NumberInput>
+                        </HStack>
+                        <FormHelperText>Typically 0-2.5V</FormHelperText>
+                      </FormControl>
+            
+                      <FormControl>
+                        <FormLabel size="sm">Sensor Range</FormLabel>
+                        <HStack>
+                          <NumberInput 
+                            value={rangeSettings.sensorMin}
+                            onChange={(_, value) => setRangeSettings(prev => ({ ...prev, sensorMin: value }))}
+                            precision={1}
+                            size="sm"
+                          >
+                            <NumberInputField placeholder="Min" />
+                          </NumberInput>
+                          <Text>to</Text>
+                          <NumberInput 
+                            value={rangeSettings.sensorMax}
+                            onChange={(_, value) => setRangeSettings(prev => ({ ...prev, sensorMax: value }))}
+                            precision={1}
+                            size="sm"
+                          >
+                            <NumberInputField placeholder="Max" />
+                          </NumberInput>
+                        </HStack>
+                        <FormHelperText>Typical ranges: 0-600 bar, 0-400 kg, 0-600 °C</FormHelperText>
+                      </FormControl>
+                    </HStack>
+          
                     <HStack>
-                      <NumberInput 
-                        value={rangeSettings.voltageMin}
-                        onChange={(_, value) => setRangeSettings(prev => ({ ...prev, voltageMin: value }))}
-                        step={0.1}
-                        precision={2}
-                        min={0}
+                      <Button 
+                        leftIcon={<Icon as={FaCalculator} />}
+                        colorScheme="teal" 
+                        onClick={calculateFactor}
+                        size="sm"
                       >
-                        <NumberInputField placeholder="Min" />
-                      </NumberInput>
-                      <Text>to</Text>
+              Calculate Factor
+                      </Button>
+            
                       <NumberInput 
-                        value={rangeSettings.voltageMax}
-                        onChange={(_, value) => setRangeSettings(prev => ({ ...prev, voltageMax: value }))}
-                        defaultValue={2.5}
-                        step={0.1}
-                        precision={2}
-                        min={0}
+                        value={calculatedFactor !== null ? calculatedFactor : manualSettings.conversionFactor}
+                        isReadOnly
+                        precision={4}
+                        size="sm"
+                        flex={1}
                       >
-                        <NumberInputField placeholder="Max" />
+                        <NumberInputField />
                       </NumberInput>
                     </HStack>
-                    <FormHelperText>Typically 0-2.5V for ADS1256</FormHelperText>
-                  </FormControl>
-                  
-                  <FormControl>
-                    <FormLabel>
-                      {rangeSettings.sensorType === 'pressure' ? 'Pressure Range (bar)' : 
-                        rangeSettings.sensorType === 'load' ? 'Load Range (kg)' : 
-                          'Temperature Range (°C)'}
-                    </FormLabel>
-                    <HStack>
-                      <NumberInput 
-                        value={rangeSettings.sensorMin}
-                        onChange={(_, value) => setRangeSettings(prev => ({ ...prev, sensorMin: value }))}
-                        precision={1}
-                      >
-                        <NumberInputField placeholder="Min" />
-                      </NumberInput>
-                      <Text>to</Text>
-                      <NumberInput 
-                        value={rangeSettings.sensorMax}
-                        onChange={(_, value) => setRangeSettings(prev => ({ ...prev, sensorMax: value }))}
-                        precision={1}
-                      >
-                        <NumberInputField placeholder="Max" />
-                      </NumberInput>
-                    </HStack>
-                    <FormHelperText>
-                      {rangeSettings.sensorType === 'pressure' ? 'Typical range: 0-600 bar' : 
-                        rangeSettings.sensorType === 'load' ? 'Typical range: 0-400 kg' : 
-                          'Typical range: 0-600 °C'}
-                    </FormHelperText>
-                  </FormControl>
-                </HStack>
-                
-                <HStack justify="space-between">
-                  <Button 
-                    leftIcon={<Icon as={FaCalculator} />}
-                    colorScheme="teal" 
-                    onClick={calculateFactor}
-                    size="sm"
-                  >
-                    Calculate Factor
-                  </Button>
-                  
-                  {calculatedFactor !== null && (
-                    <Text fontWeight="bold">
-                      Calculated Factor: {calculatedFactor.toFixed(4)}
-                    </Text>
-                  )}
-                </HStack>
-              </VStack>
-            )}
+                  </VStack>
+                )}
+                <FormHelperText>Multiply readings by this value</FormHelperText>
+              </FormControl>
+    
+              {/* Offset Section - Always visible */}
+              <FormControl>
+                <FormLabel fontWeight="bold">Offset</FormLabel>
+                <NumberInput 
+                  value={manualSettings.offset}
+                  onChange={(_, value) => setManualSettings(prev => ({ ...prev, offset: value }))}
+                  precision={4}
+                >
+                  <NumberInputField />
+                </NumberInput>
+                <FormHelperText>Add this value after applying the conversion factor</FormHelperText>
+              </FormControl>
+            </VStack>
           </Box>
           <HStack spacing={4}>
             <Button 
@@ -260,7 +237,7 @@ const DataConversionOptions = ({
               onClick={handleApplyConversion} 
               isDisabled={filterTargets.length === 0 || !enableConversion}
             >
-            Apply Conversion to Selected Channels
+    Apply Conversion to Selected Channels
             </Button>
           </HStack>
         </VStack>
