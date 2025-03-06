@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Box, VStack, Flex, Button, ChakraProvider, ColorModeProvider, CSSReset } from '@chakra-ui/react';
 import { useDataManager } from './hooks/useDataManager';
@@ -8,20 +8,10 @@ import HomePage from './components/HomePage/HomePage';
 import ImportPage from './components/ImportPage/ImportPage';
 import AnalysisPage from './components/AnalysisPage/AnalysisPage';
 import OTAModal from './components/HomePage/OTAModal';
+import DarkModeToggle from './components/DarkModeToggle';
 import "./App.css";
-import { enable, disable } from 'darkreader';
 
 function App() {
-  useEffect(() => {
-    // Dark theme for the app using DarkReader
-    enable({
-    });
-    // Disable DarkReader on unmount
-    return () => {
-      disable();
-    };
-  }, []);
-
   const [isOTAModalOpen, setIsOTAModalOpen] = useState(false);
   const dataManager = useDataManager();
 
@@ -51,8 +41,8 @@ function App() {
                       isOpen={isOTAModalOpen}
                       onClose={() => setIsOTAModalOpen(false)} 
                     />
-                    
                   </Flex>
+                  <DarkModeToggle />
                   <Routes>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/filter" element={<ImportPage />} />
