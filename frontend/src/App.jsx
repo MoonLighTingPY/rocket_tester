@@ -39,7 +39,7 @@ function App() {
                       <Button colorScheme="blue">Home</Button>
                     </Link>
                     <Link to="/filter">
-                      <Button colorScheme="green">Filter CSV</Button>
+                      <Button colorScheme="green">Manipulate CSV</Button>
                     </Link>
                     <Link to="/analysis">
                       <Button colorScheme="purple">Analysis</Button>

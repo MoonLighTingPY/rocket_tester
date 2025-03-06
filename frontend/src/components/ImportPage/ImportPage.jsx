@@ -226,7 +226,7 @@ const ImportPage = () => {
   return (
     <Box className="import-page" p={8} mx="auto">
       <VStack spacing={8} align="stretch" bg="white" p={8} borderRadius="xl" boxShadow="lg">
-        <Heading textAlign="center" color="blue.600">Import and Filter CSV Data</Heading>
+        <Heading textAlign="center" color="blue.600">Filter and convert CSV Data</Heading>
 
         <Box bg="gray.50" p={6} borderRadius="md" border="2px dashed" borderColor="gray.200">
           <FormControl>
