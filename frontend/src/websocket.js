@@ -1,5 +1,5 @@
 // Determine if we're in development mode
-const isDev = import.meta.env.DEV || process.env.NODE_ENV === 'development';
+const isDev = import.meta.env.DEV;
 
 // Use hardcoded ESP32 IP in development, otherwise use window.location.hostname
 const host = isDev ? '169.254.1.1' : window.location.hostname;
