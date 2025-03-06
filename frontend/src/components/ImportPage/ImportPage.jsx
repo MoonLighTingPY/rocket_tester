@@ -28,6 +28,8 @@ const ImportPage = () => {
   const [activeChart, setActiveChart] = useState(null);
   const [activeChartData, setActiveChartData] = useState(null);
   const [csvHeaders, setCsvHeaders] = useState([]);
+  const [dataHistory, setDataHistory] = useState([]);
+  const [lastOperation, setLastOperation] = useState(null); // 'filter' or 'conversion'
   const toast = useToast();
   const chartRefs = useRef({});
 
@@ -49,6 +51,12 @@ const ImportPage = () => {
     
     // Track if we're working with filtered or original data
     const baseData = filteredData.length > 0 ? filteredData : importedData;
+
+    setDataHistory(prev => [...prev, {
+      data: filteredData.length > 0 ? [...filteredData] : [...importedData],
+      operation: 'conversion'
+    }]);
+    setLastOperation('conversion');
     
     const convertedData = baseData.map(point => {
       const newPoint = { ...point };
@@ -66,6 +74,27 @@ const ImportPage = () => {
       title: "Data conversion applied",
       description: `Applied factor ${conversionFactor} and offset ${offset} to ${filterTargets.length} channel(s)`,
       status: "success",
+      duration: 3000,
+      isClosable: true,
+    });
+  };
+
+  const revertLastChange = () => {
+    if (dataHistory.length === 0) return;
+    
+    const lastState = dataHistory[dataHistory.length - 1];
+    setFilteredData(lastState.data);
+    
+    // Remove the last entry from history
+    setDataHistory(prev => prev.slice(0, -1));
+    
+    // Update lastOperation
+    setLastOperation(dataHistory.length > 1 ? dataHistory[dataHistory.length - 2].operation : null);
+    
+    toast({
+      title: "Last change reverted",
+      description: `Reverted last ${lastState.operation} operation`,
+      status: "info",
       duration: 3000,
       isClosable: true,
     });
@@ -149,6 +178,12 @@ const ImportPage = () => {
     const baseData = filteredData.length > 0 ? filteredData : importedData;
     
     let data = [...baseData]; // Create a copy to avoid mutating the source
+
+    setDataHistory(prev => [...prev, {
+      data: filteredData.length > 0 ? [...filteredData] : [...importedData],
+      operation: 'filter'
+    }]);
+    setLastOperation('filter');
     
     filterTargets.forEach(target => {
       if (filterType === 'kalman') {
@@ -371,9 +406,20 @@ const ImportPage = () => {
         {/* Action Buttons */}
         <HStack spacing={4} justify="center">
           <Button 
+            colorScheme="yellow" 
+            onClick={revertLastChange} 
+            isDisabled={dataHistory.length === 0}
+            size="lg"
+            leftIcon={<RepeatIcon />}
+          >
+    Undo Last {lastOperation ? (lastOperation === 'filter' ? 'Filter' : 'Conversion') : 'Change'}
+          </Button>
+          <Button 
             colorScheme="orange" 
             onClick={() => {
               setFilteredData([]);
+              setDataHistory([]);
+              setLastOperation(null);
               toast({
                 title: "Changes reverted",
                 description: "All filtering and conversion changes have been reverted",
@@ -386,7 +432,7 @@ const ImportPage = () => {
             size="lg"
             leftIcon={<Icon as={RepeatIcon} />}
           >
-  Revert Everything
+    Revert Everything
           </Button>
           <Button 
             colorScheme="green" 
