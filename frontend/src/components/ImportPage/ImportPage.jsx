@@ -43,7 +43,7 @@ const ImportPage = () => {
   }, [csvHeaders]);
 
   const applyDataConversion = (conversionData) => {
-    if (!importedData.length || !filterTargets.length || !conversionData.enableConversion) return;
+    if (!importedData.length || !filterTargets.length) return;
   
     const { conversionFactor, offset } = conversionData;
     
@@ -168,6 +168,15 @@ const ImportPage = () => {
     });
     
     setFilteredData(formattedData);
+    
+    // toast notification for applying filter
+    toast({
+      title: "Filter applied",
+      description: `Applied ${filterType} filter to ${filterTargets.length} channel(s)`,
+      status: "success",
+      duration: 3000,
+      isClosable: true,
+    });
   };
 
   const saveFilteredData = () => {
@@ -361,15 +370,23 @@ const ImportPage = () => {
 
         {/* Action Buttons */}
         <HStack spacing={4} justify="center">
-          
           <Button 
             colorScheme="orange" 
-            onClick={() => setFilteredData([])} 
+            onClick={() => {
+              setFilteredData([]);
+              toast({
+                title: "Changes reverted",
+                description: "All filtering and conversion changes have been reverted",
+                status: "info",
+                duration: 3000,
+                isClosable: true,
+              });
+            }} 
             isDisabled={filteredData.length === 0}
             size="lg"
             leftIcon={<Icon as={RepeatIcon} />}
           >
-    Revert Everything
+  Revert Everything
           </Button>
           <Button 
             colorScheme="green" 
