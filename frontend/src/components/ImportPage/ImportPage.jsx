@@ -243,6 +243,70 @@ const ImportPage = () => {
             />
             
           </FormControl>
+
+          <Box>
+            <Heading size="md" mb={4} color="purple.600">Targets</Heading>
+            <FormControl>
+              <Box bg="white" p={4} borderRadius="md" boxShadow="sm">
+                <HStack align="start" spacing={4} w="100%">
+                  {/* Load */}
+                  {csvHeaders.filter(header => header.toLowerCase().includes('(kg)')).length > 0 && (
+                    <Box w="100%">
+                      <Heading size="sm" mb={3} color="blue.600">Load Cell Sensors</Heading>
+                      <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+                        <HStack spacing={6} wrap="wrap">
+                          {csvHeaders
+                            .filter(header => header.toLowerCase().includes('(kg)'))
+                            .map(header => (
+                              <Checkbox key={header} value={header} colorScheme="blue">
+                                {header}
+                              </Checkbox>
+                            ))}
+                        </HStack>
+                      </CheckboxGroup>
+                    </Box>
+                  )}
+
+                  {/* Pressure */}
+                  {csvHeaders.filter(header => header.toLowerCase().includes('(bar)')).length > 0 && (
+                    <Box w="100%">
+                      <Heading size="sm" mb={3} color="green.600">Pressure Sensors</Heading>
+                      <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+                        <HStack spacing={6} wrap="wrap">
+                          {csvHeaders
+                            .filter(header => header.toLowerCase().includes('(bar)'))
+                            .map(header => (
+                              <Checkbox key={header} value={header} colorScheme="green">
+                                {header}
+                              </Checkbox>
+                            ))}
+                        </HStack>
+                      </CheckboxGroup>
+                    </Box>
+                  )}
+
+                  {/* Temperature */}
+                  {csvHeaders.filter(header => header.toLowerCase().includes('(°c)')).length > 0 && (
+                    <Box w="100%">
+                      <Heading size="sm" mb={3} color="orange.600">Temperature Sensors</Heading>
+                      <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
+                        <HStack spacing={6} wrap="wrap">
+                          {csvHeaders
+                            .filter(header => header.toLowerCase().includes('(°c)'))
+                            .map(header => (
+                              <Checkbox key={header} value={header} colorScheme="orange">
+                                {header}
+                              </Checkbox>
+                            ))}
+                        </HStack>
+                      </CheckboxGroup>
+                    </Box>
+                  )}
+                </HStack>
+              </Box>
+                    
+            </FormControl>
+          </Box>
           
         </Box>
         <Box bg="gray.50" p={6} borderRadius="md" border="1px solid" borderColor="gray.200">
@@ -257,7 +321,7 @@ const ImportPage = () => {
             </Box>
 
             {/* Right Column */}
-            <Box pl={{ base: 0, md: 6 }}>
+            <Box pl={{ base: 1, md: 6 }}>
               <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
                 {/* Filter Settings Column */}
                 <Box>
@@ -281,83 +345,19 @@ const ImportPage = () => {
                         gaussianSettings={gaussianSettings} 
                         setGaussianSettings={setGaussianSettings} 
                       />
+                      
                     </Box>
                   </FormControl>
-                </Box>
-        
-                {/* Filter Targets Column */}
-                <Box>
-                  <Heading size="md" mb={4} color="purple.600">Filter Targets</Heading>
-                  <FormControl>
-                    <Box bg="white" p={4} borderRadius="md" boxShadow="sm">
-                      <VStack align="start" spacing={4} w="100%">
-                        {/* Load */}
-                        {csvHeaders.filter(header => header.toLowerCase().includes('(kg)')).length > 0 && (
-                          <Box w="100%">
-                            <Heading size="sm" mb={3} color="blue.600">Load Cell Sensors</Heading>
-                            <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
-                              <HStack spacing={6} wrap="wrap">
-                                {csvHeaders
-                                  .filter(header => header.toLowerCase().includes('(kg)'))
-                                  .map(header => (
-                                    <Checkbox key={header} value={header} colorScheme="blue">
-                                      {header}
-                                    </Checkbox>
-                                  ))}
-                              </HStack>
-                            </CheckboxGroup>
-                          </Box>
-                        )}
-
-                        {/* Pressure */}
-                        {csvHeaders.filter(header => header.toLowerCase().includes('(bar)')).length > 0 && (
-                          <Box w="100%">
-                            <Heading size="sm" mb={3} color="green.600">Pressure Sensors</Heading>
-                            <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
-                              <HStack spacing={6} wrap="wrap">
-                                {csvHeaders
-                                  .filter(header => header.toLowerCase().includes('(bar)'))
-                                  .map(header => (
-                                    <Checkbox key={header} value={header} colorScheme="green">
-                                      {header}
-                                    </Checkbox>
-                                  ))}
-                              </HStack>
-                            </CheckboxGroup>
-                          </Box>
-                        )}
-
-                        {/* Temperature */}
-                        {csvHeaders.filter(header => header.toLowerCase().includes('(°c)')).length > 0 && (
-                          <Box w="100%">
-                            <Heading size="sm" mb={3} color="orange.600">Temperature Sensors</Heading>
-                            <CheckboxGroup value={filterTargets} onChange={handleFilterTargetsChange}>
-                              <HStack spacing={6} wrap="wrap">
-                                {csvHeaders
-                                  .filter(header => header.toLowerCase().includes('(°c)'))
-                                  .map(header => (
-                                    <Checkbox key={header} value={header} colorScheme="orange">
-                                      {header}
-                                    </Checkbox>
-                                  ))}
-                              </HStack>
-                            </CheckboxGroup>
-                          </Box>
-                        )}
-                      </VStack>
-                    </Box>
-                    
-                  </FormControl>
-                </Box>
-                <Button 
-                  colorScheme="blue" 
-                  onClick={applyFilter} 
-                  isDisabled={filterType === 'none' || filterTargets.length === 0}
-                  size="lg"
-                  leftIcon={<Icon as={BiFilter} />}
-                >
+                  <Button 
+                    colorScheme="blue" 
+                    onClick={applyFilter} 
+                    isDisabled={filterType === 'none' || filterTargets.length === 0}
+                    size="lg"
+                    leftIcon={<Icon as={BiFilter} />}
+                  >
     Apply Filter
-                </Button>
+                  </Button>
+                </Box>
               </SimpleGrid>
             </Box>
           </SimpleGrid>
