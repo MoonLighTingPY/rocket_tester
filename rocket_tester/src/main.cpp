@@ -1,45 +1,35 @@
 #include <Arduino.h>
-#include <WiFi.h>
 #include <SPIFFS.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <ETH.h>
+#include <ArduinoJson.h>
+#include <ArduinoOTA.h>
+#include <CircularBuffer.hpp>
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
-#include <ArduinoJson.h>
-#include <Wire.h>
-#include <CircularBuffer.hpp>
-#include <ESPmDNS.h>
-#include <WiFiUdp.h>
-#include <ArduinoOTA.h>
-#include <ETH.h>
-#include "Secret.h"
-#include "SensorConfig.h"
 #include <ADS1256.h>
-#include <SPI.h>
-#include <dhcpserver/dhcpserver.h>
-
-//WT-32_ETH01
-
-// DRDY: GPIO 39
-// RST: GPIO 4
-// CS: GPIO 14
-// SCLK 32   
-// SPI_MISO 33    // DOUT on adc
-// SPI_MOSI 2     // DIN on adc
-
-// ADS1256 setup (set custom spi pins in ADS1256.cpp init if WT-32_ETH01 is used)
-ADS1256 adc(39, 4, 0, 14, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
-
-// Network credentials (Temporary, will be replaced with an ethernet connection)
-const char* ssid = WIFI_SSID;
-const char* password = WIFI_PASS;
-const char* hostname = "esp32-rockettester";
-
-// Web server and WebSocket setup
-AsyncWebServer server(80);
-WebSocketsServer webSocket = WebSocketsServer(81);
+#include "SensorConfig.h"
 
 // Task handles
 TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t webSocketTaskHandle = NULL;
+
+// Web server and WebSocket setup
+AsyncWebServer server(80);
+WebSocketsServer webSocket = WebSocketsServer(81);
+const char* hostname = "esp32-rockettester";
+
+// ADS1256 setup (set custom spi pins in ADS1256.cpp init if WT-32_ETH01 is used)
+ADS1256 adc(39, 4, 0, 14, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
+
+//Pinout for WT32-ETH01 to ADS1256
+// DRDY: GPIO 39
+// RST: GPIO 4
+// CS: GPIO 14
+// SCLK GPIO 32 (CFG)      // DIN on adc
+// MISO GPIO 33 (485_EN)   // DOUT on adc
+// MOSI 2 
 
 // Pin definitions
 
@@ -82,7 +72,7 @@ struct BinarySensorPacket {
 #pragma pack(pop)
 
 // Circular buffer to store sensor data so we can read data at high speed and avoid blocking tasks while sending data over websocket. FIFO
-constexpr size_t BUFFER_SIZE = 1500; // Yes, it's not going to use that much, but it's better to have bit more than less
+constexpr size_t BUFFER_SIZE = 1500; // Yes, it's not going to use that much, but it's better to have a bit more than not enough and miss data
 CircularBuffer<SensorData, BUFFER_SIZE> dataBuffer;
 
 // Mutex for buffer access
@@ -91,7 +81,7 @@ portMUX_TYPE bufferMux = portMUX_INITIALIZER_UNLOCKED;
 
 // Interrupt to detect engine start (falling edge)
 // ESP outputs a signal from one pin and recieves it on another, the wire that connects them goes trough the engine's fire chamber,
-// so when the engine starts - the connection breaks, we do not recieve the signal anymore, and the interrupt is triggered,
+// so when the engine starts - the connection breaks, we do not recieve the signal anymore - the interrupt is triggered,
 // and the engine start time is captured
 void IRAM_ATTR engineStartISR() {
         engineStartTime = micros();
@@ -181,7 +171,7 @@ void webSocketTask(void *parameter) {
             portEXIT_CRITICAL(&bufferMux);
             
             // Send data to all connected clients. If no clients are connected, the data is lost. No session isolation.
-            // TO DO: Need to implement a way to store the data for backup and send it to clients in cases when connection was lost during test
+            // TO DO: Need to implement a way to store the data for backup and send it to clients in cases when connection was lost during test from the client side
             if (array.size() >= 0) {
                 doc["type"] = "test_data";
                 String jsonString;
@@ -194,7 +184,7 @@ void webSocketTask(void *parameter) {
     }
 }
 
-// WebSocket event handler (connected, disconnected, text message)
+// WebSocket event handler (connected, disconnected, message)
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
     switch(type) {
         case WStype_CONNECTED: {
@@ -228,7 +218,6 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                     handleUpdateConfig(num, obj);
                 }
             }
-
 
             if (message == "start_readings") {
                 clearDataBuffer(); // Clear the buffer before starting a new test
@@ -266,11 +255,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
 
 void setupPins() {
-    pinMode(ENGINE_OUT_PIN, OUTPUT);
-    pinMode(ENGINE_IN_PIN, INPUT_PULLUP);
     pinMode(PYRO_PIN, OUTPUT); // Pyro pin to ignite the engine
-    digitalWrite(ENGINE_OUT_PIN, HIGH); 
-    digitalWrite(PYRO_PIN, LOW); // Set to low by default to avoid accidental ignition
+    pinMode(ENGINE_OUT_PIN, OUTPUT); // Output pin to send signal for wire break detection
+    pinMode(ENGINE_IN_PIN, INPUT_PULLUP); // Input pin for wire break detection
+    digitalWrite(ENGINE_OUT_PIN, HIGH);
+    digitalWrite(PYRO_PIN, LOW); // Set to low by default to avoid accidental ignition and save user's hands lol!
     attachInterrupt(digitalPinToInterrupt(ENGINE_IN_PIN), engineStartISR, FALLING);
 }
 
@@ -287,7 +276,7 @@ void setupADC() {
     // Set input buffer mode for high impedance inputs
     adc.setBuffer(BUFFER_ENABLED);
 
-        // Configure all enabled channels
+    // Configure all enabled channels
     for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
         if (sensorConfigs[i].enabled) {
             // Set MUX for single-ended measurement relative to AINCOM
@@ -308,59 +297,6 @@ void setupADC() {
     }
 }
 
-// Temporary, will be replaced with ethernet connection
-void setupWiFi() {
-    WiFi.mode(WIFI_STA);
-    WiFi.setAutoReconnect(true); 
-    WiFi.persistent(true); // Save WiFi settings to flash
-    
-    // Connect to WiFi first using DHCP
-    WiFi.begin(ssid, password);
-    unsigned long startAttemptTime = millis();
-    
-    while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) {
-        delay(1000);
-        Serial.println("Connecting to WiFi...");
-    }
-
-    // Try to set static IP
-    if (WiFi.status() == WL_CONNECTED) {
-        // Get router's subnet info
-        IPAddress routerIP = WiFi.gatewayIP();
-        IPAddress routerSubnet = WiFi.subnetMask();
-        
-        // Proposed static IP
-        IPAddress desiredIP(192, 168, 0, 69);
-        
-        // Check if desired IP is in same subnet as router
-        if ((routerIP & routerSubnet) == (desiredIP & routerSubnet)) {
-            if (WiFi.config(desiredIP, routerIP, routerSubnet)) {
-                Serial.println("Static IP configuration successful");
-            } else {
-                Serial.println("Failed to set static IP, staying with DHCP");
-            }
-        } else {
-            Serial.println("Desired IP not in router's subnet, staying with DHCP");
-        }
-    } else {
-        Serial.println("Failed to connect to WiFi");
-    }
-
-    delay(1000); // Wait a bit to stabilize connection
-
-    if (!MDNS.begin(hostname)) {
-        Serial.println("Error setting up MDNS responder!");
-    } else {
-        // Web serber service
-        MDNS.addService("http", "tcp", 80);
-        // WebSocket service
-        MDNS.addService("ws", "tcp", 81);
-        Serial.println("mDNS responder started");
-        Serial.println("http://" + String(hostname) + ".local");
-
-    }
-}
-
 
 void setupSPIFFS() {
     if (!SPIFFS.begin(true)) {
@@ -371,7 +307,7 @@ void setupSPIFFS() {
     Serial.println("SPIFFS mounted successfully");
 }
 
-// Start web server and websocket, handle routes and OTA requests
+// Start the webserver and websocket, handle routes and OTA requests
 void setupWebServices() {
     // Set CORS headers globally for all responses so we can access the routes from any domain
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
@@ -385,6 +321,8 @@ void setupWebServices() {
     
 
     // Handler to serve index.html for all routes except existing ones
+    // This is needed as other routes can't be accessed directly, because
+    // first the index.html has to be served and then the client-side routing takes over
     server.onNotFound([](AsyncWebServerRequest *request) {
         if (request->method() == HTTP_OPTIONS) {
             request->send(200);
@@ -467,7 +405,7 @@ void setupWebServices() {
     webSocket.onEvent(webSocketEvent);
 }
 
-// OTA setup, no authentication for now
+// OTA setup, no authentication as it only works via Ethernet anyway
 void setupOTA() {
     ArduinoOTA.setHostname(hostname);  // Use existing hostname
     // Handlers for OTA events
@@ -475,7 +413,7 @@ void setupOTA() {
         String type;
         if (ArduinoOTA.getCommand() == U_FLASH) {
             type = "sketch";
-        } else {  // U_SPIFFS
+        } else {
             type = "filesystem";
             SPIFFS.end();  // Unmount SPIFFS
         }
@@ -503,9 +441,9 @@ void setupOTA() {
     Serial.println("OTA ready");
 }
 
-
+// Configure Ethernet, IP, set hostname and wait for Ethernet connection
 void setupEthernet() {
-    // WT32-ETH01 Default Pins
+    // WT32-ETH01 Default Pins. Never change them, they are hardwired on the board. Copied from WT32-ETH01 example sketch
     #define ETH_CLK_MODE    ETH_CLOCK_GPIO0_IN  // ETH_CLOCK_GPIO0_IN / ETH_CLOCK_GPIO0_OUT / ETH_CLOCK_GPIO16_OUT / ETH_CLOCK_GPIO17_OUT
     #define ETH_POWER_PIN   16                   // Do not use it, it is for testing
     #define ETH_TYPE        ETH_PHY_LAN8720     // ETH_PHY_LAN8720 / ETH_PHY_TLK110 / ETH_PHY_RTL8201 / ETH_PHY_DP83848
@@ -515,12 +453,10 @@ void setupEthernet() {
 
     ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
 
-    // Use a static IP in the link-local range to match what you're seeing
     ETH.config(IPAddress(169, 254, 1, 1),    // Device IP
                IPAddress(169, 254, 1, 100),  // Gateway (can be anything in same subnet)
                IPAddress(255, 255, 0, 0),    // Subnet mask
-               IPAddress(8, 8, 8, 8));       // DNS
-
+               IPAddress(8, 8, 8, 8));       // DNS. Dont know why it doesn't work without it. Google DNS
 
 
     // Wait for connection
@@ -535,44 +471,18 @@ void setupEthernet() {
 
     Serial.println("Ethernet PHY Link status: " + String(ETH.linkUp() ? "UP" : "DOWN"));
 
+    // Allows to connect by hostname.local instead of IP
     // Auto MDI/MDIX required (most modern pc's support it)
     // If you don't have auto MDI/MDIX, use a cross-over cable (A to B wiring)
-    // Allows to connect by hostname.local instead of IP
     ETH.setHostname(hostname);
     Serial.print("Hostname: ");
     Serial.println(ETH.getHostname());
-
-    // optional: mDNS responder. Allows to connect by hostname.local instead of IP (WiFi only)
-    // Requires bonjour service to be installed on Windows. On Linux and Mac it works out of the box
-
-    // if (!MDNS.begin(hostname)) {
-    //     Serial.println("Error setting up MDNS responder!");
-    // } else {
-    //     // Web server service
-    //     MDNS.addService("http", "tcp", 80);
-    //     // WebSocket service
-    //     MDNS.addService("ws", "tcp", 81);
-    //     Serial.println("mDNS responder started");
-    // }
-
     
 }
 
-void setup() {
-    Serial.begin(115200);
-    Serial.println("Rocket Tester WT32-ETH01"); 
-
-    setupPins();
-    setupADC();
-    setupSPIFFS();
-    loadSensorConfig();
-    // setupWiFi();
-    setupEthernet();
-    setupWebServices();
-    setupOTA();
-
-
-    // Sensor and WebSocket tasks on separate cores so they can run independently
+// RTOS Sensor and WebSocket tasks on separate cores so they can run independently
+void setupTasks() {
+    
     xTaskCreatePinnedToCore(
         sensorTask,
         "SensorTask",
@@ -592,6 +502,19 @@ void setup() {
         &webSocketTaskHandle,
         1  // Core 1
     );
+}
+
+void setup() {
+    Serial.begin(115200);
+    Serial.println("Rocket Tester Stand - Built on WT32-ETH01"); 
+    setupPins();
+    setupADC();
+    setupSPIFFS();
+    loadSensorConfig();
+    setupEthernet();
+    setupWebServices();
+    setupOTA();
+    setupTasks();
 }
 
 void loop() {
