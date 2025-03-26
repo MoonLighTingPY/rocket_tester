@@ -5,7 +5,7 @@
       "type": 0,
       "name": "LoadCell1",
       "adcChannel": 0,
-      "conversionFactor": 240.0,
+      "conversionFactor": 1.0,
       "offset": 0.0
     },
     {
@@ -13,7 +13,7 @@
       "type": 0,
       "name": "LoadCell2", 
       "adcChannel": 1,
-      "conversionFactor": 240.0,
+      "conversionFactor": 1.0,
       "offset": 0.0
     },
     {
@@ -21,31 +21,31 @@
       "type": 1,
       "name": "Pressure1",
       "adcChannel": 2,
-      "conversionFactor": 240.0,
-      "offset": -16.0
+      "conversionFactor": 1.0,
+      "offset": 0.0
     },
     {
       "enabled": true,
       "type": 1,
       "name": "Pressure2",
       "adcChannel": 3,
-      "conversionFactor": 240.0,
-      "offset": -16.0
+      "conversionFactor": 1.0,
+      "offset": 0.0
     },
     {
       "enabled": true,
       "type": 1,
       "name": "Pressure3",
       "adcChannel": 4,
-      "conversionFactor": 240.0,
-      "offset": -16.0
+      "conversionFactor": 1.0,
+      "offset": 0.0
     },
     {
       "enabled": true,
       "type": 2,
       "name": "Temperature1",
       "adcChannel": 5,
-      "conversionFactor": 320.0,
+      "conversionFactor": 1.0,
       "offset": 0.0
     },
     {
@@ -53,7 +53,7 @@
       "type": 2,
       "name": "Temperature2",
       "adcChannel": 6,
-      "conversionFactor": 320.0,
+      "conversionFactor": 1.0,
       "offset": 0.0
     },
     {
@@ -61,7 +61,7 @@
       "type": 2,
       "name": "Temperature3",
       "adcChannel": 7,
-      "conversionFactor": 320.0,
+      "conversionFactor": 1.0,
       "offset": 0.0
     }
   ]

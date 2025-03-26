@@ -27,17 +27,17 @@ ADS1256 adc(39, 4, 0, 14, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float).
 // DRDY: GPIO 39
 // RST: GPIO 4
 // CS: GPIO 14
-// SCLK GPIO 32 (CFG)      // DIN on adc
+// SCLK GPIO 32 (CFG)      
 // MISO GPIO 33 (485_EN)   // DOUT on adc
-// MOSI 2 
+// MOSI 2                  // DIN on adc
 
 // Pin definitions
 
 // Pin labels on this board were done by a degenerate dyslexic,
 // so GPIO 35 is labeled as GPIO 5 and vice versa. 
 // Be careful, as GPIO 5 (labeled 35) is INPUT ONLY!
-const int ENGINE_OUT_PIN = 35; // (GPIO 5)
-const int ENGINE_IN_PIN = 5; // (GPIO 35)
+const int ENGINE_OUT_PIN = 5; // (GPIO 35)
+const int ENGINE_IN_PIN = 35; // (GPIO 5)
 const int PYRO_PIN = 17;
 
 // Global variables
@@ -505,6 +505,7 @@ void setupTasks() {
 }
 
 void setup() {
+    delay(2000);
     Serial.begin(115200);
     Serial.println("Rocket Tester Stand - Built on WT32-ETH01"); 
     setupPins();
