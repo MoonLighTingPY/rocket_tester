@@ -4,9 +4,10 @@ import {
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
   Button, FormControl, FormLabel, Input, Checkbox, VStack, SimpleGrid,
   Box, Text, Divider, FormErrorMessage, Badge, HStack, Select, Tooltip, InputGroup, InputRightAddon,
-  ButtonGroup,
+  ButtonGroup, useToast, NumberInput, NumberInputField, FormHelperText
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
+import { FaCalculator } from 'react-icons/fa';
 
 const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   const [localConfig, setLocalConfig] = useState(sensorConfig || []);
@@ -19,8 +20,149 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   });
   const [presetName, setPresetName] = useState('');
   const [selectedPreset, setSelectedPreset] = useState('');
-  
+  const [calculationModalOpen, setCalculationModalOpen] = useState(null); // Store sensor index when open
+  const [rangeSettings, setRangeSettings] = useState({
+    voltageMin: 0,
+    voltageMax: 2.5,
+    sensorMin: 0,
+    sensorMax: 100
+  });
+  const toast = useToast();
 
+  // Function to calculate conversion factor
+  const calculateFactor = (sensorIndex) => {
+    const { voltageMin, voltageMax, sensorMin, sensorMax } = rangeSettings;
+    if (voltageMax === voltageMin) {
+      toast({
+        title: "Calculation Error",
+        description: "Voltage range cannot be zero",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    
+    const factor = (sensorMax - sensorMin) / (voltageMax - voltageMin);
+    
+    // Update the editable values with the calculated factor
+    setEditableValues(prev => ({
+      ...prev,
+      [`${sensorIndex}-conversionFactor`]: factor.toFixed(4)
+    }));
+    
+    // Close calculation popup
+    setCalculationModalOpen(null);
+    
+    toast({
+      title: "Conversion factor calculated",
+      description: `Factor: ${factor.toFixed(4)}`,
+      status: "success",
+      duration: 3000,
+      isClosable: true,
+    });
+  };
+
+  // Render calculator popup when calculationModalOpen is set
+  const renderCalculator = () => {
+    if (calculationModalOpen === null) return null;
+    
+    const sensorIndex = calculationModalOpen;
+    const sensor = localConfig[sensorIndex];
+    if (!sensor) return null;
+    
+    let unitLabel;
+    switch(sensor.type) {
+      case 0: unitLabel = 'kg'; break;
+      case 1: unitLabel = 'bar'; break;
+      case 2: unitLabel = '°C'; break;
+      default: unitLabel = 'units';
+    }
+
+    return (
+      <Box
+        position="absolute"
+        zIndex="modal"
+        bg="white"
+        p={4}
+        borderRadius="md"
+        boxShadow="lg"
+        borderWidth="1px"
+        maxW="400px"
+      >
+        <VStack spacing={3} align="stretch">
+          <HStack justifyContent="space-between">
+            <Text fontWeight="bold">Calculate Conversion Factor</Text>
+            <Button size="sm" variant="ghost" onClick={() => setCalculationModalOpen(null)}>X</Button>
+          </HStack>
+          
+          <FormControl>
+            <FormLabel fontSize="sm">Voltage Range (V)</FormLabel>
+            <HStack>
+              <NumberInput 
+                value={rangeSettings.voltageMin}
+                onChange={(_, value) => setRangeSettings(prev => ({ ...prev, voltageMin: value }))}
+                step={0.1}
+                precision={2}
+                min={0}
+                size="sm"
+              >
+                <NumberInputField placeholder="Min" />
+              </NumberInput>
+              <Text>to</Text>
+              <NumberInput 
+                value={rangeSettings.voltageMax}
+                onChange={(_, value) => setRangeSettings(prev => ({ ...prev, voltageMax: value }))}
+                step={0.1}
+                precision={2}
+                min={0}
+                size="sm"
+              >
+                <NumberInputField placeholder="Max" />
+              </NumberInput>
+            </HStack>
+            <FormHelperText>Typically 0-2.5V</FormHelperText>
+          </FormControl>
+
+          <FormControl>
+            <FormLabel fontSize="sm">Sensor Range ({unitLabel})</FormLabel>
+            <HStack>
+              <NumberInput 
+                value={rangeSettings.sensorMin}
+                onChange={(_, value) => setRangeSettings(prev => ({ ...prev, sensorMin: value }))}
+                precision={1}
+                size="sm"
+              >
+                <NumberInputField placeholder="Min" />
+              </NumberInput>
+              <Text>to</Text>
+              <NumberInput 
+                value={rangeSettings.sensorMax}
+                onChange={(_, value) => setRangeSettings(prev => ({ ...prev, sensorMax: value }))}
+                precision={1}
+                size="sm"
+              >
+                <NumberInputField placeholder="Max" />
+              </NumberInput>
+            </HStack>
+            <FormHelperText>
+              {sensor.type === 0 ? 'Typical: 0-400 kg' : 
+               sensor.type === 1 ? 'Typical: 0-600 bar' : 
+                                  'Typical: 0-600 °C'}
+            </FormHelperText>
+          </FormControl>
+          
+          <Button 
+            leftIcon={<FaCalculator />}
+            colorScheme="blue" 
+            onClick={() => calculateFactor(sensorIndex)}
+          >
+            Calculate Factor
+          </Button>
+        </VStack>
+      </Box>
+    );
+  };
 
   useEffect(() => {
     if (sensorConfig && Array.isArray(sensorConfig) && sensorConfig.length > 0) {
@@ -282,16 +424,16 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="6xl" scrollBehavior="inside">
       <ModalOverlay />
-      <ModalContent maxW={{ base: "90%", md: "80%", lg: "70%" }} maxH="90vh">
+      <ModalContent maxW={{ base: "90%", md: "80%", lg: "70%" }} maxH="90vh" position="relative">
+        {renderCalculator()}
         <ModalHeader>Sensor Configuration</ModalHeader>
         <ModalBody 
           display="flex" 
           flexDir="column" 
-          maxH="calc(90vh - 150px)" // Adjust for header and footer height
-          overflowY="auto" // Enable vertical scrolling
+          maxH="calc(90vh - 150px)"
+          overflowY="auto"
         >
           <VStack spacing={4} align="stretch" minH="0">
-
             {Object.entries(groupedSensors).map(([type, sensors]) => (
               <Box key={type}>
                 <Text fontSize="lg" fontWeight="bold" mb={2}>
@@ -386,25 +528,53 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
 
   
                             <FormControl isInvalid={errors[`${originalIndex}-conversionFactor`]}>
-                              <Tooltip label="Factor to convert the ADC reading to a real unit. Represents units per 1V. For example, if loadcell reads 250kg at 2.5V, conversion factor is 100kg/V">
-                                <FormLabel fontSize="sm" mb={1}>
-                                Conversion Factor <InfoIcon ml={1} boxSize={3} />
-                                </FormLabel>
-                              </Tooltip>
-                              <InputGroup size="sm">
-                                <Input
-                                  type="text"
-                                  value={editableValues[`${originalIndex}-conversionFactor`]}
-                                  onChange={(e) => handleChange(originalIndex, 'conversionFactor', e.target.value)}
-                                  isDisabled={!sensor.enabled}
-                                  bg={!sensor.enabled ? "gray.100" : "white"}
-                                />
-                                <InputRightAddon>
-                                  {sensor.type === 0 ? 'kg/V' : sensor.type === 1 ? 'bar/V' : '°C/V'}
-                                </InputRightAddon>
-                              </InputGroup>
-                              <FormErrorMessage>{errors[`${originalIndex}-conversionFactor`]}</FormErrorMessage>
-                            </FormControl>
+                          <Tooltip label="Factor to convert the ADC reading to a real unit. Represents units per 1V. For example, if loadcell reads 250kg at 2.5V, conversion factor is 100kg/V">
+                            <FormLabel fontSize="sm" mb={1}>
+                              Conversion Factor <InfoIcon ml={1} boxSize={3} />
+                            </FormLabel>
+                          </Tooltip>
+                          <HStack>
+                            <InputGroup size="sm" flex={1}>
+                              <Input
+                                type="text"
+                                value={editableValues[`${originalIndex}-conversionFactor`]}
+                                onChange={(e) => handleChange(originalIndex, 'conversionFactor', e.target.value)}
+                                isDisabled={!sensor.enabled}
+                                bg={!sensor.enabled ? "gray.100" : "white"}
+                              />
+                              <InputRightAddon>
+                                {sensor.type === 0 ? 'kg/V' : sensor.type === 1 ? 'bar/V' : '°C/V'}
+                              </InputRightAddon>
+                            </InputGroup>
+                            <Button 
+                              size="sm" 
+                              colorScheme="teal" 
+                              isDisabled={!sensor.enabled}
+                              onClick={() => {
+                                // Initialize range values based on sensor type
+                                let sensorMax;
+                                switch(sensor.type) {
+                                  case 0: sensorMax = 400; break; // Load cell - kg
+                                  case 1: sensorMax = 600; break; // Pressure - bar
+                                  case 2: sensorMax = 600; break; // Temperature - °C
+                                  default: sensorMax = 100;
+                                }
+                                
+                                setRangeSettings({
+                                  voltageMin: 0,
+                                  voltageMax: 2.5,
+                                  sensorMin: 0,
+                                  sensorMax
+                                });
+                                setCalculationModalOpen(originalIndex);
+                              }}
+                            >
+                              <FaCalculator />
+                            </Button>
+                          </HStack>
+                          <FormErrorMessage>{errors[`${originalIndex}-conversionFactor`]}</FormErrorMessage>
+                        </FormControl>
+                        
 
                             <FormControl isInvalid={errors[`${originalIndex}-offset`]}>
                               <Tooltip label="Offset in real units to correct sensor bias. For example, if sensor reads 5kg at real 0kg, offset is -5.">
