@@ -10,6 +10,8 @@
 #include <WebSocketsServer.h>
 #include <ADS1256.h>
 #include "SensorConfig.h"
+#include "ESPmDNS.h"
+#include <algorithm>
 
 // Task handles
 TaskHandle_t sensorTaskHandle = NULL;
@@ -21,7 +23,7 @@ WebSocketsServer webSocket = WebSocketsServer(81);
 const char* hostname = "esp32-rockettester";
 
 // ADS1256 setup (set custom spi pins in ADS1256.cpp init if WT-32_ETH01 is used)
-ADS1256 adc(39, 4, 0, 14, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
+// ADS1256 adc(39, 4, 0, 14, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float). 
 
 //Pinout for WT32-ETH01 to ADS1256
 // DRDY: GPIO 39
@@ -96,6 +98,8 @@ void clearDataBuffer() {
     portEXIT_CRITICAL(&bufferMux);
 }
 
+int counter = 0;
+
 // Sensor reading task. Reads all enabled sensors and pushes data to the buffer
 // for the WebSocket task to send to the client. Buffer is used to avoid blocking, so tasks
 // can run independently and at different speeds (reading is faster than sending)
@@ -110,8 +114,10 @@ void sensorTask(void *parameter) {
             float voltage[SENSOR_COUNT];
             bool hasData = false;
             for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
-                voltage[i] = adc.convertToVoltage(adc.cycleSingle());
-                // voltage[i] = i * 0.1f; // Temporary, will be replaced with ADC readings
+                // voltage[i] = adc.convertToVoltage(adc.cycleSingle());
+                counter++;
+                voltage[i] = counter; // Temporary, will be replaced with ADC readings
+                // delayMicroseconds(0); // wifi delay, remove if not needed
                 
                 if (sensorConfigs[i].enabled) {
                     data.values[i] = voltage[i] * sensorConfigs[i].conversionFactor + sensorConfigs[i].offset;
@@ -133,26 +139,50 @@ void sensorTask(void *parameter) {
         }
 
         // RTOS wake up delay
-        vTaskDelay(1);
+        vTaskDelay(5);
     }
 }
 
+
+// WebSocket communication task
 // WebSocket communication task
 void webSocketTask(void *parameter) {
     
+    int sendDelay = 20; // Start with default delay
+    int bufferHighWatermark = BUFFER_SIZE * 0.7; // 70% of buffer capacity
+    int bufferLowWatermark = BUFFER_SIZE * 0.3; // 30% of buffer capacity
+    
     while (true) {
-
         webSocket.loop(); // Has to be here to handle the websocket connection constantly
         ArduinoOTA.handle(); // Same for OTA
 
         // Send data to clients if we are reading and have data in the buffer
         if (isReading && !dataBuffer.isEmpty()) {
+            // Check buffer fill level to adjust send rate
+            size_t bufferSize;
+            portENTER_CRITICAL(&bufferMux);
+            bufferSize = dataBuffer.size();
+            portEXIT_CRITICAL(&bufferMux);
+            
+            // Dynamically adjust the delay based on buffer fullness
+            if (bufferSize > bufferHighWatermark) {
+                // Buffer getting full, speed up sending
+                sendDelay = 1;
+            } else if (bufferSize < bufferLowWatermark) {
+                // Buffer is emptying, slow down to save resources
+                sendDelay = 5;
+            }
+            
+            // Limit how much data we send at once
+            const size_t maxItemsToSend = 50; // Adjust based on your payload size
+            
             JsonDocument doc;
             JsonArray array = doc["data"].to<JsonArray>();
             
-            // Using critial so we don't get interrupted while fucking arond with the buffer
             portENTER_CRITICAL(&bufferMux);
-            while (!dataBuffer.isEmpty()) {
+            // Using critical so we don't get interrupted while reading from the buffer
+            size_t itemsToProcess = std::min(static_cast<size_t>(dataBuffer.size()), maxItemsToSend);
+            for (size_t i = 0; i < itemsToProcess; i++) {
                 // Shift data from buffer and add to JSON array
                 SensorData data = dataBuffer.shift();
                 JsonObject reading = array.add<JsonObject>();
@@ -161,26 +191,30 @@ void webSocketTask(void *parameter) {
                 reading["t2"] = data.ignitionTimestamp;
 
                 // Add only enabled sensors values to JSON with their names
-                for (size_t i = 0; i < SENSOR_COUNT; i++) {
-                    const SensorConfig& sensor = sensorConfigs[i];
+                for (size_t j = 0; j < SENSOR_COUNT; j++) {
+                    const SensorConfig& sensor = sensorConfigs[j];
                     if (sensor.enabled) {
-                        reading[sensor.name] = data.values[i];
+                        reading[sensor.name] = data.values[j];
                     }
                 }
             }
             portEXIT_CRITICAL(&bufferMux);
             
-            // Send data to all connected clients. If no clients are connected, the data is lost. No session isolation.
-            // TO DO: Need to implement a way to store the data for backup and send it to clients in cases when connection was lost during test from the client side
-            if (array.size() >= 0) {
+            // Send data to all connected clients
+            if (array.size() > 0) {
                 doc["type"] = "test_data";
                 String jsonString;
                 serializeJson(doc, jsonString);
-                webSocket.broadcastTXT(jsonString);
+                
+                // Check if client connections are still healthy
+                if (webSocket.connectedClients() > 0) {
+                    webSocket.broadcastTXT(jsonString);
+                }
             }
         }
-
-        vTaskDelay(1);
+        
+        // Dynamically adjust delay based on if we're reading and buffer state
+        vTaskDelay(isReading ? sendDelay : 20);
     }
 }
 
@@ -266,22 +300,22 @@ void setupPins() {
 
 void setupADC() {
     Serial.println("Setting up ADC");
-    adc.InitializeADC();
+    // adc.InitializeADC();
     Serial.println("ADC initialized");
-    adc.setPGA(PGA_2);
-    adc.setDRATE(DRATE_30000SPS);
-    adc.sendDirectCommand(SELFCAL);
+    // adc.setPGA(PGA_2);
+    // adc.setDRATE(DRATE_30000SPS);
+    // adc.sendDirectCommand(SELFCAL);
     delay(100);  // Wait for calibration
 
     // Set input buffer mode for high impedance inputs
-    adc.setBuffer(BUFFER_ENABLED);
+    // adc.setBuffer(BUFFER_ENABLED);
 
     // Configure all enabled channels
     for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
         if (sensorConfigs[i].enabled) {
             // Set MUX for single-ended measurement relative to AINCOM
             uint8_t mux = SING_0 + sensorConfigs[i].adcChannel;
-            adc.setMUX(mux);
+            // adc.setMUX(mux);
             delayMicroseconds(100);
         }
     }
@@ -291,7 +325,7 @@ void setupADC() {
     for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
         if (sensorConfigs[i].enabled) {
             uint8_t mux = SING_0 + sensorConfigs[i].adcChannel;
-            adc.setMUX(mux);
+            // adc.setMUX(mux);
             break;
         }
     }
@@ -503,6 +537,24 @@ void setupTasks() {
         1  // Core 1
     );
 }
+// Connect to WiFi
+// Development only, for ESP32, as it doesn't have Ethernet. In production, use Ethernet
+void setupWifi() {
+    WiFi.disconnect(true);
+    WiFi.begin("путін хуйло", "28021981");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+        Serial.println("Connecting to WiFi...");
+    }
+    Serial.println(WiFi.localIP());
+
+    if (!MDNS.begin(hostname)) {
+        Serial.println("Error setting up MDNS responder!");
+    } else {
+        Serial.println("mDNS responder started");
+        Serial.println("http://" + String(hostname) + ".local");
+    }
+}
 
 void setup() {
     delay(2000);
@@ -512,7 +564,8 @@ void setup() {
     setupADC();
     setupSPIFFS();
     loadSensorConfig();
-    setupEthernet();
+    // setupEthernet();
+    setupWifi();
     setupWebServices();
     setupOTA();
     setupTasks();

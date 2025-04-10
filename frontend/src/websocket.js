@@ -2,7 +2,7 @@
 const isDev = import.meta.env.DEV;
 
 // Use hardcoded ESP32 IP in development, otherwise use window.location.hostname
-const host = isDev ? '169.254.1.1' : window.location.hostname;
+const host = isDev ? 'esp32-rockettester.local' : window.location.hostname;
 const socket = new WebSocket(`ws://${host}:81`);
 
 socket.onopen = () => {
