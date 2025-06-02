@@ -1,6 +1,6 @@
 # Rocket Engine Test Firmware and Web Interface 🚀
 
-# THIS README IS OUTDATED, THE POJECT USES A DIFFERENT ARCHITECTURE NOW, AND IS CAPABLE OF MORE! :)
+# THIS README IS OUTDATED, THE POJECT HAS COMPLETELY DIFFERENT ARCHITECTURE NOW, AND IS CAPABLE OF MORE! :)
 
 Created for testing rocket engines. Captures thrust, pressure, and temperature readings during tests with high sampling rates and microsecond timing precision, fully controlled and configured using a web interface hosted on microcontroller
 
