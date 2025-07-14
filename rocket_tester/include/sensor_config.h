@@ -4,8 +4,11 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
-// Maximum number of sensors
-constexpr size_t SENSOR_COUNT = 8;
+// Maximum number of sensors - 2 load cells + 2 pressure + 12 temperature
+constexpr size_t SENSOR_COUNT = 16;
+constexpr size_t LOAD_CELL_COUNT = 2;
+constexpr size_t PRESSURE_SENSOR_COUNT = 2;
+constexpr size_t TEMPERATURE_SENSOR_COUNT = 12;
 
 // Sensor types
 enum SensorType
@@ -15,18 +18,28 @@ enum SensorType
     TEMPERATURE = 2
 };
 
+// ADC types for different sensor categories
+enum ADCType
+{
+    ADS1232_ADC = 0, // For load cells
+    ADS1256_ADC = 1, // For pressure sensors
+    MAX31855_ADC = 2 // For temperature sensors
+};
+
 // Sensor configuration structure
 struct SensorConfig
 {
     bool enabled;
     SensorType type;
-    uint8_t adcChannel;
+    ADCType adcType;
+    uint8_t adcChannel;     // Channel on the specific ADC
+    uint8_t chipSelect;     // CS pin for MAX31855 (only used for temperature sensors)
     char name[50];          // Name of the sensor
-    float conversionFactor; // For converting voltage to actual units . Represents units per 1V. For example, if loadcell reads 250kg at 2.5V, conversion factor is 100kg/V
+    float conversionFactor; // For converting to actual units
     float offset;           // For calibration offset
 };
 
-// External declaration of sensorConfigs array defined in SensorConfig.cpp
+// External declaration of sensorConfigs array
 extern SensorConfig sensorConfigs[SENSOR_COUNT];
 
 // Function declarations

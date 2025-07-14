@@ -1,7 +1,11 @@
 #include "system_config.h"
 
+// MAX31855 CS pin assignments
+const int PinConfig::MAX31855_CS_PINS[TEMPERATURE_SENSOR_COUNT] = {
+    6, 7, 15, 16, 8, 3, 46, 9, 10, 11, 13, 14};
+
 // Network configuration implementation
-const char *NetworkConfig::hostname = "esp32-rockettester";
+const char *NetworkConfig::hostname = "esp32s3-rockettester";
 const IPAddress NetworkConfig::deviceIP(169, 254, 1, 1);
 const IPAddress NetworkConfig::gateway(169, 254, 1, 100);
 const IPAddress NetworkConfig::subnet(255, 255, 0, 0);

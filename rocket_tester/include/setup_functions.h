@@ -5,7 +5,7 @@ class Setup
 {
 public:
   static void pins();
-  static void adc();
+  static void adcs();
   static void spiffs();
   static void webServices();
   static void ota();

@@ -8,11 +8,14 @@
 #include <ArduinoOTA.h>
 #include <Update.h>
 #include <ADS1256.h>
+#include <HX711.h>
+#include <Adafruit_MAX31855.h>
 
-// External references
 extern AsyncWebServer server;
 extern WebSocketsServer webSocket;
-extern ADS1256 adc;
+extern ADS1256 adc1256;
+extern HX711 ads1232;
+extern Adafruit_MAX31855 thermocouples[];
 extern void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length);
 extern void engineStartISR();
 
@@ -23,39 +26,58 @@ void Setup::pins()
   pinMode(PinConfig::ENGINE_IN_PIN, INPUT_PULLUP);
   digitalWrite(PinConfig::ENGINE_OUT_PIN, HIGH);
   attachInterrupt(digitalPinToInterrupt(PinConfig::ENGINE_IN_PIN), engineStartISR, FALLING);
+
+  // ADS1232 control pins
+  pinMode(PinConfig::ADS1232_POMN_PIN, OUTPUT);
+  pinMode(PinConfig::ADS1232_SPEED_PIN, OUTPUT);
+  pinMode(PinConfig::ADS1232_GAIN1_PIN, OUTPUT);
+  pinMode(PinConfig::ADS1232_GAIN0_PIN, OUTPUT);
+
+  // Set ADS1232 configuration
+  digitalWrite(PinConfig::ADS1232_POMN_PIN, HIGH);  // Power on
+  digitalWrite(PinConfig::ADS1232_SPEED_PIN, HIGH); // High speed
+  digitalWrite(PinConfig::ADS1232_GAIN1_PIN, LOW);  // Gain configuration
+  digitalWrite(PinConfig::ADS1232_GAIN0_PIN, HIGH); // Gain = 64
+
+  // Initialize MAX31855 CS pins
+  for (int i = 0; i < TEMPERATURE_SENSOR_COUNT; i++)
+  {
+    pinMode(PinConfig::MAX31855_CS_PINS[i], OUTPUT);
+    digitalWrite(PinConfig::MAX31855_CS_PINS[i], HIGH);
+  }
 }
 
-void Setup::adc()
+void Setup::adcs()
 {
-  Serial.println("Setting up ADC");
-  ::adc.InitializeADC();
-  Serial.println("ADC initialized");
-  ::adc.setPGA(PGA_2);
-  ::adc.setDRATE(DRATE_30000SPS);
-  ::adc.sendDirectCommand(SELFCAL);
+  Serial.println("Setting up ADCs");
+
+  // Setup ADS1256 for pressure sensors
+  Serial.println("Initializing ADS1256...");
+  adc1256.InitializeADC();
+  adc1256.setPGA(PGA_2);
+  adc1256.setDRATE(DRATE_30000SPS);
+  adc1256.sendDirectCommand(SELFCAL);
   delay(100);
+  adc1256.setBuffer(BUFFER_ENABLED);
+  Serial.println("ADS1256 initialized");
 
-  ::adc.setBuffer(BUFFER_ENABLED);
+  // Setup ADS1232 for load cells
+  Serial.println("Initializing ADS1232...");
+  ads1232.begin(PinConfig::ADS1232_DOUT_PIN, PinConfig::ADS1232_SCLK_PIN);
+  ads1232.set_scale();
+  ads1232.tare(); // Reset the scale to 0
+  Serial.println("ADS1232 initialized");
 
-  for (uint8_t i = 0; i < SENSOR_COUNT; i++)
+  // Setup MAX31855 thermocouples
+  Serial.println("Initializing MAX31855 thermocouples...");
+  for (int i = 0; i < TEMPERATURE_SENSOR_COUNT; i++)
   {
-    if (sensorConfigs[i].enabled)
+    if (sensorConfigs[i + 4].enabled) // Temperature sensors start at index 4
     {
-      uint8_t mux = SING_0 + sensorConfigs[i].adcChannel;
-      ::adc.setMUX(mux);
-      delayMicroseconds(100);
+      Serial.printf("Initializing thermocouple %d on CS pin %d\n", i, PinConfig::MAX31855_CS_PINS[i]);
     }
   }
-
-  for (uint8_t i = 0; i < SENSOR_COUNT; i++)
-  {
-    if (sensorConfigs[i].enabled)
-    {
-      uint8_t mux = SING_0 + sensorConfigs[i].adcChannel;
-      ::adc.setMUX(mux);
-      break;
-    }
-  }
+  Serial.println("All ADCs initialized");
 }
 
 void Setup::spiffs()
@@ -186,28 +208,57 @@ void Setup::ota()
 
 void Setup::ethernet()
 {
-#define ETH_CLK_MODE ETH_CLOCK_GPIO0_IN
-#define ETH_POWER_PIN 16
-#define ETH_TYPE ETH_PHY_LAN8720
-#define ETH_ADDR 1
-#define ETH_MDC_PIN 23
-#define ETH_MDIO_PIN 18
+  // ESP32-S3-ETH-PoE specific Ethernet setup
+  // For ESP32-S3-ETH-PoE boards, the pins are usually fixed in hardware
 
-  ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE);
+  Serial.println("Initializing Ethernet...");
+
+  // For ESP32-S3-ETH-PoE, use the standard pin configuration
+  // Most ESP32-S3-ETH-PoE boards use these default pins:
+  // PHY Address: 1 (or 0, depends on board)
+  // Power pin: Usually not needed (-1) or specific to board
+  // MDC: GPIO 23 (default)
+  // MDIO: GPIO 18 (default)
+
+  // Try PHY address 1 first (common for ESP32-S3-ETH-PoE)
+  if (!ETH.begin(1, -1, 23, 18))
+  {
+    Serial.println("ETH.begin() with PHY address 1 failed, trying PHY address 0...");
+    // If that fails, try PHY address 0
+    if (!ETH.begin(0, -1, 23, 18))
+    {
+      Serial.println("ETH.begin() failed with both PHY addresses");
+      return;
+    }
+  }
+
   ETH.config(NetworkConfig::deviceIP, NetworkConfig::gateway, NetworkConfig::subnet, NetworkConfig::dns);
 
-  while (!ETH.linkUp())
+  // Wait for link to come up
+  Serial.print("Waiting for Ethernet link");
+  unsigned long timeout = millis() + 10000; // 10 second timeout
+  while (!ETH.linkUp() && millis() < timeout)
   {
     Serial.print(".");
     delay(500);
   }
 
-  Serial.println();
-  Serial.print("Ethernet IP: ");
-  Serial.println(ETH.localIP());
-  Serial.println("Ethernet PHY Link status: " + String(ETH.linkUp() ? "UP" : "DOWN"));
+  if (ETH.linkUp())
+  {
+    Serial.println();
+    Serial.print("Ethernet IP: ");
+    Serial.println(ETH.localIP());
+    Serial.println("Ethernet PHY Link status: UP");
 
-  ETH.setHostname(NetworkConfig::hostname);
-  Serial.print("Hostname: ");
-  Serial.println(ETH.getHostname());
+    ETH.setHostname(NetworkConfig::hostname);
+    Serial.print("Hostname: ");
+    Serial.println(ETH.getHostname());
+  }
+  else
+  {
+    Serial.println();
+    Serial.println("Failed to establish Ethernet link!");
+    Serial.println("Check your connections and board configuration");
+    Serial.println("Note: Make sure you're using an ESP32-S3-ETH-PoE board with proper Ethernet hardware");
+  }
 }

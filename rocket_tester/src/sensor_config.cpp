@@ -1,20 +1,33 @@
 #include "sensor_config.h"
 #include <Arduino.h>
 #include <WebSocketsServer.h>
-#include <cstring> // for strncpy
+#include <cstring>
 
-extern WebSocketsServer webSocket; // Defined in main.cpp, used to send sensor configuration to clients
+extern WebSocketsServer webSocket;
 
-// Initialize sensorConfigs with default values
+// Initialize sensorConfigs with default values for all 16 sensors
 SensorConfig sensorConfigs[SENSOR_COUNT] = {
-    {true, LOAD, 0, "LoadCell1", 240.0f, 0.0f},
-    {false, LOAD, 1, "LoadCell2", 240.0f, 0.0f},
-    {false, PRESSURE, 2, "Pressure1", 240.0f, -16.0f},
-    {false, PRESSURE, 3, "Pressure2", 240.0f, -16.0f},
-    {false, PRESSURE, 4, "Pressure3", 240.0f, -16.0f},
-    {false, TEMPERATURE, 5, "Temperature1", 320.0f, 0.0f},
-    {false, TEMPERATURE, 6, "Temperature2", 320.0f, 0.0f},
-    {false, TEMPERATURE, 7, "Temperature3", 320.0f, 0.0f}};
+    // Load cells (ADS1232) - 2 sensors
+    {true, LOAD, ADS1232_ADC, 0, 0, "LoadCell1", 100.0f, 0.0f},
+    {false, LOAD, ADS1232_ADC, 1, 0, "LoadCell2", 100.0f, 0.0f},
+
+    // Pressure sensors (ADS1256) - 2 sensors
+    {false, PRESSURE, ADS1256_ADC, 0, 0, "Pressure1", 240.0f, -16.0f},
+    {false, PRESSURE, ADS1256_ADC, 1, 0, "Pressure2", 240.0f, -16.0f},
+
+    // Temperature sensors (MAX31855) - 12 sensors
+    {false, TEMPERATURE, MAX31855_ADC, 0, 6, "Temperature1", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 1, 7, "Temperature2", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 2, 15, "Temperature3", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 3, 16, "Temperature4", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 4, 8, "Temperature5", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 5, 3, "Temperature6", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 6, 46, "Temperature7", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 7, 9, "Temperature8", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 8, 10, "Temperature9", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 9, 11, "Temperature10", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 10, 13, "Temperature11", 1.0f, 0.0f},
+    {false, TEMPERATURE, MAX31855_ADC, 11, 14, "Temperature12", 1.0f, 0.0f}};
 
 // Load sensor configuration from SPIFFS
 void loadSensorConfig()
@@ -34,13 +47,15 @@ void loadSensorConfig()
         {
             sensorConfigs[i].enabled = arr[i]["enabled"] | sensorConfigs[i].enabled;
             sensorConfigs[i].type = static_cast<SensorType>(arr[i]["type"] | (int)sensorConfigs[i].type);
-            // Only update name if it exists in config
+            sensorConfigs[i].adcType = static_cast<ADCType>(arr[i]["adcType"] | (int)sensorConfigs[i].adcType);
+
             if (arr[i]["name"].is<const char *>())
             {
                 strncpy(sensorConfigs[i].name, arr[i]["name"].as<const char *>(), sizeof(sensorConfigs[i].name) - 1);
-                sensorConfigs[i].name[sizeof(sensorConfigs[i].name) - 1] = '\0'; // Ensure null-termination
+                sensorConfigs[i].name[sizeof(sensorConfigs[i].name) - 1] = '\0';
             }
             sensorConfigs[i].adcChannel = arr[i]["adcChannel"] | sensorConfigs[i].adcChannel;
+            sensorConfigs[i].chipSelect = arr[i]["chipSelect"] | sensorConfigs[i].chipSelect;
             sensorConfigs[i].conversionFactor = arr[i]["conversionFactor"] | sensorConfigs[i].conversionFactor;
             sensorConfigs[i].offset = arr[i]["offset"] | sensorConfigs[i].offset;
         }
@@ -53,7 +68,7 @@ void loadSensorConfig()
     file.close();
 }
 
-// Save sensor recieved configuration from the client to SPIFFS
+// Save sensor configuration to SPIFFS
 void saveSensorConfig(const JsonArray &arr)
 {
     File file = SPIFFS.open("/sensorConfig.json", "w");
@@ -68,8 +83,10 @@ void saveSensorConfig(const JsonArray &arr)
         JsonObject sensorObj = configArr.add<JsonObject>();
         sensorObj["enabled"] = sensorConfigs[i].enabled;
         sensorObj["type"] = sensorConfigs[i].type;
+        sensorObj["adcType"] = sensorConfigs[i].adcType;
         sensorObj["name"] = sensorConfigs[i].name;
         sensorObj["adcChannel"] = sensorConfigs[i].adcChannel;
+        sensorObj["chipSelect"] = sensorConfigs[i].chipSelect;
         sensorObj["conversionFactor"] = sensorConfigs[i].conversionFactor;
         sensorObj["offset"] = sensorConfigs[i].offset;
     }
@@ -91,7 +108,9 @@ void sendSensorConfig(uint8_t clientNum)
         sensorObj["name"] = sensorConfigs[i].name;
         sensorObj["enabled"] = sensorConfigs[i].enabled;
         sensorObj["type"] = sensorConfigs[i].type;
+        sensorObj["adcType"] = sensorConfigs[i].adcType;
         sensorObj["adcChannel"] = sensorConfigs[i].adcChannel;
+        sensorObj["chipSelect"] = sensorConfigs[i].chipSelect;
         sensorObj["conversionFactor"] = sensorConfigs[i].conversionFactor;
         sensorObj["offset"] = sensorConfigs[i].offset;
     }
@@ -111,17 +130,18 @@ void handleUpdateConfig(uint8_t clientNum, JsonObject &data)
     {
         sensorConfigs[i].enabled = arr[i]["enabled"];
         sensorConfigs[i].type = static_cast<SensorType>(arr[i]["type"]);
-        // Update name
+        sensorConfigs[i].adcType = static_cast<ADCType>(arr[i]["adcType"]);
+
         if (arr[i]["name"].is<const char *>())
         {
             strncpy(sensorConfigs[i].name, arr[i]["name"].as<const char *>(), sizeof(sensorConfigs[i].name) - 1);
             sensorConfigs[i].name[sizeof(sensorConfigs[i].name) - 1] = '\0';
         }
         sensorConfigs[i].adcChannel = arr[i]["adcChannel"];
+        sensorConfigs[i].chipSelect = arr[i]["chipSelect"];
         sensorConfigs[i].conversionFactor = arr[i]["conversionFactor"];
         sensorConfigs[i].offset = arr[i]["offset"];
     }
     saveSensorConfig(arr);
-    // Send back updated config
     sendSensorConfig(clientNum);
 }
