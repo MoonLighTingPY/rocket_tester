@@ -46,12 +46,6 @@ void IRAM_ATTR engineStartISR()
     systemState.engineStartTime = micros();
 }
 
-void setupTasks()
-{
-    SensorTask::create(&sensorTaskHandle);
-    WebSocketTask::create(&webSocketTaskHandle);
-}
-
 void setup()
 {
     delay(2000);
@@ -65,8 +59,8 @@ void setup()
     Setup::ethernet();
     Setup::webServices();
     Setup::ota();
-    setupTasks();
-
+    SensorTask::create(&sensorTaskHandle);
+    WebSocketTask::create(&webSocketTaskHandle);
 }
 
 void loop()
