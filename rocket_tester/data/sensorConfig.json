@@ -3,64 +3,150 @@
     {
       "enabled": true,
       "type": 0,
+      "adcType": 0,
       "name": "LoadCell1",
       "adcChannel": 0,
-      "conversionFactor": 1.0,
-      "offset": 0.0
-    },
-    {
-      "enabled": true,
-      "type": 0,
-      "name": "LoadCell2", 
-      "adcChannel": 1,
+      "chipSelect": 0,
       "conversionFactor": 1.0,
       "offset": 0.0
     },
     {
       "enabled": true,
       "type": 1,
+      "adcType": 1,
       "name": "Pressure1",
-      "adcChannel": 2,
+      "adcChannel": 0,
+      "chipSelect": 0,
       "conversionFactor": 1.0,
       "offset": 0.0
     },
     {
       "enabled": true,
       "type": 1,
+      "adcType": 1,
       "name": "Pressure2",
-      "adcChannel": 3,
-      "conversionFactor": 1.0,
-      "offset": 0.0
-    },
-    {
-      "enabled": true,
-      "type": 1,
-      "name": "Pressure3",
-      "adcChannel": 4,
+      "adcChannel": 1,
+      "chipSelect": 0,
       "conversionFactor": 1.0,
       "offset": 0.0
     },
     {
       "enabled": true,
       "type": 2,
+      "adcType": 2,
       "name": "Temperature1",
-      "adcChannel": 5,
-      "conversionFactor": 1.0,
-      "offset": 0.0
-    },
-    {
-      "enabled": true, 
-      "type": 2,
-      "name": "Temperature2",
-      "adcChannel": 6,
+      "adcChannel": 0,
+      "chipSelect": 6,
       "conversionFactor": 1.0,
       "offset": 0.0
     },
     {
       "enabled": true,
       "type": 2,
+      "adcType": 2,
+      "name": "Temperature2",
+      "adcChannel": 1,
+      "chipSelect": 7,
+      "conversionFactor": 1.0,
+      "offset": 0.0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "adcType": 2,
       "name": "Temperature3",
+      "adcChannel": 2,
+      "chipSelect": 15,
+      "conversionFactor": 1.0,
+      "offset": 0.0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "adcType": 2,
+      "name": "Temperature4",
+      "adcChannel": 3,
+      "chipSelect": 16,
+      "conversionFactor": 1.0,
+      "offset": 0.0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "adcType": 2,
+      "name": "Temperature5",
+      "adcChannel": 4,
+      "chipSelect": 8,
+      "conversionFactor": 1.0,
+      "offset": 0.0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "adcType": 2,
+      "name": "Temperature6",
+      "adcChannel": 5,
+      "chipSelect": 3,
+      "conversionFactor": 1.0,
+      "offset": 0.0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "adcType": 2,
+      "name": "Temperature7",
+      "adcChannel": 6,
+      "chipSelect": 46,
+      "conversionFactor": 1.0,
+      "offset": 0.0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "adcType": 2,
+      "name": "Temperature8",
       "adcChannel": 7,
+      "chipSelect": 9,
+      "conversionFactor": 1.0,
+      "offset": 0.0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "adcType": 2,
+      "name": "Temperature9",
+      "adcChannel": 8,
+      "chipSelect": 10,
+      "conversionFactor": 1.0,
+      "offset": 0.0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "adcType": 2,
+      "name": "Temperature10",
+      "adcChannel": 9,
+      "chipSelect": 11,
+      "conversionFactor": 1.0,
+      "offset": 0.0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "adcType": 2,
+      "name": "Temperature11",
+      "adcChannel": 10,
+      "chipSelect": 13,
+      "conversionFactor": 1.0,
+      "offset": 0.0
+    },
+    {
+      "enabled": true,
+      "type": 2,
+      "adcType": 2,
+      "name": "Temperature12",
+      "adcChannel": 11,
+      "chipSelect": 14,
       "conversionFactor": 1.0,
       "offset": 0.0
     }
