@@ -27,22 +27,22 @@ ADS1256 adc(39, 4, 0, 14, 2.4937); //DRDY, RESET, SYNC(PDWN), CS, VREF(float).
 // DRDY: GPIO 39
 // RST: GPIO 4
 // CS: GPIO 14
-// SCLK GPIO 32 (CFG)      // DIN on adc
+// SCLK GPIO 32 (CFG)      
 // MISO GPIO 33 (485_EN)   // DOUT on adc
-// MOSI 2 
+// MOSI 2                  // DIN on adc
 
 // Pin definitions
 
 // Pin labels on this board were done by a degenerate dyslexic,
 // so GPIO 35 is labeled as GPIO 5 and vice versa. 
 // Be careful, as GPIO 5 (labeled 35) is INPUT ONLY!
-const int ENGINE_OUT_PIN = 35; // (GPIO 5)
-const int ENGINE_IN_PIN = 5; // (GPIO 35)
+const int ENGINE_OUT_PIN = 5; // (GPIO 35)
+const int ENGINE_IN_PIN = 35; // (GPIO 5)
 const int PYRO_PIN = 17;
 
 // Global variables
 bool isReading = false;
-bool ingitedWire = false;
+bool ignitedWire = false;
 unsigned long readingsStartTime = 0;
 unsigned long ingitionStartTime = 0;
 unsigned long engineStartTime = 0;
@@ -96,6 +96,47 @@ void clearDataBuffer() {
     portEXIT_CRITICAL(&bufferMux);
 }
 
+
+bool prevPyroState = LOW;
+
+
+
+void pyroPinTask(void *parameter) {
+    while (true) {
+        // Check pyro pin state instantly
+            // Only check if we're reading but not yet ignited
+    if (isReading && !ignitedWire) {
+        // Read current pin state
+        bool currentPyroState = digitalRead(PYRO_PIN);
+        
+        // Check for LOW to HIGH transition (rising edge)
+        if (currentPyroState == HIGH && prevPyroState == LOW) {
+            // Update ignition state
+            ignitedWire = true;
+            ingitionStartTime = micros();
+            
+            // Send notification to web clients
+            JsonDocument doc;
+            doc["type"] = "ignition_detected";
+            doc["timestamp"] = ingitionStartTime;
+            String jsonString;
+            serializeJson(doc, jsonString);
+            webSocket.broadcastTXT(jsonString);
+            
+            Serial.println("External ignition detected!");
+        }
+        
+        // Update previous state for next check
+        prevPyroState = currentPyroState;
+    } else if (!isReading) {
+        // Reset previous state when not reading
+        ignitedWire = false;
+        prevPyroState = LOW;
+    }
+        vTaskDelay(1); // Small delay to avoid busy waiting
+    }
+}
+
 // Sensor reading task. Reads all enabled sensors and pushes data to the buffer
 // for the WebSocket task to send to the client. Buffer is used to avoid blocking, so tasks
 // can run independently and at different speeds (reading is faster than sending)
@@ -106,7 +147,7 @@ void sensorTask(void *parameter) {
         if (isReading) {
             uint32_t currentTime = micros();
             data.readingsTimestamp = currentTime - readingsStartTime;
-            data.ignitionTimestamp = ingitedWire ? (currentTime - ingitionStartTime) : 0;
+            data.ignitionTimestamp = ignitedWire ? (currentTime - ingitionStartTime) : 0;
             float voltage[SENSOR_COUNT];
             bool hasData = false;
             for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
@@ -198,8 +239,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             // Stop reading and clear buffer when client disconnects, set flags to initial states
             clearDataBuffer();
             isReading = false;
-            ingitedWire = false;
-            digitalWrite(PYRO_PIN, LOW);
+            ignitedWire = false;
             break;
         }
             
@@ -223,18 +263,23 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 clearDataBuffer(); // Clear the buffer before starting a new test
                 isReading = true;
                 readingsStartTime = micros();
-            }
+                ignitedWire = false;
+                prevPyroState = digitalRead(PYRO_PIN);
 
-            else if (message == "start_ignition") {
-                ingitedWire = true;
-                ingitionStartTime = micros();
-                digitalWrite(PYRO_PIN, HIGH); // Ignite the engine
+                // Only reset ignition state if the pin is currently LOW
+                if (prevPyroState == LOW) {
+                    ignitedWire = false;
+                } else {
+                    // Pin is already HIGH, so consider it already ignited
+                    ignitedWire = true;
+                    ingitionStartTime = micros();
+                }
             }
 
             else if (message == "end_test") {
                 // Set flags to initial states and clear buffer after the test is done
                 isReading = false;
-                ingitedWire = false;
+                ignitedWire = false;
                 digitalWrite(PYRO_PIN, LOW);
                 clearDataBuffer();
 
@@ -255,11 +300,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 
 
 void setupPins() {
-    pinMode(PYRO_PIN, OUTPUT); // Pyro pin to ignite the engine
+    pinMode(PYRO_PIN, INPUT_PULLDOWN); // Pin that detects ignition (HIGH when ignited)
     pinMode(ENGINE_OUT_PIN, OUTPUT); // Output pin to send signal for wire break detection
     pinMode(ENGINE_IN_PIN, INPUT_PULLUP); // Input pin for wire break detection
     digitalWrite(ENGINE_OUT_PIN, HIGH);
-    digitalWrite(PYRO_PIN, LOW); // Set to low by default to avoid accidental ignition and save user's hands lol!
     attachInterrupt(digitalPinToInterrupt(ENGINE_IN_PIN), engineStartISR, FALLING);
 }
 
@@ -502,9 +546,20 @@ void setupTasks() {
         &webSocketTaskHandle,
         1  // Core 1
     );
+
+    xTaskCreatePinnedToCore(
+        pyroPinTask,
+        "PyroPinTask",
+        10000,
+        NULL,
+        5,  // Medium priority
+        NULL,
+        1  // Core 1
+    );
 }
 
 void setup() {
+    delay(2000);
     Serial.begin(115200);
     Serial.println("Rocket Tester Stand - Built on WT32-ETH01"); 
     setupPins();

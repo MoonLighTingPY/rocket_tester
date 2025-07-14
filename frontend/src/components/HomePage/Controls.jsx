@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect } from 'react';
-import { HStack, VStack, Button, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, Text } from '@chakra-ui/react';
+import { HStack, VStack, Button, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, Text, Box } from '@chakra-ui/react';
 import { useToast } from '@chakra-ui/toast';
 import { socket } from '../../websocket';
 import DataContext from '../../hooks/DataContext';
@@ -89,15 +89,34 @@ const Controls = () => {
     }
   }, [isModalOpen, timer]);
 
-  const handleIgnite = () => {
-    setIsIgnited(true);
-    socket.send('start_ignition');
-    toast({
-      title: 'Ignition started',
-      status: 'info',
-      duration: 2000,
-    });
-  };
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleSocketMessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'ignition_detected') {
+          setIsIgnited(true);
+          toast({
+            title: 'Ignition detected',
+            description: 'External ignition has been detected',
+            status: 'info',
+            duration: 2000,
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing websocket message:', error);
+      }
+    };
+    
+    socket.addEventListener('message', handleSocketMessage);
+    
+    return () => {
+      socket.removeEventListener('message', handleSocketMessage);
+    };
+  }, [socket, toast]);
+  
 
   const handleEndTest = () => {
     socket.send('end_test');
@@ -132,13 +151,19 @@ const Controls = () => {
         >
           Start
         </Button>
-        <Button
-          colorScheme="orange"
-          onClick={handleIgnite}
-          isDisabled={!isSocketConnected || !isReading || isIgnited}
+        <Box
+          px={4}
+          py={2}
+          borderRadius="md"
+          bg={isIgnited ? "orange.400" : "gray.200"}
+          color={isIgnited ? "white" : "gray.600"}
+          fontWeight="bold"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
         >
-          Ignite
-        </Button>
+          {isIgnited ? "Ignited" : "Not Ignited"}
+        </Box>
         <Button
           colorScheme="red"
           onClick={handleEndTest}
