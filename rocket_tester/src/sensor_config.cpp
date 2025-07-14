@@ -5,11 +5,10 @@
 
 extern WebSocketsServer webSocket;
 
-// Initialize sensorConfigs with default values for all 16 sensors
+// Initialize sensorConfigs with default values for all 15 sensors
 SensorConfig sensorConfigs[SENSOR_COUNT] = {
-    // Load cells (ADS1232) - 2 sensors
+    // Load cell (ADS1232) - 1 sensor
     {true, LOAD, ADS1232_ADC, 0, 0, "LoadCell1", 100.0f, 0.0f},
-    {false, LOAD, ADS1232_ADC, 1, 0, "LoadCell2", 100.0f, 0.0f},
 
     // Pressure sensors (ADS1256) - 2 sensors
     {false, PRESSURE, ADS1256_ADC, 0, 0, "Pressure1", 240.0f, -16.0f},

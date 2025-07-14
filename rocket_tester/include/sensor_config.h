@@ -4,9 +4,9 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
-// Maximum number of sensors - 2 load cells + 2 pressure + 12 temperature
-constexpr size_t SENSOR_COUNT = 16;
-constexpr size_t LOAD_CELL_COUNT = 2;
+// Maximum number of sensors - 1 load cell + 2 pressure + 12 temperature
+constexpr size_t SENSOR_COUNT = 15;
+constexpr size_t LOAD_CELL_COUNT = 1;
 constexpr size_t PRESSURE_SENSOR_COUNT = 2;
 constexpr size_t TEMPERATURE_SENSOR_COUNT = 12;
 
@@ -21,7 +21,7 @@ enum SensorType
 // ADC types for different sensor categories
 enum ADCType
 {
-    ADS1232_ADC = 0, // For load cells
+    ADS1232_ADC = 0, // For load cell
     ADS1256_ADC = 1, // For pressure sensors
     MAX31855_ADC = 2 // For temperature sensors
 };

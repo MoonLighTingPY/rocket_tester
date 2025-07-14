@@ -2,7 +2,7 @@
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
 #include <ADS1256.h>
-#include <HX711.h>
+#include <ADS1232.h>
 #include <Adafruit_MAX31855.h>
 #include <ArduinoJson.h>
 
@@ -23,7 +23,7 @@ WebSocketsServer webSocket = WebSocketsServer(NetworkConfig::WEBSOCKET_PORT);
 
 // ADC instances
 ADS1256 adc1256(PinConfig::ADS1256_DRDY_PIN, PinConfig::ADS1256_RST_PIN, 0, PinConfig::ADS1256_CS_PIN, 2.4937);
-HX711 ads1232;
+ADS1232 ads1232(PinConfig::ADS1232_POMN_PIN, PinConfig::ADS1232_SCLK_PIN, PinConfig::ADS1232_DOUT_PIN);
 
 // MAX31855 thermocouple instances - create array for all possible thermocouples
 Adafruit_MAX31855 thermocouples[TEMPERATURE_SENSOR_COUNT] = {
@@ -67,10 +67,6 @@ void setup()
     Setup::ota();
     setupTasks();
 
-    Serial.println("System ready with 16 sensor support:");
-    Serial.println("- 2 Load Cells (ADS1232)");
-    Serial.println("- 2 Pressure Sensors (ADS1256)");
-    Serial.println("- 12 Temperature Sensors (MAX31855)");
 }
 
 void loop()

@@ -8,13 +8,13 @@
 #include <ArduinoOTA.h>
 #include <Update.h>
 #include <ADS1256.h>
-#include <HX711.h>
+#include <ADS1232.h>
 #include <Adafruit_MAX31855.h>
 
 extern AsyncWebServer server;
 extern WebSocketsServer webSocket;
 extern ADS1256 adc1256;
-extern HX711 ads1232;
+extern ADS1232 ads1232;
 extern Adafruit_MAX31855 thermocouples[];
 extern void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length);
 extern void engineStartISR();
@@ -28,13 +28,11 @@ void Setup::pins()
   attachInterrupt(digitalPinToInterrupt(PinConfig::ENGINE_IN_PIN), engineStartISR, FALLING);
 
   // ADS1232 control pins
-  pinMode(PinConfig::ADS1232_POMN_PIN, OUTPUT);
   pinMode(PinConfig::ADS1232_SPEED_PIN, OUTPUT);
   pinMode(PinConfig::ADS1232_GAIN1_PIN, OUTPUT);
   pinMode(PinConfig::ADS1232_GAIN0_PIN, OUTPUT);
 
   // Set ADS1232 configuration
-  digitalWrite(PinConfig::ADS1232_POMN_PIN, HIGH);  // Power on
   digitalWrite(PinConfig::ADS1232_SPEED_PIN, HIGH); // High speed
   digitalWrite(PinConfig::ADS1232_GAIN1_PIN, LOW);  // Gain configuration
   digitalWrite(PinConfig::ADS1232_GAIN0_PIN, HIGH); // Gain = 64
@@ -61,18 +59,23 @@ void Setup::adcs()
   adc1256.setBuffer(BUFFER_ENABLED);
   Serial.println("ADS1256 initialized");
 
-  // Setup ADS1232 for load cells
+  // Setup ADS1232 for load cell
   Serial.println("Initializing ADS1232...");
-  ads1232.begin(PinConfig::ADS1232_DOUT_PIN, PinConfig::ADS1232_SCLK_PIN);
-  ads1232.set_scale();
-  ads1232.tare(); // Reset the scale to 0
-  Serial.println("ADS1232 initialized");
+  ads1232.power_up();
+  delay(100);
+
+  // Perform initial calibration/tare
+  Serial.println("Performing ADS1232 tare...");
+  long tare_offset = ads1232.raw_read(10); // Average 10 readings for tare
+  ads1232.set_offset(tare_offset);
+  ads1232.set_scale(1.0f); // Default scale, can be calibrated later
+  Serial.printf("ADS1232 initialized - Tare offset: %ld\n", tare_offset);
 
   // Setup MAX31855 thermocouples
   Serial.println("Initializing MAX31855 thermocouples...");
   for (int i = 0; i < TEMPERATURE_SENSOR_COUNT; i++)
   {
-    if (sensorConfigs[i + 4].enabled) // Temperature sensors start at index 4
+    if (sensorConfigs[i + 3].enabled) // Temperature sensors start at index 3 (0=load, 1-2=pressure, 3+=temperature)
     {
       Serial.printf("Initializing thermocouple %d on CS pin %d\n", i, PinConfig::MAX31855_CS_PINS[i]);
     }
@@ -208,17 +211,7 @@ void Setup::ota()
 
 void Setup::ethernet()
 {
-  // ESP32-S3-ETH-PoE specific Ethernet setup
-  // For ESP32-S3-ETH-PoE boards, the pins are usually fixed in hardware
-
   Serial.println("Initializing Ethernet...");
-
-  // For ESP32-S3-ETH-PoE, use the standard pin configuration
-  // Most ESP32-S3-ETH-PoE boards use these default pins:
-  // PHY Address: 1 (or 0, depends on board)
-  // Power pin: Usually not needed (-1) or specific to board
-  // MDC: GPIO 23 (default)
-  // MDIO: GPIO 18 (default)
 
   // Try PHY address 1 first (common for ESP32-S3-ETH-PoE)
   if (!ETH.begin(1, -1, 23, 18))

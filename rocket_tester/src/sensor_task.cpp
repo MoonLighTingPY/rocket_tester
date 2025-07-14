@@ -2,17 +2,16 @@
 #include "system_config.h"
 #include "sensor_config.h"
 #include <ADS1256.h>
-#include <HX711.h>
+#include <ADS1232.h>
 #include <Adafruit_MAX31855.h>
 
 extern ADS1256 adc1256;
-extern HX711 ads1232;
+extern ADS1232 ads1232;
 extern Adafruit_MAX31855 thermocouples[];
 
 void SensorTask::run(void *parameter)
 {
   SensorData data;
-  uint8_t currentLoadCell = 0; // For alternating between ADS1232 channels
 
   while (true)
   {
@@ -34,11 +33,10 @@ void SensorTask::run(void *parameter)
 
           switch (sensorConfigs[i].adcType)
           {
-          case ADS1232_ADC: // Load cells
+          case ADS1232_ADC: // Load cell
             if (ads1232.is_ready())
             {
-              // ADS1232 has internal channel switching for AINP1 and AINP2
-              rawValue = ads1232.get_units();
+              rawValue = ads1232.units_read(1); // Single reading for speed
               readSuccess = true;
             }
             break;
