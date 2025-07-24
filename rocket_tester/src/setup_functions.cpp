@@ -215,14 +215,8 @@ bool Setup::ethernet()
   // Try DHCP first
   if (!ETH.begin(0, ETH_POWER, ETH_MDC, ETH_MDIO, phyType, clkMode))
   {
-    Serial.println("ETH.begin() with DHCP failed, trying static IP...");
-
-    // Fallback to static IP
-    if (!ETH.begin(0, ETH_POWER, ETH_MDC, ETH_MDIO, phyType, clkMode))
-    {
-      Serial.println("ETH.begin() failed with both DHCP and static IP");
-      return false;
-    }
+    Serial.println("ETH begin failed");
+    return false;
     ETH.config(NetworkConfig::deviceIP, NetworkConfig::gateway, NetworkConfig::subnet, NetworkConfig::dns);
   }
 
