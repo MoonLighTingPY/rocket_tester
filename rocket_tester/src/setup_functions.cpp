@@ -199,7 +199,7 @@ void Setup::ota()
   Serial.println("OTA ready");
 }
 
-void Setup::ethernet()
+bool Setup::ethernet()
 {
   Serial.println("Initializing Ethernet...");
 
@@ -221,7 +221,7 @@ void Setup::ethernet()
     if (!ETH.begin(0, ETH_POWER, ETH_MDC, ETH_MDIO, phyType, clkMode))
     {
       Serial.println("ETH.begin() failed with both DHCP and static IP");
-      return;
+      return false;
     }
     ETH.config(NetworkConfig::deviceIP, NetworkConfig::gateway, NetworkConfig::subnet, NetworkConfig::dns);
   }
@@ -245,6 +245,7 @@ void Setup::ethernet()
     ETH.setHostname(NetworkConfig::hostname);
     Serial.print("Hostname: ");
     Serial.println(ETH.getHostname());
+    return true;
   }
   else
   {
@@ -252,5 +253,6 @@ void Setup::ethernet()
     Serial.println("Failed to establish Ethernet link!");
     Serial.println("Check your connections and board configuration");
     Serial.println("Note: Make sure you're using an ESP32-S3-ETH-PoE board with proper Ethernet hardware");
+    return false;
   }
 }

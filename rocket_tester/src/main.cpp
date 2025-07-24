@@ -48,7 +48,6 @@ void IRAM_ATTR engineStartISR()
 
 void setup()
 {
-    delay(2000);
     Serial.begin(115200);
     Serial.println("Rocket Tester Stand - ESP32-S3-ETH-PoE with Multi-ADC Support");
 
@@ -56,11 +55,13 @@ void setup()
     Setup::adcs();
     Setup::spiffs();
     loadSensorConfig();
-    Setup::ethernet();
-    Setup::webServices();
-    Setup::ota();
-    SensorTask::create(&sensorTaskHandle);
-    WebSocketTask::create(&webSocketTaskHandle);
+    if (Setup::ethernet())
+    {
+        Setup::webServices();
+        Setup::ota();
+        SensorTask::create(&sensorTaskHandle);
+        WebSocketTask::create(&webSocketTaskHandle);
+    }
 }
 
 void loop()

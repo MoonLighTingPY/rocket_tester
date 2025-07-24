@@ -9,7 +9,7 @@ public:
   static void spiffs();
   static void webServices();
   static void ota();
-  static void ethernet();
+  static bool ethernet();
 };
 
 #endif
