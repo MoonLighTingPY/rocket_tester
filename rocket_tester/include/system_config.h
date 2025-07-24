@@ -14,24 +14,22 @@ struct PinConfig
   static const int PYRO_PIN = 15;
 
   // ADS1232 pins (for load cells)
-  static const int ADS1232_SCLK_PIN = 18;
-  static const int ADS1232_DOUT_PIN = 16;
-  static const int ADS1232_POMN_PIN = 17;
-  static const int ADS1232_SPEED_PIN = 21;
-  static const int ADS1232_GAIN1_PIN = 34;
-  static const int ADS1232_GAIN0_PIN = 35;
+  static const int ADS1232_SCLK_PIN = 35;
+  static const int ADS1232_DOUT_PIN = 36;
+  static const int ADS1232_POMN_PIN = 37;
 
   // ADS1256 pins (for pressure sensors)
-  static const int ADS1256_DRDY_PIN = 36;
-  static const int ADS1256_RST_PIN = 37;
-  static const int ADS1256_CS_PIN = 38;
-  static const int ADS1256_SCLK_PIN = 33;
-  static const int ADS1256_MISO_PIN = 39;
+  static const int ADS1256_DRDY_PIN = 42;
+  static const int ADS1256_RST_PIN = 46;
+  static const int ADS1256_CS_PIN = 45;
+  static const int ADS1256_SCLK_PIN = 39;
+  static const int ADS1256_MISO_PIN = 41;
   static const int ADS1256_MOSI_PIN = 40;
 
   // MAX31855 shared pins (for thermocouples)
-  static const int MAX31855_SCLK_PIN = 41;
-  static const int MAX31855_MISO_PIN = 42;
+  static const int MAX31855_SCLK_PIN = 18;
+  static const int MAX31855_MISO_PIN = 16; // DOUT
+
   // Individual CS pins for each MAX31855
   static const int MAX31855_CS_PINS[TEMPERATURE_SENSOR_COUNT];
 };

@@ -27,16 +27,6 @@ void Setup::pins()
   digitalWrite(PinConfig::ENGINE_OUT_PIN, HIGH);
   attachInterrupt(digitalPinToInterrupt(PinConfig::ENGINE_IN_PIN), engineStartISR, FALLING);
 
-  // ADS1232 control pins
-  pinMode(PinConfig::ADS1232_SPEED_PIN, OUTPUT);
-  pinMode(PinConfig::ADS1232_GAIN1_PIN, OUTPUT);
-  pinMode(PinConfig::ADS1232_GAIN0_PIN, OUTPUT);
-
-  // Set ADS1232 configuration
-  digitalWrite(PinConfig::ADS1232_SPEED_PIN, HIGH); // High speed
-  digitalWrite(PinConfig::ADS1232_GAIN1_PIN, LOW);  // Gain configuration
-  digitalWrite(PinConfig::ADS1232_GAIN0_PIN, HIGH); // Gain = 64
-
   // Initialize MAX31855 CS pins
   for (int i = 0; i < TEMPERATURE_SENSOR_COUNT; i++)
   {
@@ -213,19 +203,28 @@ void Setup::ethernet()
 {
   Serial.println("Initializing Ethernet...");
 
-  // Try PHY address 1 first (common for ESP32-S3-ETH-PoE)
-  if (!ETH.begin(1, -1, 23, 18))
+  // Use correct pins for ESP32-S3-ETH module (from your documentation)
+  const int ETH_MDC = 23;
+  const int ETH_MDIO = 18;
+  const int ETH_POWER = -1; // Not used
+
+  // Use correct enum types for ESP32 Arduino core
+  eth_phy_type_t phyType = ETH_PHY_LAN8720;
+  eth_clock_mode_t clkMode = ETH_CLOCK_GPIO17_OUT;
+
+  // Try DHCP first
+  if (!ETH.begin(0, ETH_POWER, ETH_MDC, ETH_MDIO, phyType, clkMode))
   {
-    Serial.println("ETH.begin() with PHY address 1 failed, trying PHY address 0...");
-    // If that fails, try PHY address 0
-    if (!ETH.begin(0, -1, 23, 18))
+    Serial.println("ETH.begin() with DHCP failed, trying static IP...");
+
+    // Fallback to static IP
+    if (!ETH.begin(0, ETH_POWER, ETH_MDC, ETH_MDIO, phyType, clkMode))
     {
-      Serial.println("ETH.begin() failed with both PHY addresses");
+      Serial.println("ETH.begin() failed with both DHCP and static IP");
       return;
     }
+    ETH.config(NetworkConfig::deviceIP, NetworkConfig::gateway, NetworkConfig::subnet, NetworkConfig::dns);
   }
-
-  ETH.config(NetworkConfig::deviceIP, NetworkConfig::gateway, NetworkConfig::subnet, NetworkConfig::dns);
 
   // Wait for link to come up
   Serial.print("Waiting for Ethernet link");
