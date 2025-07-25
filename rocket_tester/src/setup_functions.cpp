@@ -2,7 +2,8 @@
 #include "system_config.h"
 #include "sensor_config.h"
 #include <SPIFFS.h>
-#include <ETH.h>
+#include <EthernetESP32.h>
+#include <ESPmDNS.h>
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
 #include <ArduinoOTA.h>
@@ -10,6 +11,15 @@
 #include <ADS1256.h>
 #include <ADS1232.h>
 #include <Adafruit_MAX31855.h>
+
+#define W5500_CS 14
+#define W5500_RST 9
+#define W5500_INT 10
+#define W5500_MISO 12
+#define W5500_MOSI 11
+#define W5500_SCK 13
+
+W5500Driver driver(W5500_CS, W5500_INT, W5500_RST);
 
 extern AsyncWebServer server;
 extern WebSocketsServer webSocket;
@@ -203,50 +213,24 @@ bool Setup::ethernet()
 {
   Serial.println("Initializing Ethernet...");
 
-  // Use correct pins for ESP32-S3-ETH module (from your documentation)
-  const int ETH_MDC = 23;
-  const int ETH_MDIO = 18;
-  const int ETH_POWER = -1; // Not used
+  SPI.begin(W5500_SCK, W5500_MISO, W5500_MOSI, W5500_CS);
 
-  // Use correct enum types for ESP32 Arduino core
-  eth_phy_type_t phyType = ETH_PHY_LAN8720;
-  eth_clock_mode_t clkMode = ETH_CLOCK_GPIO17_OUT;
+  Ethernet.init(driver);
 
-  // Try DHCP first
-  if (!ETH.begin(0, ETH_POWER, ETH_MDC, ETH_MDIO, phyType, clkMode))
+  byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
+  IPAddress ip(169, 254, 1, 1);
+  IPAddress gateway(169, 254, 1, 1);
+  IPAddress subnet(255, 255, 0, 0);
+
+  Serial.println("Initialize Ethernet with static IP:");
+  Ethernet.begin(mac, ip, gateway, subnet);
+
+  Serial.print("  Static IP: ");
+  Serial.println(Ethernet.localIP());
+  delay(2000);
+  if (MDNS.begin("esp32-rockettester"))
   {
-    Serial.println("ETH begin failed");
-    return false;
-    ETH.config(NetworkConfig::deviceIP, NetworkConfig::gateway, NetworkConfig::subnet, NetworkConfig::dns);
+    Serial.println("MDNS responder started");
   }
-
-  // Wait for link to come up
-  Serial.print("Waiting for Ethernet link");
-  unsigned long timeout = millis() + 10000; // 10 second timeout
-  while (!ETH.linkUp() && millis() < timeout)
-  {
-    Serial.print(".");
-    delay(500);
-  }
-
-  if (ETH.linkUp())
-  {
-    Serial.println();
-    Serial.print("Ethernet IP: ");
-    Serial.println(ETH.localIP());
-    Serial.println("Ethernet PHY Link status: UP");
-
-    ETH.setHostname(NetworkConfig::hostname);
-    Serial.print("Hostname: ");
-    Serial.println(ETH.getHostname());
-    return true;
-  }
-  else
-  {
-    Serial.println();
-    Serial.println("Failed to establish Ethernet link!");
-    Serial.println("Check your connections and board configuration");
-    Serial.println("Note: Make sure you're using an ESP32-S3-ETH-PoE board with proper Ethernet hardware");
-    return false;
-  }
+  return true;
 }

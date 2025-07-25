@@ -1,11 +1,11 @@
 #include <Arduino.h>
-#include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
+#include <WebServer.h>
 #include <ADS1256.h>
 #include <ADS1232.h>
 #include <Adafruit_MAX31855.h>
 #include <ArduinoJson.h>
-
+#include <ESPAsyncWebServer.h>
 #include "system_config.h"
 #include "sensor_config.h"
 #include "setup_functions.h"
@@ -51,12 +51,16 @@ void setup()
     Serial.begin(115200);
     Serial.println("Rocket Tester Stand - ESP32-S3-ETH-PoE with Multi-ADC Support");
 
+    // Set all CS pins HIGH before SPI/Ethernet init
     Setup::pins();
-    Setup::adcs();
-    Setup::spiffs();
-    loadSensorConfig();
+
+    // Initialize Ethernet FIRST
     if (Setup::ethernet())
     {
+        // Now safe to init ADCs and other SPI devices
+        Setup::adcs();
+        Setup::spiffs();
+        loadSensorConfig();
         Setup::webServices();
         Setup::ota();
         SensorTask::create(&sensorTaskHandle);
