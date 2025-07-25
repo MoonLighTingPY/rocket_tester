@@ -1,0 +1,56 @@
+#include <EthernetESP32.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+
+#define W5500_CS 14
+#define W5500_RST 9
+#define W5500_INT 10
+#define W5500_MISO 12
+#define W5500_MOSI 11
+#define W5500_SCK 13
+
+W5500Driver driver(W5500_CS, W5500_INT, W5500_RST);
+
+WebServer server(80);
+
+void handleRoot()
+{
+    server.send(200, "text/plain", "hello from esp32!");
+}
+
+void setup(void)
+{
+    Serial.begin(115200);
+    SPI.begin(W5500_SCK, W5500_MISO, W5500_MOSI, W5500_CS);
+
+    Ethernet.init(driver);
+
+    byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
+    IPAddress ip(169, 254, 1, 1);
+    IPAddress gateway(169, 254, 1, 1);
+    IPAddress subnet(255, 255, 0, 0);
+
+    Serial.println("Initialize Ethernet with static IP:");
+    Ethernet.begin(mac, ip, gateway, subnet);
+
+    Serial.print("  Static IP: ");
+    Serial.println(Ethernet.localIP());
+    delay(2000);
+    if (MDNS.begin("esp32"))
+    {
+        Serial.println("MDNS responder started");
+    }
+
+    server.on("/", handleRoot);
+
+    server.on("/inline", []()
+              { server.send(200, "text/plain", "this works as well"); });
+
+    server.begin();
+    Serial.println("HTTP server started");
+}
+
+void loop(void)
+{
+    server.handleClient();
+}
