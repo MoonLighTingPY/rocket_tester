@@ -23,6 +23,19 @@ void SensorTask::run(void *parameter)
 
       bool hasData = false;
 
+      // --- Read all ADS1256 channels first, store voltages ---
+      float ads1256Voltages[SENSOR_COUNT] = {0.0f};
+      for (uint8_t i = 0; i < SENSOR_COUNT; i++)
+      {
+        if (sensorConfigs[i].adcType == ADS1256_ADC)
+        {
+          int32_t rawAdc = adc1256.cycleSingle();
+          Serial.printf("ADS1256 Channel %d raw: %ld\n", i, rawAdc);
+          ads1256Voltages[i] = adc1256.convertToVoltage(rawAdc);
+          Serial.printf("ADS1256 Channel %d: %.2f V\n", i, ads1256Voltages[i]);
+        }
+      }
+
       // Read all sensors
       for (uint8_t i = 0; i < SENSOR_COUNT; i++)
       {
@@ -42,13 +55,9 @@ void SensorTask::run(void *parameter)
             break;
 
           case ADS1256_ADC: // Pressure sensors
-          {
-            // Use direct cycleSingle without MUX changes
-            float voltage = adc1256.convertToVoltage(adc1256.cycleSingle());
-            rawValue = voltage;
+            rawValue = ads1256Voltages[i];
             readSuccess = true;
-          }
-          break;
+            break;
 
           case MAX31855_ADC: // Temperature sensors
           {
