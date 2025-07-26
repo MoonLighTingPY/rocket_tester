@@ -44,6 +44,8 @@ void WebSocketTask::run(void *parameter)
 
     if (systemState.isReading && !bufferConfig.dataBuffer.isEmpty())
     {
+      Serial.println("WebSocketTask: Sending test data...");
+
       JsonDocument doc;
       JsonArray array = doc["data"].to<JsonArray>();
 

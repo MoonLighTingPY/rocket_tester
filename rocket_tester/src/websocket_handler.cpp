@@ -40,6 +40,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
 
     if (message == "start_readings")
     {
+      Serial.println("WebSocket: starting readings...");
       bufferConfig.clear();
       systemState.isReading = true;
       systemState.readingsStartTime = micros();
@@ -55,6 +56,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
         systemState.ignitedWire = true;
         systemState.ignitionStartTime = micros();
       }
+      Serial.printf("Readings started at %lu\n", systemState.readingsStartTime);
     }
     else if (message == "end_test")
     {
