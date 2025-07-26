@@ -12,10 +12,12 @@
 #include "sensor_task.h"
 #include "websocket_task.h"
 #include "websocket_handler.h"
+#include "ethernet_task.h"
 
 // Task handles
 TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t webSocketTaskHandle = NULL;
+TaskHandle_t ethernetTaskHandle = NULL;
 
 // Hardware instances
 AsyncWebServer server(NetworkConfig::WEB_SERVER_PORT);
@@ -65,6 +67,7 @@ void setup()
         Setup::ota();
         SensorTask::create(&sensorTaskHandle);
         WebSocketTask::create(&webSocketTaskHandle);
+        EthernetTask::create(&ethernetTaskHandle);
     }
 }
 
