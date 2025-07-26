@@ -42,28 +42,30 @@ void SensorTask::run(void *parameter)
             break;
 
           case ADS1256_ADC: // Pressure sensors
-            {
-              // Use direct cycleSingle without MUX changes
-              float voltage = adc1256.convertToVoltage(adc1256.cycleSingle());
-              rawValue = voltage;
-              readSuccess = true;
-            }
-            break;
+          {
+            // Use direct cycleSingle without MUX changes
+            float voltage = adc1256.convertToVoltage(adc1256.cycleSingle());
+            rawValue = voltage;
+            readSuccess = true;
+          }
+          break;
 
           case MAX31855_ADC: // Temperature sensors
-            {
-              uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
-              if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
-              {
-                double temp = thermocouples[thermocoupleIndex].readCelsius();
-                if (!isnan(temp))
-                {
-                  rawValue = (float)temp;
-                  readSuccess = true;
-                }
-              }
-            }
-            break;
+          {
+            // uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
+            // if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
+            // {
+            //   double temp = thermocouples[thermocoupleIndex].readCelsius();
+            //   if (!isnan(temp))
+            //   {
+            //     rawValue = (float)temp;
+            //     readSuccess = true;
+            //   }
+            // }
+            rawValue = 0.0f;    // Placeholder for actual MAX31855 reading
+            readSuccess = true; // Simulate success for now
+          }
+          break;
           }
 
           if (readSuccess)
