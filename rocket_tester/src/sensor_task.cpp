@@ -33,14 +33,6 @@ void SensorTask::run(void *parameter)
 
           switch (sensorConfigs[i].adcType)
           {
-          case ADS1232_ADC: // Load cell
-            if (ads1232.is_ready())
-            {
-              rawValue = ads1232.units_read(1); // Single reading for speed
-              readSuccess = true;
-            }
-            break;
-
           case ADS1256_ADC: // Pressure sensors
           {
             uint8_t mux = SING_0 + sensorConfigs[i].adcChannel;
@@ -49,23 +41,15 @@ void SensorTask::run(void *parameter)
             float voltage = adc1256.convertToVoltage(adc1256.cycleSingle());
             rawValue = voltage;
             readSuccess = true;
+            Serial.printf("Sensor %d (ADS1256): MUX=%d, Voltage=%.3fV\n", i, mux, voltage);
           }
           break;
 
-          case MAX31855_ADC: // Temperature sensors
-          {
-            uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
-            if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
-            {
-              double temp = thermocouples[thermocoupleIndex].readCelsius();
-              if (!isnan(temp))
-              {
-                rawValue = (float)temp;
-                readSuccess = true;
-              }
-            }
-          }
-          break;
+          default:
+            // Dummy data for all other sensor types
+            rawValue = 42.0f + i;
+            readSuccess = true;
+            break;
           }
 
           if (readSuccess)

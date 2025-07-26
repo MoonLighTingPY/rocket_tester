@@ -11,8 +11,6 @@
 #include <ADS1256.h>
 #include <ADS1232.h>
 #include <Adafruit_MAX31855.h>
-#include <SPI.h>
-#include "driver/spi_common.h"
 
 #define W5500_CS 14
 #define W5500_RST 9
@@ -25,6 +23,7 @@ W5500Driver driver(W5500_CS, W5500_INT, W5500_RST);
 
 extern AsyncWebServer server;
 extern WebSocketsServer webSocket;
+extern SPIClass ads1256_spi;
 extern ADS1256 adc1256;
 extern ADS1232 ads1232;
 extern Adafruit_MAX31855 thermocouples[];
@@ -47,19 +46,17 @@ void Setup::pins()
   }
 }
 
-// Modified ADS1256 initialization to use separate SPI bus
 void Setup::adcs()
 {
   Serial.println("Setting up ADCs");
+  ads1256_spi.begin(
+      PinConfig::ADS1256_SCLK_PIN,
+      PinConfig::ADS1256_MISO_PIN,
+      PinConfig::ADS1256_MOSI_PIN,
+      PinConfig::ADS1256_CS_PIN);
 
-  // Setup ADS1256 for pressure sensors - USE SEPARATE SPI BUS
+  // Setup ADS1256 for pressure sensors
   Serial.println("Initializing ADS1256...");
-
-  // Initialize separate SPI bus for ADS1256 if needed
-  // OR use software SPI for ADS1256 to avoid conflicts
-  SPIClass *ads1256_spi = new SPIClass(SPI2_HOST); // Use different SPI bus
-  ads1256_spi->begin(PinConfig::ADS1256_SCLK_PIN, PinConfig::ADS1256_MISO_PIN, PinConfig::ADS1256_MOSI_PIN, PinConfig::ADS1256_CS_PIN);
-
   adc1256.InitializeADC();
   adc1256.setPGA(PGA_2);
   adc1256.setDRATE(DRATE_30000SPS);
@@ -68,22 +65,23 @@ void Setup::adcs()
   adc1256.setBuffer(BUFFER_ENABLED);
   Serial.println("ADS1256 initialized");
 
-  // Setup ADS1232 for load cell (uses separate GPIO pins - OK)
+  // Setup ADS1232 for load cell
   Serial.println("Initializing ADS1232...");
   ads1232.power_up();
   delay(100);
 
+  // Perform initial calibration/tare
   Serial.println("Performing ADS1232 tare...");
-  long tare_offset = ads1232.raw_read(10);
+  long tare_offset = ads1232.raw_read(10); // Average 10 readings for tare
   ads1232.set_offset(tare_offset);
-  ads1232.set_scale(1.0f);
+  ads1232.set_scale(1.0f); // Default scale, can be calibrated later
   Serial.printf("ADS1232 initialized - Tare offset: %ld\n", tare_offset);
 
-  // Setup MAX31855 thermocouples (use separate SPI or bit-bang)
+  // Setup MAX31855 thermocouples
   Serial.println("Initializing MAX31855 thermocouples...");
   for (int i = 0; i < TEMPERATURE_SENSOR_COUNT; i++)
   {
-    if (sensorConfigs[i + 3].enabled)
+    if (sensorConfigs[i + 3].enabled) // Temperature sensors start at index 3 (0=load, 1-2=pressure, 3+=temperature)
     {
       Serial.printf("Initializing thermocouple %d on CS pin %d\n", i, PinConfig::MAX31855_CS_PINS[i]);
     }
@@ -221,19 +219,7 @@ bool Setup::ethernet()
 {
   Serial.println("Initializing Ethernet...");
 
-  // Initialize SPI for W5500 ONLY
   SPI.begin(W5500_SCK, W5500_MISO, W5500_MOSI, W5500_CS);
-
-  // Configure W5500 pins
-  pinMode(W5500_RST, OUTPUT);
-  pinMode(W5500_CS, OUTPUT);
-  pinMode(W5500_INT, INPUT);
-
-  // Reset W5500
-  digitalWrite(W5500_RST, LOW);
-  delay(10);
-  digitalWrite(W5500_RST, HIGH);
-  delay(100);
 
   Ethernet.init(driver);
 
@@ -245,29 +231,12 @@ bool Setup::ethernet()
   Serial.println("Initialize Ethernet with static IP:");
   Ethernet.begin(mac, ip, gateway, subnet);
 
-  // Wait for link up
-  int timeout = 0;
-  while (Ethernet.linkStatus() == LinkOFF && timeout < 50)
-  {
-    delay(100);
-    timeout++;
-  }
-
-  if (Ethernet.linkStatus() == LinkOFF)
-  {
-    Serial.println("Ethernet link failed!");
-    return false;
-  }
-
   Serial.print("  Static IP: ");
   Serial.println(Ethernet.localIP());
-  Serial.print("  Link Status: ");
-  Serial.println(Ethernet.linkStatus() == LinkON ? "UP" : "DOWN");
-
-  if (MDNS.begin("esp32s3-rockettester"))
+  delay(2000);
+  if (MDNS.begin("esp32-rockettester"))
   {
     Serial.println("MDNS responder started");
   }
-
   return true;
 }

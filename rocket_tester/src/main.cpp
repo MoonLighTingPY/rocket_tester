@@ -23,8 +23,10 @@ TaskHandle_t ethernetTaskHandle = NULL;
 AsyncWebServer server(NetworkConfig::WEB_SERVER_PORT);
 WebSocketsServer webSocket = WebSocketsServer(NetworkConfig::WEBSOCKET_PORT);
 
+SPIClass ads1256_spi(HSPI); // or SPI2_HOST if using ESP-IDF defines
+
 // ADC instances
-ADS1256 adc1256(PinConfig::ADS1256_DRDY_PIN, PinConfig::ADS1256_RST_PIN, 0, PinConfig::ADS1256_CS_PIN, 2.4937);
+ADS1256 adc1256(PinConfig::ADS1256_DRDY_PIN, PinConfig::ADS1256_RST_PIN, 0, PinConfig::ADS1256_CS_PIN, 2.4937, &ads1256_spi);
 ADS1232 ads1232(PinConfig::ADS1232_POMN_PIN, PinConfig::ADS1232_SCLK_PIN, PinConfig::ADS1232_DOUT_PIN);
 
 // MAX31855 thermocouple instances - create array for all possible thermocouples
