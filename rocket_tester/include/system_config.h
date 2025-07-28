@@ -1,4 +1,4 @@
-// Updated system_config.h - Fix pin conflicts
+// Updated system_config.h with CS controller setup
 #ifndef SYSTEM_CONFIG_H
 #define SYSTEM_CONFIG_H
 
@@ -35,12 +35,14 @@ struct PinConfig
   static const int ADS1256_MISO_PIN = 41; // Different from W5500
   static const int ADS1256_MOSI_PIN = 40; // Different from W5500
 
-  // MAX31855 shared pins (for thermocouples) - Use bit-bang or separate SPI
+  // MAX31855 shared pins (for thermocouples) - CS handled by Arduino Pro Micro
   static const int MAX31855_SCLK_PIN = 18; // Different from both above
   static const int MAX31855_MISO_PIN = 16; // DOUT - Different from above
+  // No individual CS pins needed - handled by Arduino Pro Micro via UART
 
-  // Individual CS pins for each MAX31855
-  static const int MAX31855_CS_PINS[TEMPERATURE_SENSOR_COUNT];
+  // UART pins for CS controller communication
+  static const int CS_CONTROLLER_TX = 43; // UART0 TX to Arduino Pro Micro RX
+  static const int CS_CONTROLLER_RX = 44; // UART1 RX (if needed for feedback)
 };
 
 // Network configuration
@@ -55,7 +57,7 @@ struct NetworkConfig
   static const IPAddress dns;
 };
 
-// Rest of your existing structs...
+// Rest of your existing structs remain the same...
 struct SystemState
 {
   bool isReading;
@@ -64,6 +66,7 @@ struct SystemState
   unsigned long readingsStartTime;
   unsigned long ignitionStartTime;
   unsigned long engineStartTime;
+
   SystemState() : isReading(false),
                   ignitedWire(false),
                   prevPyroState(LOW),
@@ -78,6 +81,7 @@ struct SensorData
   unsigned long readingsTimestamp;
   unsigned long ignitionTimestamp;
   unsigned long engineTimestamp;
+
   SensorData() : readingsTimestamp(0), ignitionTimestamp(0), engineTimestamp(0)
   {
     for (int i = 0; i < SENSOR_COUNT; i++)
@@ -101,6 +105,7 @@ struct BufferConfig
   static constexpr size_t BUFFER_SIZE = 1500;
   CircularBuffer<SensorData, BUFFER_SIZE> dataBuffer;
   portMUX_TYPE bufferMux = portMUX_INITIALIZER_UNLOCKED;
+
   void clear()
   {
     portENTER_CRITICAL(&bufferMux);

@@ -1,0 +1,70 @@
+// Arduino Pro Micro CS Multiplexer
+// Receives commands via Serial (RX pin) to control CS pins for MAX31855 chips
+// Commands: "CS0", "CS1", "CS2", etc. to select chip, "CSOFF" to deselect all
+
+const int CS_PINS[] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 16, 15}; // 12 CS pins for MAX31855s
+const int NUM_CS_PINS = sizeof(CS_PINS) / sizeof(CS_PINS[0]);
+int currentActiveCS = -1; // Track which CS is currently active
+
+void setup() {
+  // Initialize serial communication
+  Serial.begin(115200);
+  
+  // Initialize all CS pins as OUTPUT and set them HIGH (deselected)
+  for (int i = 0; i < NUM_CS_PINS; i++) {
+    pinMode(CS_PINS[i], OUTPUT);
+    digitalWrite(CS_PINS[i], HIGH);
+  }
+  
+  Serial.println("CS Multiplexer Ready");
+}
+
+void loop() {
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim(); // Remove whitespace
+    
+    if (command.startsWith("CS") && command.length() >= 3) {
+      if (command == "CSOFF") {
+        // Deselect all CS pins
+        deselectAllCS();
+        Serial.println("ALL_OFF");
+      } else {
+        // Extract CS number (e.g., "CS0", "CS11")
+        String csNumStr = command.substring(2);
+        int csNum = csNumStr.toInt();
+        
+        if (csNum >= 0 && csNum < NUM_CS_PINS) {
+          selectCS(csNum);
+          Serial.print("CS");
+          Serial.print(csNum);
+          Serial.println("_ACTIVE");
+        } else {
+          Serial.println("ERROR_INVALID_CS");
+        }
+      }
+    } else {
+      Serial.println("ERROR_INVALID_COMMAND");
+    }
+  }
+  
+  // Small delay to prevent overwhelming the serial buffer
+  delay(1);
+}
+
+void selectCS(int csIndex) {
+  // First deselect all CS pins
+  deselectAllCS();
+  
+  // Then select the requested CS pin (set LOW for MAX31855)
+  digitalWrite(CS_PINS[csIndex], LOW);
+  currentActiveCS = csIndex;
+}
+
+void deselectAllCS() {
+  // Set all CS pins HIGH (deselected)
+  for (int i = 0; i < NUM_CS_PINS; i++) {
+    digitalWrite(CS_PINS[i], HIGH);
+  }
+  currentActiveCS = -1;
+}

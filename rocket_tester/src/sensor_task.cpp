@@ -1,13 +1,44 @@
+// Modified sensor_task.cpp with CS controller integration
+
 #include "sensor_task.h"
 #include "system_config.h"
 #include "sensor_config.h"
 #include <ADS1256.h>
 #include <ADS1232.h>
 #include <Adafruit_MAX31855.h>
+#include "cs_controller.h"
 
 extern ADS1256 adc1256;
 extern ADS1232 ads1232;
-extern Adafruit_MAX31855 thermocouples[];
+extern CSController csController;
+extern Adafruit_MAX31855 thermocouple; // Single instance for all thermocouples
+
+// Helper function to read specific thermocouple with CS control
+float readThermocoupleWithCS(uint8_t index)
+{
+  if (index >= TEMPERATURE_SENSOR_COUNT)
+  {
+    return NAN;
+  }
+
+  // Select the CS for this thermocouple
+  if (!csController.selectCS(index))
+  {
+    Serial.printf("Failed to select CS%d for thermocouple\n", index);
+    return NAN;
+  }
+
+  // Small delay for CS to settle
+  delayMicroseconds(100);
+
+  // Read the temperature
+  double temp = thermocouple.readCelsius();
+
+  // Deselect all CS pins after reading
+  csController.deselectAll();
+
+  return isnan(temp) ? NAN : (float)temp;
+}
 
 void SensorTask::run(void *parameter)
 {
@@ -20,7 +51,6 @@ void SensorTask::run(void *parameter)
       uint32_t currentTime = micros();
       data.readingsTimestamp = currentTime - systemState.readingsStartTime;
       data.ignitionTimestamp = systemState.ignitedWire ? (currentTime - systemState.ignitionStartTime) : 0;
-
       bool hasData = false;
 
       // --- Read all ADS1256 channels first, store voltages ---
@@ -61,18 +91,21 @@ void SensorTask::run(void *parameter)
 
           case MAX31855_ADC: // Temperature sensors
           {
-            // uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
-            // if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
-            // {
-            //   double temp = thermocouples[thermocoupleIndex].readCelsius();
-            //   if (!isnan(temp))
-            //   {
-            //     rawValue = (float)temp;
-            //     readSuccess = true;
-            //   }
-            // }
-            rawValue = 0.0f;    // Placeholder for actual MAX31855 reading
-            readSuccess = true; // Simulate success for now
+            uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
+            if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
+            {
+              float temp = readThermocoupleWithCS(thermocoupleIndex);
+              if (!isnan(temp))
+              {
+                rawValue = temp;
+                readSuccess = true;
+                Serial.printf("Thermocouple %d: %.2f°C\n", thermocoupleIndex, temp);
+              }
+              else
+              {
+                Serial.printf("Failed to read thermocouple %d\n", thermocoupleIndex);
+              }
+            }
           }
           break;
           }
@@ -103,7 +136,8 @@ void SensorTask::run(void *parameter)
         portEXIT_CRITICAL(&bufferConfig.bufferMux);
       }
     }
-    vTaskDelay(1);
+
+    vTaskDelay(1); // 1ms delay
   }
 }
 

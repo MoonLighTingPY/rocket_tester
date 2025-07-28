@@ -11,22 +11,22 @@ SensorConfig sensorConfigs[SENSOR_COUNT] = {
     {true, LOAD, ADS1232_ADC, 0, 0, "LoadCell1", 100.0f, 0.0f},
 
     // Pressure sensors (ADS1256) - 2 sensors
-    {false, PRESSURE, ADS1256_ADC, 0, 0, "Pressure1", 240.0f, -16.0f},
-    {false, PRESSURE, ADS1256_ADC, 1, 0, "Pressure2", 240.0f, -16.0f},
+    {true, PRESSURE, ADS1256_ADC, 0, 0, "Pressure1", 240.0f, -16.0f},
+    {true, PRESSURE, ADS1256_ADC, 1, 0, "Pressure2", 240.0f, -16.0f},
 
     // Temperature sensors (MAX31855) - 12 sensors
-    {false, TEMPERATURE, MAX31855_ADC, 0, 6, "Temperature1", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 1, 7, "Temperature2", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 2, 15, "Temperature3", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 3, 16, "Temperature4", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 4, 8, "Temperature5", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 5, 3, "Temperature6", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 6, 46, "Temperature7", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 7, 9, "Temperature8", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 8, 10, "Temperature9", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 9, 11, "Temperature10", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 10, 13, "Temperature11", 1.0f, 0.0f},
-    {false, TEMPERATURE, MAX31855_ADC, 11, 14, "Temperature12", 1.0f, 0.0f}};
+    {true, TEMPERATURE, MAX31855_ADC, 0, 6, "Temperature1", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 1, 7, "Temperature2", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 2, 15, "Temperature3", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 3, 16, "Temperature4", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 4, 8, "Temperature5", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 5, 3, "Temperature6", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 6, 46, "Temperature7", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 7, 9, "Temperature8", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 8, 10, "Temperature9", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 9, 11, "Temperature10", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 10, 13, "Temperature11", 1.0f, 0.0f},
+    {true, TEMPERATURE, MAX31855_ADC, 11, 14, "Temperature12", 1.0f, 0.0f}};
 
 // Load sensor configuration from SPIFFS
 void loadSensorConfig()

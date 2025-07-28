@@ -1,6 +1,9 @@
+// Updated setup_functions.cpp with CS controller integration
+
 #include "setup_functions.h"
 #include "system_config.h"
 #include "sensor_config.h"
+#include "cs_controller.h"
 #include <SPIFFS.h>
 #include <EthernetESP32.h>
 #include <ESPmDNS.h>
@@ -26,7 +29,9 @@ extern WebSocketsServer webSocket;
 extern SPIClass ads1256_spi;
 extern ADS1256 adc1256;
 extern ADS1232 ads1232;
-extern Adafruit_MAX31855 thermocouples[];
+extern Adafruit_MAX31855 thermocouple; // Single instance now
+extern CSController csController;
+extern HardwareSerial csSerial;
 extern void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length);
 extern void engineStartISR();
 
@@ -38,17 +43,41 @@ void Setup::pins()
   digitalWrite(PinConfig::ENGINE_OUT_PIN, HIGH);
   attachInterrupt(digitalPinToInterrupt(PinConfig::ENGINE_IN_PIN), engineStartISR, FALLING);
 
-  // Initialize MAX31855 CS pins
+  // No need to initialize individual MAX31855 CS pins - handled by Arduino Pro Micro
+  Serial.println("GPIO pins initialized (CS pins handled by Arduino Pro Micro)");
+}
+
+void Setup::initCSController()
+{
+  Serial.println("Initializing CS Controller...");
+
+  // Initialize the serial connection to Arduino Pro Micro
+  csSerial.begin(115200, SERIAL_8N1, PinConfig::CS_CONTROLLER_RX, PinConfig::CS_CONTROLLER_TX);
+
+  // Give Arduino time to initialize
+  delay(500);
+
+  // Initialize CS controller (no response expected)
+  csController.begin();
+  Serial.println("CS Controller initialized successfully");
+
+  // Test all CS channels (just send commands, no feedback)
+  Serial.println("Testing CS channels...");
   for (int i = 0; i < TEMPERATURE_SENSOR_COUNT; i++)
   {
-    pinMode(PinConfig::MAX31855_CS_PINS[i], OUTPUT);
-    digitalWrite(PinConfig::MAX31855_CS_PINS[i], HIGH);
+    csController.selectCS(i);
+    delay(50); // Give time for Arduino to process
+    csController.deselectAll();
+    delay(50);
   }
+  Serial.println("CS Controller test complete");
 }
 
 void Setup::adcs()
 {
   Serial.println("Setting up ADCs");
+
+  // Initialize ADS1256 SPI
   ads1256_spi.begin(
       PinConfig::ADS1256_SCLK_PIN,
       PinConfig::ADS1256_MISO_PIN,
@@ -77,15 +106,45 @@ void Setup::adcs()
   ads1232.set_scale(1.0f); // Default scale, can be calibrated later
   Serial.printf("ADS1232 initialized - Tare offset: %ld\n", tare_offset);
 
-  // Setup MAX31855 thermocouples
-  Serial.println("Initializing MAX31855 thermocouples...");
+  // Setup MAX31855 thermocouples - now using CS controller
+  Serial.println("Initializing MAX31855 with CS controller...");
+
+  // Test each enabled thermocouple
   for (int i = 0; i < TEMPERATURE_SENSOR_COUNT; i++)
   {
-    if (sensorConfigs[i + 3].enabled) // Temperature sensors start at index 3 (0=load, 1-2=pressure, 3+=temperature)
+    if (sensorConfigs[i + 3].enabled) // Temperature sensors start at index 3
     {
-      Serial.printf("Initializing thermocouple %d on CS pin %d\n", i, PinConfig::MAX31855_CS_PINS[i]);
+      Serial.printf("Testing thermocouple %d...", i);
+
+      // Select CS for this thermocouple
+      if (csController.selectCS(i))
+      {
+        delay(10); // Let CS settle
+
+        // Try to read temperature
+        double temp = thermocouple.readCelsius();
+        uint8_t error = thermocouple.readError(); // If available in your library
+        Serial.printf("Raw error flags: 0x%02X\n", error);
+        csController.deselectAll(); // Always deselect after reading
+
+        if (!isnan(temp))
+        {
+          Serial.printf(" OK (%.2f°C)\n", temp);
+        }
+        else
+        {
+          Serial.printf(" FAILED (NaN reading)\n");
+        }
+      }
+      else
+      {
+        Serial.printf(" FAILED (CS selection failed)\n");
+      }
+
+      delay(50); // Small delay between tests
     }
   }
+
   Serial.println("All ADCs initialized");
 }
 
@@ -234,6 +293,7 @@ bool Setup::ethernet()
   Serial.print("  Static IP: ");
   Serial.println(Ethernet.localIP());
   delay(2000);
+
   if (MDNS.begin("esp32-rockettester"))
   {
     Serial.println("MDNS responder started");
