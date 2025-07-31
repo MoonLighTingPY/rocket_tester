@@ -30,9 +30,7 @@ void SensorTask::run(void *parameter)
         if (sensorConfigs[i].adcType == ADS1256_ADC)
         {
           int32_t rawAdc = adc1256.cycleSingle();
-          Serial.printf("ADS1256 Channel %d raw: %ld\n", i, rawAdc);
           ads1256Voltages[i] = adc1256.convertToVoltage(rawAdc);
-          Serial.printf("ADS1256 Channel %d: %.2f V\n", i, ads1256Voltages[i]);
         }
       }
 
@@ -64,14 +62,14 @@ void SensorTask::run(void *parameter)
             uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
             if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
             {
-              double temp = thermocouples[thermocoupleIndex].readCelsius();
+              // double temp = thermocouples[thermocoupleIndex].readCelsius();
+              double temp = 1.0;
               if (!isnan(temp))
               {
                 rawValue = (float)temp;
                 readSuccess = true;
               }
             }
-            rawValue = 0.0f;    // Placeholder for actual MAX31855 reading
             readSuccess = true; // Simulate success for now
           }
           break;
