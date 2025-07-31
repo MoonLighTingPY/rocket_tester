@@ -32,9 +32,7 @@ ADS1232 ads1232(PinConfig::ADS1232_PDMN_PIN, PinConfig::ADS1232_SCLK_PIN, PinCon
 // MAX31855 thermocouple instances - create array for all possible thermocouples
 Adafruit_MAX31855 thermocouples[TEMPERATURE_SENSOR_COUNT] = {
     Adafruit_MAX31855(PinConfig::MAX31855_CS_PINS[0], &ads1256_spi),
-    Adafruit_MAX31855(PinConfig::MAX31855_CS_PINS[1], &ads1256_spi),
-    Adafruit_MAX31855(PinConfig::MAX31855_CS_PINS[2], &ads1256_spi),
-    Adafruit_MAX31855(PinConfig::MAX31855_CS_PINS[3], &ads1256_spi),
+    Adafruit_MAX31855(PinConfig::MAX31855_CS_PINS[1], &ads1256_spi)
 };
 
 // Interrupt handler

@@ -8,7 +8,7 @@
 constexpr size_t SENSOR_COUNT = 15;
 constexpr size_t LOAD_CELL_COUNT = 1;
 constexpr size_t PRESSURE_SENSOR_COUNT = 2;
-constexpr size_t TEMPERATURE_SENSOR_COUNT = 4;
+constexpr size_t TEMPERATURE_SENSOR_COUNT = 2;
 
 // Sensor types
 enum SensorType
