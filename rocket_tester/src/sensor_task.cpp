@@ -60,9 +60,7 @@ void SensorTask::run(void *parameter)
         if (sensorConfigs[i].adcType == ADS1256_ADC)
         {
           int32_t rawAdc = adc1256.cycleSingle();
-          Serial.printf("ADS1256 Channel %d raw: %ld\n", i, rawAdc);
           ads1256Voltages[i] = adc1256.convertToVoltage(rawAdc);
-          Serial.printf("ADS1256 Channel %d: %.2f V\n", i, ads1256Voltages[i]);
         }
       }
 
