@@ -24,7 +24,7 @@ struct PinConfig
   // ADS1232 pins (for load cells) - GPIO based, no SPI conflict
   static const int ADS1232_SCLK_PIN = 35;
   static const int ADS1232_DOUT_PIN = 36;
-  static const int ADS1232_POMN_PIN = 37;
+  static const int ADS1232_PDMN_PIN = 37;
 
   // ADS1256 pins (for pressure sensors) - Use HSPI or software SPI
   static const int ADS1256_DRDY_PIN = 42;

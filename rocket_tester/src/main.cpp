@@ -29,7 +29,7 @@ SPIClass ads1256_spi(HSPI);
 
 // ADC instances
 ADS1256 adc1256(PinConfig::ADS1256_DRDY_PIN, PinConfig::ADS1256_RST_PIN, 0, PinConfig::ADS1256_CS_PIN, 2.4937, &ads1256_spi);
-ADS1232 ads1232(PinConfig::ADS1232_POMN_PIN, PinConfig::ADS1232_SCLK_PIN, PinConfig::ADS1232_DOUT_PIN);
+ADS1232 ads1232(PinConfig::ADS1232_PDMN_PIN, PinConfig::ADS1232_SCLK_PIN, PinConfig::ADS1232_DOUT_PIN);
 
 // CS Controller instance - using Serial1 (UART1)
 HardwareSerial csSerial(1); // UART1
