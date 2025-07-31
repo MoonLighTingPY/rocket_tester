@@ -22,22 +22,22 @@ struct PinConfig
   static const int W5500_INT = 10;  // Interrupt
 
   // ADS1232 pins (for load cells) - GPIO based, no SPI conflict
-  static const int ADS1232_SCLK_PIN = 35;
-  static const int ADS1232_DOUT_PIN = 36;
-  static const int ADS1232_POMN_PIN = 37;
+  static const int ADS1232_SCLK_PIN = 33;
+  static const int ADS1232_DOUT_PIN = 34;
+  static const int ADS1232_PDMN_PIN = 38;
 
   // ADS1256 pins (for pressure sensors) - Use HSPI or software SPI
-  static const int ADS1256_DRDY_PIN = 42;
-  static const int ADS1256_RST_PIN = 46;
-  static const int ADS1256_CS_PIN = 45;
+  static const int ADS1256_DRDY_PIN = 39;
+  static const int ADS1256_RST_PIN = 41;
+  static const int ADS1256_CS_PIN = 40;
   // Use different pins to avoid W5500 conflict
-  static const int ADS1256_SCLK_PIN = 39; // Different from W5500
-  static const int ADS1256_MISO_PIN = 41; // Different from W5500
-  static const int ADS1256_MOSI_PIN = 40; // Different from W5500
+  static const int ADS1256_SCLK_PIN = 36; // Different from W5500
+  static const int ADS1256_MISO_PIN = 37; // Different from W5500
+  static const int ADS1256_MOSI_PIN = 35; // Different from W5500
 
   // MAX31855 shared pins (for thermocouples) - Use bit-bang or separate SPI
-  static const int MAX31855_SCLK_PIN = 18; // Different from both above
-  static const int MAX31855_MISO_PIN = 16; // DOUT - Different from above
+  static const int MAX31855_SCLK_PIN = 36; // Different from both above
+  static const int MAX31855_MISO_PIN = 37; // DOUT - Different from above
 
   // Individual CS pins for each MAX31855
   static const int MAX31855_CS_PINS[TEMPERATURE_SENSOR_COUNT];

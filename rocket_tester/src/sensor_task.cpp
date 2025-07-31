@@ -61,16 +61,16 @@ void SensorTask::run(void *parameter)
 
           case MAX31855_ADC: // Temperature sensors
           {
-            // uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
-            // if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
-            // {
-            //   double temp = thermocouples[thermocoupleIndex].readCelsius();
-            //   if (!isnan(temp))
-            //   {
-            //     rawValue = (float)temp;
-            //     readSuccess = true;
-            //   }
-            // }
+            uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
+            if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
+            {
+              double temp = thermocouples[thermocoupleIndex].readCelsius();
+              if (!isnan(temp))
+              {
+                rawValue = (float)temp;
+                readSuccess = true;
+              }
+            }
             rawValue = 0.0f;    // Placeholder for actual MAX31855 reading
             readSuccess = true; // Simulate success for now
           }
