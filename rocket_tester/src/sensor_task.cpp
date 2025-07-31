@@ -59,18 +59,23 @@ void SensorTask::run(void *parameter)
 
           case MAX31855_ADC: // Temperature sensors
           {
+            // Set all other CS pins HIGH
+            for (int cs = 0; cs < TEMPERATURE_SENSOR_COUNT; cs++) {
+              digitalWrite(PinConfig::MAX31855_CS_PINS[cs], HIGH);
+            }
+            digitalWrite(PinConfig::ADS1256_CS_PIN, HIGH); // Ensure ADS1256 CS is HIGH
+            // Set only the target CS LOW
             uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
-            if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
-            {
-              // double temp = thermocouples[thermocoupleIndex].readCelsius();
-              double temp = 1.0;
-              if (!isnan(temp))
-              {
+            if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT) {
+              digitalWrite(PinConfig::MAX31855_CS_PINS[thermocoupleIndex], LOW);
+              double temp = thermocouples[thermocoupleIndex].readCelsius();
+              digitalWrite(PinConfig::MAX31855_CS_PINS[thermocoupleIndex], HIGH);
+              if (!isnan(temp)) {
                 rawValue = (float)temp;
                 readSuccess = true;
               }
             }
-            readSuccess = true; // Simulate success for now
+            digitalWrite(PinConfig::ADS1256_CS_PIN, LOW);
           }
           break;
           }

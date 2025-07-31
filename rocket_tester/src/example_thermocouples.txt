@@ -1,0 +1,76 @@
+#include <Arduino.h>
+#include <Adafruit_MAX31855.h>
+#include "system_config.h"
+
+// Initialize SPI first
+SPIClass spi(HSPI);
+
+// Create thermocouple object after SPI is available
+Adafruit_MAX31855 *thermocouple = nullptr;
+
+void printFaults(uint8_t error) {
+    if (error & MAX31855_FAULT_OPEN) {
+        Serial.print(" FAULT_OPEN");
+    }
+    if (error & MAX31855_FAULT_SHORT_GND) {
+        Serial.print(" FAULT_SHORT_GND");
+    }
+    if (error & MAX31855_FAULT_SHORT_VCC) {
+        Serial.print(" FAULT_SHORT_VCC");
+    }
+    if (error == 0) {
+        Serial.print(" No faults detected.");
+    }
+    Serial.println();
+}
+
+void setup() {
+    Serial.begin(115200);
+    delay(1000);
+    
+    // Initialize SPI first with correct parameters
+    // HSPI uses default pins: SCK=36, MISO=37, MOSI=35 (but MAX31855 doesn't use MOSI)
+    spi.begin(PinConfig::MAX31855_SCLK_PIN, PinConfig::MAX31855_MISO_PIN, -1, -1);
+    
+    // Now create the thermocouple object
+    thermocouple = new Adafruit_MAX31855(PinConfig::MAX31855_CS_PINS[0], &spi);
+    
+    Serial.println("MAX31855 test begin");
+    delay(500);
+
+    // Self-test at startup
+    double c = thermocouple->readCelsius();
+    if (isnan(c)) {
+        Serial.print("Startup: Thermocouple fault(s) detected!");
+        uint8_t error = thermocouple->readError();
+        printFaults(error);
+    } else {
+        Serial.print("Startup: Temperature (C): ");
+        Serial.println(c, 2);
+    }
+}
+
+void loop() {
+    if (thermocouple == nullptr) {
+        Serial.println("Thermocouple not initialized!");
+        delay(1000);
+        return;
+    }
+    
+    double c = thermocouple->readCelsius();
+    
+    if (isnan(c)) {
+        Serial.print("Thermocouple fault(s) detected!");
+        uint8_t error = thermocouple->readError();
+        printFaults(error);
+    } else {
+        Serial.print("Temperature (C): ");
+        Serial.println(c, 2);
+        
+        double internal = thermocouple->readInternal();
+        Serial.print("Internal Temp (C): ");
+        Serial.println(internal, 2);
+    }
+    
+    delay(1000);
+}
