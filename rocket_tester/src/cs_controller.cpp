@@ -28,7 +28,6 @@ bool CSController::selectCS(int csIndex)
     serial->println(command);
     currentActiveCS = csIndex;
 
-    Serial.printf("CS Controller: Selected CS%d\n", csIndex);
     return true;
 }
 
@@ -36,7 +35,6 @@ void CSController::deselectAll()
 {
     serial->println("CSOFF");
     currentActiveCS = -1;
-    Serial.println("CS Controller: All CS deselected");
 }
 
 int CSController::getCurrentActiveCS() const

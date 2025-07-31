@@ -97,7 +97,6 @@ void SensorTask::run(void *parameter)
               {
                 rawValue = temp;
                 readSuccess = true;
-                Serial.printf("Thermocouple %d: %.2f°C\n", thermocoupleIndex, temp);
               }
               else
               {
