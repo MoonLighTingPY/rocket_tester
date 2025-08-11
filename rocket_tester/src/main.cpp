@@ -29,11 +29,12 @@ SPIClass ads1256_spi(HSPI); // or SPI2_HOST if using ESP-IDF defines
 ADS1256 adc1256(PinConfig::ADS1256_DRDY_PIN, PinConfig::ADS1256_RST_PIN, 0, PinConfig::ADS1256_CS_PIN, 2.4937, &ads1256_spi);
 ADS1232 ads1232(PinConfig::ADS1232_PDMN_PIN, PinConfig::ADS1232_SCLK_PIN, PinConfig::ADS1232_DOUT_PIN);
 
-// MAX31855 thermocouple instances - create array for all possible thermocouples
+// MAX31855 thermocouple instances - using multiplexer signal pin as CS
 Adafruit_MAX31855 thermocouples[TEMPERATURE_SENSOR_COUNT] = {
-    Adafruit_MAX31855(PinConfig::MAX31855_CS_PINS[0], &ads1256_spi),
-    Adafruit_MAX31855(PinConfig::MAX31855_CS_PINS[1], &ads1256_spi)
-};
+    Adafruit_MAX31855(PinConfig::MUX_SIG_PIN, &ads1256_spi),
+    Adafruit_MAX31855(PinConfig::MUX_SIG_PIN, &ads1256_spi)};
+
+// Remove the setMultiplexerChannel function definition from here
 
 // Interrupt handler
 void IRAM_ATTR engineStartISR()
