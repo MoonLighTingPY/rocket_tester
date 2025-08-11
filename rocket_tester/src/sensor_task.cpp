@@ -13,28 +13,35 @@ extern void setMultiplexerChannel(uint8_t channel);
 // Helper function to read thermocouple with fault handling
 float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t timeoutMs = 50)
 {
+  Serial.printf("[DEBUG] Entered readThermocoupleWithFaultHandling(%u, %lu)\n", thermocoupleIndex, timeoutMs);
+
   if (thermocoupleIndex >= TEMPERATURE_SENSOR_COUNT)
   {
+    Serial.println("[DEBUG] Invalid thermocouple index!");
     return NAN;
   }
 
   // Set multiplexer to select the correct MAX31855
   uint8_t muxChannel = PinConfig::MAX31855_MUX_CHANNELS[thermocoupleIndex];
+  Serial.printf("[DEBUG] Setting multiplexer channel to %u\n", muxChannel);
   setMultiplexerChannel(muxChannel);
 
   // Shorter delay for multiplexer settling
+  Serial.println("[DEBUG] Waiting for multiplexer to settle...");
   delayMicroseconds(20);
 
   uint32_t startTime = millis();
   double temp = NAN;
 
-  // Single read attempt with quick timeout
+  Serial.printf("[DEBUG] Attempting to read thermocouple %u\n", thermocoupleIndex);
   temp = thermocouples[thermocoupleIndex].readCelsius();
+  Serial.printf("[DEBUG] ReadCelsius returned: %f\n", temp);
 
   if (isnan(temp))
   {
-    // Check for faults only if reading failed
+    Serial.printf("[DEBUG] Temperature read is NAN, checking for faults...\n");
     uint8_t error = thermocouples[thermocoupleIndex].readError();
+    Serial.printf("[DEBUG] readError returned: 0x%02X\n", error);
     if (error != 0)
     {
       // Only print errors occasionally to avoid flooding serial
@@ -52,11 +59,21 @@ float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t time
         lastErrorPrint = millis();
       }
     }
+    else
+    {
+      Serial.println("[DEBUG] No error flags set for thermocouple.");
+    }
+  }
+  else
+  {
+    Serial.printf("[DEBUG] Successfully read temperature: %f\n", temp);
   }
 
   // Deselect all thermocouples by setting MUX signal high
+  Serial.println("[DEBUG] Deselecting all thermocouples (MUX_SIG_PIN HIGH)");
   digitalWrite(PinConfig::MUX_SIG_PIN, HIGH);
 
+  Serial.println("[DEBUG] Exiting readThermocoupleWithFaultHandling");
   return (float)temp;
 }
 
