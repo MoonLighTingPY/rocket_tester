@@ -30,17 +30,22 @@ struct PinConfig
   static const int ADS1256_DRDY_PIN = 39;
   static const int ADS1256_RST_PIN = 41;
   static const int ADS1256_CS_PIN = 40;
-  // Use different pins to avoid W5500 conflict
-  static const int ADS1256_SCLK_PIN = 36; // Different from W5500
-  static const int ADS1256_MISO_PIN = 37; // Different from W5500
-  static const int ADS1256_MOSI_PIN = 35; // Different from W5500
+  static const int ADS1256_SCLK_PIN = 36;
+  static const int ADS1256_MISO_PIN = 37;
+  static const int ADS1256_MOSI_PIN = 35;
 
   // MAX31855 shared pins (for thermocouples) - Use bit-bang or separate SPI
-  static const int MAX31855_SCLK_PIN = 36; // Different from both above
-  static const int MAX31855_MISO_PIN = 37; // DOUT - Different from above
+  static const int MAX31855_SCLK_PIN = 36; // Same as ADS1256
+  static const int MAX31855_MISO_PIN = 37; // Same as ADS1256
 
-  // Individual CS pins for each MAX31855
-  static const int MAX31855_CS_PINS[TEMPERATURE_SENSOR_COUNT];
+  // Analog multiplexer pins for MAX31855 CS selection
+  static const int MUX_SIG_PIN = 46; // Signal pin (connects to MAX31855 CS)
+  static const int MUX_S0_PIN = 47;  // Address bit 0
+  static const int MUX_S1_PIN = 42;  // Address bit 1
+  static const int MUX_S2_PIN = 45;  // Address bit 2
+
+  // Multiplexer channels for MAX31855 chips
+  static const int MAX31855_MUX_CHANNELS[TEMPERATURE_SENSOR_COUNT];
 };
 
 // Network configuration

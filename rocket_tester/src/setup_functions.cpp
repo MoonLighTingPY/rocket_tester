@@ -30,6 +30,15 @@ extern Adafruit_MAX31855 thermocouples[];
 extern void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length);
 extern void engineStartISR();
 
+// Helper function to set multiplexer channel
+void setMultiplexerChannel(uint8_t channel)
+{
+  digitalWrite(PinConfig::MUX_S0_PIN, (channel & 0x01) ? HIGH : LOW);
+  digitalWrite(PinConfig::MUX_S1_PIN, (channel & 0x02) ? HIGH : LOW);
+  digitalWrite(PinConfig::MUX_S2_PIN, (channel & 0x04) ? HIGH : LOW);
+  delayMicroseconds(10); // Small delay for multiplexer settling
+}
+
 void Setup::pins()
 {
   pinMode(PinConfig::PYRO_PIN, INPUT_PULLDOWN);
@@ -38,12 +47,19 @@ void Setup::pins()
   digitalWrite(PinConfig::ENGINE_OUT_PIN, HIGH);
   attachInterrupt(digitalPinToInterrupt(PinConfig::ENGINE_IN_PIN), engineStartISR, FALLING);
 
-  // Initialize MAX31855 CS pins
-  for (int i = 0; i < TEMPERATURE_SENSOR_COUNT; i++)
-  {
-    pinMode(PinConfig::MAX31855_CS_PINS[i], OUTPUT);
-    digitalWrite(PinConfig::MAX31855_CS_PINS[i], HIGH);
-  }
+  // Initialize multiplexer control pins
+  pinMode(PinConfig::MUX_S0_PIN, OUTPUT);
+  pinMode(PinConfig::MUX_S1_PIN, OUTPUT);
+  pinMode(PinConfig::MUX_S2_PIN, OUTPUT);
+  pinMode(PinConfig::MUX_SIG_PIN, OUTPUT);
+
+  // Set all multiplexer pins to ensure no MAX31855 is selected initially
+  digitalWrite(PinConfig::MUX_S0_PIN, LOW);
+  digitalWrite(PinConfig::MUX_S1_PIN, LOW);
+  digitalWrite(PinConfig::MUX_S2_PIN, LOW);
+  digitalWrite(PinConfig::MUX_SIG_PIN, HIGH); // Deselect all (CS high)
+
+
 }
 
 void Setup::adcs()
@@ -77,16 +93,6 @@ void Setup::adcs()
   ads1232.set_scale(1.0f); // Default scale, can be calibrated later
   Serial.printf("ADS1232 initialized - Tare offset: %ld\n", tare_offset);
 
-  // Setup MAX31855 thermocouples
-  Serial.println("Initializing MAX31855 thermocouples...");
-  for (int i = 0; i < TEMPERATURE_SENSOR_COUNT; i++)
-  {
-    if (sensorConfigs[i + 3].enabled) // Temperature sensors start at index 3 (0=load, 1-2=pressure, 3+=temperature)
-    {
-      Serial.printf("Initializing thermocouple %d on CS pin %d\n", i, PinConfig::MAX31855_CS_PINS[i]);
-    }
-  }
-  Serial.println("All ADCs initialized");
 }
 
 void Setup::spiffs()

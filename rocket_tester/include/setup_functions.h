@@ -1,6 +1,8 @@
 #ifndef SETUP_FUNCTIONS_H
 #define SETUP_FUNCTIONS_H
 
+#include <Arduino.h>
+
 class Setup
 {
 public:
@@ -11,5 +13,8 @@ public:
   static void ota();
   static bool ethernet();
 };
+
+// Declare the multiplexer helper function
+void setMultiplexerChannel(uint8_t channel);
 
 #endif

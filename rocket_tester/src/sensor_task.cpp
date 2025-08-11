@@ -8,6 +8,57 @@
 extern ADS1256 adc1256;
 extern ADS1232 ads1232;
 extern Adafruit_MAX31855 thermocouples[];
+extern void setMultiplexerChannel(uint8_t channel);
+
+// Helper function to read thermocouple with fault handling
+float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t timeoutMs = 50)
+{
+  if (thermocoupleIndex >= TEMPERATURE_SENSOR_COUNT)
+  {
+    return NAN;
+  }
+
+  // Set multiplexer to select the correct MAX31855
+  uint8_t muxChannel = PinConfig::MAX31855_MUX_CHANNELS[thermocoupleIndex];
+  setMultiplexerChannel(muxChannel);
+
+  // Shorter delay for multiplexer settling
+  delayMicroseconds(20);
+
+  uint32_t startTime = millis();
+  double temp = NAN;
+
+  // Single read attempt with quick timeout
+  temp = thermocouples[thermocoupleIndex].readCelsius();
+
+  if (isnan(temp))
+  {
+    // Check for faults only if reading failed
+    uint8_t error = thermocouples[thermocoupleIndex].readError();
+    if (error != 0)
+    {
+      // Only print errors occasionally to avoid flooding serial
+      static uint32_t lastErrorPrint = 0;
+      if (millis() - lastErrorPrint > 1000) // Print errors max once per second
+      {
+        Serial.printf("TC%d fault: 0x%02X ", thermocoupleIndex, error);
+        if (error & MAX31855_FAULT_OPEN)
+          Serial.print("OPEN ");
+        if (error & MAX31855_FAULT_SHORT_GND)
+          Serial.print("SHORT_GND ");
+        if (error & MAX31855_FAULT_SHORT_VCC)
+          Serial.print("SHORT_VCC ");
+        Serial.println();
+        lastErrorPrint = millis();
+      }
+    }
+  }
+
+  // Deselect all thermocouples by setting MUX signal high
+  digitalWrite(PinConfig::MUX_SIG_PIN, HIGH);
+
+  return (float)temp;
+}
 
 void SensorTask::run(void *parameter)
 {
@@ -59,22 +110,24 @@ void SensorTask::run(void *parameter)
 
           case MAX31855_ADC: // Temperature sensors
           {
-            // Set all other CS pins HIGH
-            for (int cs = 0; cs < TEMPERATURE_SENSOR_COUNT; cs++) {
-              digitalWrite(PinConfig::MAX31855_CS_PINS[cs], HIGH);
-            }
-            digitalWrite(PinConfig::ADS1256_CS_PIN, HIGH); // Ensure ADS1256 CS is HIGH
-            // Set only the target CS LOW
+            // Ensure ADS1256 SPI is not active
+            digitalWrite(PinConfig::ADS1256_CS_PIN, HIGH);
+            delayMicroseconds(10);
+
+            // Map sensor config adcChannel to actual thermocouple index (0-1)
             uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
-            if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT) {
-              digitalWrite(PinConfig::MAX31855_CS_PINS[thermocoupleIndex], LOW);
-              double temp = thermocouples[thermocoupleIndex].readCelsius();
-              digitalWrite(PinConfig::MAX31855_CS_PINS[thermocoupleIndex], HIGH);
-              if (!isnan(temp)) {
-                rawValue = (float)temp;
+            if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
+            {
+              rawValue = readThermocoupleWithFaultHandling(thermocoupleIndex, 20); // Very short timeout
+
+              if (!isnan(rawValue))
+              {
                 readSuccess = true;
               }
             }
+
+            // Restore ADS1256 CS to LOW for next cycle
+            delayMicroseconds(10);
             digitalWrite(PinConfig::ADS1256_CS_PIN, LOW);
           }
           break;
