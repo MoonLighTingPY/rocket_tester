@@ -21,25 +21,53 @@ float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t time
     return NAN;
   }
 
+  // Ensure proper SPI bus isolation
+  digitalWrite(PinConfig::ADS1256_CS_PIN, HIGH);
+  delayMicroseconds(50); // Longer delay to ensure ADS1256 is fully deselected
+
   // Set multiplexer to select the correct MAX31855
   uint8_t muxChannel = PinConfig::MAX31855_MUX_CHANNELS[thermocoupleIndex];
   Serial.printf("[DEBUG] Setting multiplexer channel to %u\n", muxChannel);
   setMultiplexerChannel(muxChannel);
 
-  // Shorter delay for multiplexer settling
+  // Longer delay for multiplexer settling
   Serial.println("[DEBUG] Waiting for multiplexer to settle...");
-  delayMicroseconds(20);
+  delayMicroseconds(100); // Increased settling time
+
+  // Select the thermocouple via multiplexer signal pin
+  digitalWrite(PinConfig::MUX_SIG_PIN, LOW); // Active low to select
+  delayMicroseconds(50);
 
   uint32_t startTime = millis();
   double temp = NAN;
 
   Serial.printf("[DEBUG] Attempting to read thermocouple %u\n", thermocoupleIndex);
-  temp = thermocouples[thermocoupleIndex].readCelsius();
-  Serial.printf("[DEBUG] ReadCelsius returned: %f\n", temp);
 
-  if (isnan(temp))
+  // Add timeout protection
+  bool readComplete = false;
+  uint32_t attempts = 0;
+  const uint32_t maxAttempts = 3;
+
+  while (!readComplete && attempts < maxAttempts && (millis() - startTime) < timeoutMs)
   {
-    Serial.printf("[DEBUG] Temperature read is NAN, checking for faults...\n");
+    temp = thermocouples[thermocoupleIndex].readCelsius();
+    attempts++;
+
+    if (!isnan(temp))
+    {
+      readComplete = true;
+      Serial.printf("[DEBUG] ReadCelsius returned: %f (attempt %lu)\n", temp, attempts);
+    }
+    else
+    {
+      Serial.printf("[DEBUG] ReadCelsius attempt %lu failed\n", attempts);
+      delayMicroseconds(100); // Small delay between attempts
+    }
+  }
+
+  if (!readComplete)
+  {
+    Serial.printf("[DEBUG] Temperature read timed out after %lu attempts\n", attempts);
     uint8_t error = thermocouples[thermocoupleIndex].readError();
     Serial.printf("[DEBUG] readError returned: 0x%02X\n", error);
     if (error != 0)
@@ -58,10 +86,6 @@ float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t time
         Serial.println();
         lastErrorPrint = millis();
       }
-    }
-    else
-    {
-      Serial.println("[DEBUG] No error flags set for thermocouple.");
     }
   }
   else
