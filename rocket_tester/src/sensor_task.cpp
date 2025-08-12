@@ -10,10 +10,39 @@ extern ADS1232 ads1232;
 extern Adafruit_MAX31855 thermocouples[];
 extern void setMultiplexerChannel(uint8_t channel);
 
+// ADC calibration constants - updated based on actual measurements
+const uint16_t ADC_0V_OFFSET = 47;      // ADC reading at 0V
+const uint16_t ADC_2_5V_READING = 1500; // ADC reading at 2.5V (measured ~1496-1501)
+const float VOLT_2_5V = 2500.0;         // 2.5V in millivolts
+
+// Function to convert ADC reading to voltage with oversampling and calibration
+float adc2volt(uint8_t pin, uint8_t samples = 5)
+{
+  uint32_t adcRaw = 0;
+
+  // Oversampling to reduce noise
+  for (uint8_t n = 0; n < samples; n++)
+  {
+    adcRaw += analogRead(pin);
+    delayMicroseconds(500); // Small delay between samples
+  }
+  adcRaw = adcRaw / samples;
+
+  // Apply calibration using actual measured values
+  float volt = map(adcRaw, ADC_0V_OFFSET, ADC_2_5V_READING, 0, VOLT_2_5V);
+  volt = volt / 1000.0; // Convert millivolts to volts
+
+  // Clamp to valid range
+  if (volt < 0.0)
+    volt = 0.0;
+  if (volt > 2.6)
+    volt = 2.6; // Allow slight overhead
+  return volt;
+}
+
 // Helper function to read thermocouple with fault handling
 float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t timeoutMs = 50)
 {
-  Serial.printf("[DEBUG] Entered readThermocoupleWithFaultHandling(%u, %lu)\n", thermocoupleIndex, timeoutMs);
 
   if (thermocoupleIndex >= TEMPERATURE_SENSOR_COUNT)
   {
@@ -27,11 +56,9 @@ float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t time
 
   // Set multiplexer to select the correct MAX31855
   uint8_t muxChannel = PinConfig::MAX31855_MUX_CHANNELS[thermocoupleIndex];
-  Serial.printf("[DEBUG] Setting multiplexer channel to %u\n", muxChannel);
   setMultiplexerChannel(muxChannel);
 
   // Longer delay for multiplexer settling
-  Serial.println("[DEBUG] Waiting for multiplexer to settle...");
   delayMicroseconds(100); // Increased settling time
 
   // Select the thermocouple via multiplexer signal pin
@@ -40,8 +67,6 @@ float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t time
 
   uint32_t startTime = millis();
   double temp = NAN;
-
-  Serial.printf("[DEBUG] Attempting to read thermocouple %u\n", thermocoupleIndex);
 
   // Add timeout protection
   bool readComplete = false;
@@ -56,7 +81,6 @@ float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t time
     if (!isnan(temp))
     {
       readComplete = true;
-      Serial.printf("[DEBUG] ReadCelsius returned: %f (attempt %lu)\n", temp, attempts);
     }
     else
     {
@@ -88,22 +112,24 @@ float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t time
       }
     }
   }
-  else
-  {
-    Serial.printf("[DEBUG] Successfully read temperature: %f\n", temp);
-  }
 
   // Deselect all thermocouples by setting MUX signal high
-  Serial.println("[DEBUG] Deselecting all thermocouples (MUX_SIG_PIN HIGH)");
   digitalWrite(PinConfig::MUX_SIG_PIN, HIGH);
-
-  Serial.println("[DEBUG] Exiting readThermocoupleWithFaultHandling");
   return (float)temp;
 }
 
 void SensorTask::run(void *parameter)
 {
   SensorData data;
+
+  // Configure ADC settings for better precision
+  analogReadResolution(11); // 11-bit resolution (0-2047)
+  analogSetAttenuation(ADC_11db);
+
+  // Initialize ADC pins once at startup
+  analogRead(1); // Initialize ADC1_CH0
+  analogRead(2); // Initialize ADC1_CH1
+  delay(10);     // Allow ADC to stabilize
 
   while (true)
   {
@@ -114,17 +140,6 @@ void SensorTask::run(void *parameter)
       data.ignitionTimestamp = systemState.ignitedWire ? (currentTime - systemState.ignitionStartTime) : 0;
 
       bool hasData = false;
-
-      // --- Read all ADS1256 channels first, store voltages ---
-      float ads1256Voltages[SENSOR_COUNT] = {0.0f};
-      for (uint8_t i = 0; i < SENSOR_COUNT; i++)
-      {
-        if (sensorConfigs[i].adcType == ADS1256_ADC)
-        {
-          int32_t rawAdc = adc1256.cycleSingle();
-          ads1256Voltages[i] = adc1256.convertToVoltage(rawAdc);
-        }
-      }
 
       // Read all sensors
       for (uint8_t i = 0; i < SENSOR_COUNT; i++)
@@ -145,8 +160,22 @@ void SensorTask::run(void *parameter)
             break;
 
           case ADS1256_ADC: // Pressure sensors
-            rawValue = ads1256Voltages[i];
-            readSuccess = true;
+            // Convert ADC reading to voltage with proper calibration
+            if (sensorConfigs[i].adcChannel == 0)
+            {
+              rawValue = adc2volt(1); // ADC1_CH0 = GPIO1, convert to voltage
+              readSuccess = true;
+            }
+            else if (sensorConfigs[i].adcChannel == 1)
+            {
+              rawValue = adc2volt(2); // ADC1_CH1 = GPIO2, convert to voltage
+              readSuccess = true;
+            }
+            else
+            {
+              rawValue = 0.0f;
+              readSuccess = false;
+            }
             break;
 
           case MAX31855_ADC: // Temperature sensors
@@ -159,7 +188,7 @@ void SensorTask::run(void *parameter)
             uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
             if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
             {
-              rawValue = readThermocoupleWithFaultHandling(thermocoupleIndex, 20); // Very short timeout
+              rawValue = readThermocoupleWithFaultHandling(thermocoupleIndex, 20);
 
               if (!isnan(rawValue))
               {
@@ -200,7 +229,9 @@ void SensorTask::run(void *parameter)
         portEXIT_CRITICAL(&bufferConfig.bufferMux);
       }
     }
-    vTaskDelay(1);
+
+    // Increase delay to reduce CPU load and prevent stack overflow
+    vTaskDelay(pdMS_TO_TICKS(10)); // 10ms delay instead of 1ms
   }
 }
 
@@ -209,7 +240,7 @@ void SensorTask::create(TaskHandle_t *taskHandle)
   xTaskCreatePinnedToCore(
       run,
       "SensorTask",
-      12000, // Increased stack size for multiple ADCs
+      16000, // Increased stack size even more
       NULL,
       7, // High priority for sensor readings
       taskHandle,
