@@ -5,10 +5,13 @@
 #include <SPIFFS.h>
 
 // Maximum number of sensors - 1 load cell + 2 pressure + 12 temperature
-constexpr size_t SENSOR_COUNT = 15;
 constexpr size_t LOAD_CELL_COUNT = 1;
 constexpr size_t PRESSURE_SENSOR_COUNT = 2;
-constexpr size_t TEMPERATURE_SENSOR_COUNT = 4;
+constexpr size_t TEMPERATURE_SENSOR_COUNT = 4; // adjust when you add more thermocouples
+
+// Derive total sensor count
+constexpr size_t SENSOR_COUNT =
+    LOAD_CELL_COUNT + PRESSURE_SENSOR_COUNT + TEMPERATURE_SENSOR_COUNT;
 
 // Sensor types
 enum SensorType

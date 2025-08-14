@@ -6,7 +6,7 @@ export const useDataManager = () => {
   const [csvData, setCsvData] = useState([]);
   const [ignitionDelay, setIgnitionDelay] = useState(null);
   const [sensorConfig, setSensorConfig] = useState([]);
-  const SENSOR_COUNT = 8;
+  const SENSOR_COUNT = 6;
 
   useEffect(() => {
     // Request initial config when websocket connects
@@ -28,7 +28,8 @@ export const useDataManager = () => {
     if (event.data instanceof Blob) {
       event.data.arrayBuffer().then(buffer => {
         const view = new DataView(buffer);
-        const packetSize = 4 + 4 + (4 * SENSOR_COUNT); // timestamps + sensor values
+        const sensorCount = sensorConfig && sensorConfig.length ? sensorConfig.length : SENSOR_COUNT;
+        const packetSize = 4 + 4 + (4 * sensorCount); // timestamps + sensor values
         const packetCount = buffer.byteLength / packetSize;
             
         const newTestData = [];
@@ -43,11 +44,12 @@ export const useDataManager = () => {
                 
           // Read sensor values
           const sensorValues = {};
-          let sensorOffset = offset + 8;
-                
+          const sensorOffset = offset + 8;
+
           sensorConfig.forEach((sensor, index) => {
+            const raw = view.getFloat32(sensorOffset + (index * 4), true);
             if (sensor.enabled) {
-              sensorValues[sensor.name] = view.getFloat32(sensorOffset + (index * 4), true);
+              sensorValues[sensor.name] = raw;
             }
           });
 
