@@ -1,9 +1,8 @@
-
 import { useContext, useRef, useState } from 'react';
 import { 
   VStack, Heading, SimpleGrid, GridItem, Box, Text,
   useDisclosure, Modal, ModalOverlay, 
-  ModalContent, ModalBody, ModalCloseButton, Button
+  ModalContent, ModalBody, ModalCloseButton, Button, HStack
 } from '@chakra-ui/react';
 import { chartTheme } from '../../config/chartConfig';
 import Chart from '../Chart/Chart';
@@ -11,13 +10,13 @@ import ChartControls from '../Chart/ChartControls';
 import Controls from './Controls';
 import DataContext from '../../hooks/DataContext';
 import SensorConfigModal from './SensorConfigModal';
-
-
+import LoadCellCalibrationModal from './LoadCellCalibrationModal';
 
 const HomePage = () => {
   const { testData, ignitionDelay, sensorConfig, updateSensorConfig } = useContext(DataContext);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isCalibrationModalOpen, setIsCalibrationModalOpen] = useState(false);
   const [activeChart, setActiveChart] = useState(null);
   const chartRefs = useRef({
     0: { regular: null, fullScreen: null }, // Load
@@ -25,14 +24,12 @@ const HomePage = () => {
     2: { regular: null, fullScreen: null }, // Temperature
   });
 
-
   // Define sensor type labels and colors
   // Map numerical SensorType to string labels
   const sensorTypeLabels = {
     0: 'Load Cell',
     1: 'Pressure',
     2: 'Temperature',
-
     default: 'Unknown Sensor',
   };
 
@@ -41,7 +38,6 @@ const HomePage = () => {
     0: chartTheme.colors.loadCell,
     1: chartTheme.colors.pressure,
     2: chartTheme.colors.temperature,
-
     default: '#000000', // Fallback color if new sensor will be added in the future
   };
 
@@ -57,17 +53,27 @@ const HomePage = () => {
     return groups;
   }, {});
 
-
   return (
     <VStack spacing={6} w="full">
       <Heading>Rocket Test Dashboard</Heading>
-      <Button 
-        onClick={() => setIsConfigModalOpen(true)} 
-        disabled={!sensorConfig || sensorConfig.length === 0}
-      >
-        Edit Sensor Config
-      </Button>
-
+      
+      {/* Configuration Buttons */}
+      <HStack spacing={4}>
+        <Button 
+          onClick={() => setIsConfigModalOpen(true)} 
+          disabled={!sensorConfig || sensorConfig.length === 0}
+          colorScheme="blue"
+        >
+          Edit Sensor Config
+        </Button>
+        <Button 
+          onClick={() => setIsCalibrationModalOpen(true)}
+          disabled={!sensorConfig || sensorConfig.length === 0}
+          colorScheme="orange"
+        >
+          Calibrate Load Cell
+        </Button>
+      </HStack>
 
       <Controls />
       
@@ -84,29 +90,15 @@ const HomePage = () => {
           sensors.length > 0 && ( // Only render if there are sensors in this group
             <GridItem key={type}>
               <Box p={6} bg="white" shadow="md" rounded="lg" position="relative">
-                <Heading size="md" mb={4}>{sensorTypeLabels[type]}</Heading>
                 <ChartControls
-                  chartRef={chartRefs.current[type]?.regular?.current}
-                  title={sensorTypeLabels[type]}
-                  onOpen={onOpen}
-                  setActiveChart={() => setActiveChart(type)}
+                  onFullScreen={() => {
+                    setActiveChart(parseInt(type));
+                    onOpen();
+                  }}
                   onResetZoom={() => {
                     const chart = chartRefs.current[type]?.regular?.current;
-                    if (chart?.resetZoom) {
+                    if (chart && typeof chart.resetZoom === 'function') {
                       chart.resetZoom();
-                    }
-                  }}
-                  onDownload={() => {
-                    const chart = chartRefs.current[type]?.regular?.current;
-                    if (chart?.toBase64Image) {
-                      const link = document.createElement('a');
-                      const now = new Date();
-                      const localDateTime = now.toLocaleString('sv-SE', { timeZoneName: 'short' })
-                        .replace(' ', '_')
-                        .replace(':', '-');
-                      link.download = `${sensorTypeLabels[type]}-${localDateTime}.png`;
-                      link.href = chart.toBase64Image();
-                      link.click();
                     }
                   }}
                 />
@@ -162,9 +154,17 @@ const HomePage = () => {
           </ModalBody>
         </ModalContent>
       </Modal>
+      
       <SensorConfigModal
         isOpen={isConfigModalOpen}
         onClose={() => setIsConfigModalOpen(false)}
+        sensorConfig={sensorConfig}
+        onSave={updateSensorConfig}
+      />
+      
+      <LoadCellCalibrationModal
+        isOpen={isCalibrationModalOpen}
+        onClose={() => setIsCalibrationModalOpen(false)}
         sensorConfig={sensorConfig}
         onSave={updateSensorConfig}
       />
