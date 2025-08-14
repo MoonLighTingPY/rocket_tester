@@ -9,18 +9,43 @@ import {
 import { InfoIcon } from '@chakra-ui/icons';
 import { FaCalculator } from 'react-icons/fa';
 
+const SENSOR_TYPE = {
+  LOAD: 0,
+  PRESSURE: 1,
+  TEMPERATURE: 2
+};
+
+const ADC_TYPE = {
+  ADS1232: 0,
+  ADS1256: 1,
+  MAX31855: 2
+};
+
+// Map sensor type -> adc type (current backend design couples them)
+const SENSOR_TYPE_TO_ADC_TYPE = {
+  [SENSOR_TYPE.LOAD]: ADC_TYPE.ADS1232,
+  [SENSOR_TYPE.PRESSURE]: ADC_TYPE.ADS1256,
+  [SENSOR_TYPE.TEMPERATURE]: ADC_TYPE.MAX31855
+};
+
+// Max channel indices per adc type (frontend enforced)
+const ADC_CHANNEL_LIMITS = {
+  [ADC_TYPE.ADS1232]: 0,      // single channel (load cell)
+  [ADC_TYPE.ADS1256]: 7,      // 0..7
+  [ADC_TYPE.MAX31855]: 3      // 0..3 (4 thermocouples via mux)
+};
+
 const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   const [localConfig, setLocalConfig] = useState(sensorConfig || []);
   const [editableValues, setEditableValues] = useState({});
   const [errors, setErrors] = useState({});
   const [presets, setPresets] = useState(() => {
-    // Load presets from localStorage on init or use empty object if no config in localstorage yet
     const saved = localStorage.getItem('sensorConfigPresets');
     return saved ? JSON.parse(saved) : {};
   });
   const [presetName, setPresetName] = useState('');
   const [selectedPreset, setSelectedPreset] = useState('');
-  const [calculationModalOpen, setCalculationModalOpen] = useState(null); // Store sensor index when open
+  const [calculationModalOpen, setCalculationModalOpen] = useState(null);
   const [rangeSettings, setRangeSettings] = useState({
     voltageMin: 0,
     voltageMax: 2.5,
@@ -29,54 +54,44 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
   });
   const toast = useToast();
 
-  // Function to calculate conversion factor
   const calculateFactor = (sensorIndex) => {
     const { voltageMin, voltageMax, sensorMin, sensorMax } = rangeSettings;
     if (voltageMax === voltageMin) {
       toast({
-        title: "Calculation Error",
-        description: "Voltage range cannot be zero",
-        status: "error",
+        title: 'Calculation Error',
+        description: 'Voltage range cannot be zero',
+        status: 'error',
         duration: 3000,
-        isClosable: true,
+        isClosable: true
       });
       return;
     }
-    
     const factor = (sensorMax - sensorMin) / (voltageMax - voltageMin);
-    
-    // Update the editable values with the calculated factor
     setEditableValues(prev => ({
       ...prev,
       [`${sensorIndex}-conversionFactor`]: factor.toFixed(4)
     }));
-    
-    // Close calculation popup
     setCalculationModalOpen(null);
-    
     toast({
-      title: "Conversion factor calculated",
+      title: 'Conversion factor calculated',
       description: `Factor: ${factor.toFixed(4)}`,
-      status: "success",
+      status: 'success',
       duration: 3000,
-      isClosable: true,
+      isClosable: true
     });
   };
 
-  // Render calculator popup when calculationModalOpen is set
   const renderCalculator = () => {
     if (calculationModalOpen === null) return null;
-    
     const sensorIndex = calculationModalOpen;
     const sensor = localConfig[sensorIndex];
     if (!sensor) return null;
-    
-    let unitLabel;
-    switch(sensor.type) {
-      case 0: unitLabel = 'kg'; break;
-      case 1: unitLabel = 'bar'; break;
-      case 2: unitLabel = '°C'; break;
-      default: unitLabel = 'units';
+
+    let unitLabel = 'units';
+    switch (sensor.type) {
+      case SENSOR_TYPE.LOAD: unitLabel = 'kg'; break;
+      case SENSOR_TYPE.PRESSURE: unitLabel = 'bar'; break;
+      case SENSOR_TYPE.TEMPERATURE: unitLabel = '°C'; break;
     }
 
     return (
@@ -95,11 +110,11 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
             <Text fontWeight="bold">Calculate Conversion Factor</Text>
             <Button size="sm" variant="ghost" onClick={() => setCalculationModalOpen(null)}>X</Button>
           </HStack>
-          
+
           <FormControl>
             <FormLabel fontSize="sm">Voltage Range (V)</FormLabel>
             <HStack>
-              <NumberInput 
+              <NumberInput
                 value={rangeSettings.voltageMin}
                 onChange={(_, value) => setRangeSettings(prev => ({ ...prev, voltageMin: value }))}
                 step={0.1}
@@ -110,7 +125,7 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
                 <NumberInputField placeholder="Min" />
               </NumberInput>
               <Text>to</Text>
-              <NumberInput 
+              <NumberInput
                 value={rangeSettings.voltageMax}
                 onChange={(_, value) => setRangeSettings(prev => ({ ...prev, voltageMax: value }))}
                 step={0.1}
@@ -124,37 +139,39 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
             <FormHelperText>Typically 0-2.5V</FormHelperText>
           </FormControl>
 
-          <FormControl>
-            <FormLabel fontSize="sm">Sensor Range ({unitLabel})</FormLabel>
-            <HStack>
-              <NumberInput 
-                value={rangeSettings.sensorMin}
-                onChange={(_, value) => setRangeSettings(prev => ({ ...prev, sensorMin: value }))}
-                precision={1}
-                size="sm"
-              >
-                <NumberInputField placeholder="Min" />
-              </NumberInput>
-              <Text>to</Text>
-              <NumberInput 
-                value={rangeSettings.sensorMax}
-                onChange={(_, value) => setRangeSettings(prev => ({ ...prev, sensorMax: value }))}
-                precision={1}
-                size="sm"
-              >
-                <NumberInputField placeholder="Max" />
-              </NumberInput>
-            </HStack>
-            <FormHelperText>
-              {sensor.type === 0 ? 'Typical: 0-400 kg' : 
-               sensor.type === 1 ? 'Typical: 0-600 bar' : 
-                                  'Typical: 0-600 °C'}
-            </FormHelperText>
-          </FormControl>
-          
-          <Button 
+            <FormControl>
+              <FormLabel fontSize="sm">Sensor Range ({unitLabel})</FormLabel>
+              <HStack>
+                <NumberInput
+                  value={rangeSettings.sensorMin}
+                  onChange={(_, value) => setRangeSettings(prev => ({ ...prev, sensorMin: value }))}
+                  precision={1}
+                  size="sm"
+                >
+                  <NumberInputField placeholder="Min" />
+                </NumberInput>
+                <Text>to</Text>
+                <NumberInput
+                  value={rangeSettings.sensorMax}
+                  onChange={(_, value) => setRangeSettings(prev => ({ ...prev, sensorMax: value }))}
+                  precision={1}
+                  size="sm"
+                >
+                  <NumberInputField placeholder="Max" />
+                </NumberInput>
+              </HStack>
+              <FormHelperText>
+                {sensor.type === SENSOR_TYPE.LOAD
+                  ? 'Typical: 0-400 kg'
+                  : sensor.type === SENSOR_TYPE.PRESSURE
+                    ? 'Typical: 0-600 bar'
+                    : 'Typical: 0-600 °C'}
+              </FormHelperText>
+            </FormControl>
+
+          <Button
             leftIcon={<FaCalculator />}
-            colorScheme="blue" 
+            colorScheme="blue"
             onClick={() => calculateFactor(sensorIndex)}
           >
             Calculate Factor
@@ -166,270 +183,252 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
 
   useEffect(() => {
     if (sensorConfig && Array.isArray(sensorConfig) && sensorConfig.length > 0) {
-      setLocalConfig([...sensorConfig]);
+      const cloned = sensorConfig.map(s => ({ ...s }));
+      setLocalConfig(cloned);
       const initialValues = {};
-      sensorConfig.forEach((sensor, index) => {
+      cloned.forEach((sensor, index) => {
+        initialValues[`${index}-name`] = sensor.name;
+        initialValues[`${index}-type`] = sensor.type;
+        initialValues[`${index}-adcChannel`] = sensor.adcChannel;
         initialValues[`${index}-conversionFactor`] = sensor.conversionFactor?.toString() ?? '0.00';
         initialValues[`${index}-offset`] = sensor.offset?.toString() ?? '0.00';
       });
       setEditableValues(initialValues);
-      setErrors({}); // Clear errors when modal reopens
+      setErrors({});
     }
   }, [sensorConfig]);
 
-  const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
+  const deepClone = (o) => JSON.parse(JSON.stringify(o));
 
   const loadPreset = (presetName) => {
     if (!presets[presetName]) return;
-
-    const preset = deepClone(presets[presetName]); // Deep clone the preset
+    const preset = deepClone(presets[presetName]);
     setLocalConfig(preset);
-      
     const newEditableValues = {};
     preset.forEach((sensor, index) => {
+      newEditableValues[`${index}-name`] = sensor.name;
+      newEditableValues[`${index}-type`] = sensor.type;
+      newEditableValues[`${index}-adcChannel`] = sensor.adcChannel;
       newEditableValues[`${index}-conversionFactor`] = sensor.conversionFactor?.toString() ?? '0.00';
       newEditableValues[`${index}-offset`] = sensor.offset?.toString() ?? '0.00';
-        
     });
-      
-    setEditableValues(newEditableValues); // Replace entirely instead of merging
+    setEditableValues(newEditableValues);
     setErrors({});
   };
-
 
   const saveAsPreset = () => {
     if (!presetName.trim()) {
       setErrors(prev => ({ ...prev, preset: { type: 'error', message: 'Preset name is required' } }));
       return;
     }
-    
-    // Create a deep copy of the current configuration
     const configToSave = localConfig.map((sensor, index) => ({
       ...deepClone(sensor),
+      name: editableValues[`${index}-name`] ?? sensor.name,
+      type: editableValues[`${index}-type`] ?? sensor.type,
+      adcType: SENSOR_TYPE_TO_ADC_TYPE[editableValues[`${index}-type`] ?? sensor.type],
+      adcChannel: parseInt(editableValues[`${index}-adcChannel`]),
       conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`]),
       offset: parseFloat(editableValues[`${index}-offset`])
     }));
-    
-    const newPresets = {
-      ...deepClone(presets),
-      [presetName]: configToSave
-    };
-    
+    const newPresets = { ...deepClone(presets), [presetName]: configToSave };
     setPresets(newPresets);
     localStorage.setItem('sensorConfigPresets', JSON.stringify(newPresets));
-      
-    // Select the newly created preset
     setSelectedPreset(presetName);
-      
     setPresetName('');
-    setErrors(prev => ({ 
-      ...prev, 
-      preset: { type: 'success', message: 'Preset created successfully' } 
-    }));
+    setErrors(prev => ({ ...prev, preset: { type: 'success', message: 'Preset created successfully' } }));
   };
 
-  const deletePreset = (presetName) => {
-    const newPresets = { ...presets };
-    delete newPresets[presetName];
-    setPresets(newPresets);
-    localStorage.setItem('sensorConfigPresets', JSON.stringify(newPresets));
-    if (selectedPreset === presetName) {
-      setSelectedPreset('');
-    }
+  const deletePreset = (name) => {
+    const np = { ...presets };
+    delete np[name];
+    setPresets(np);
+    localStorage.setItem('sensorConfigPresets', JSON.stringify(np));
+    if (selectedPreset === name) setSelectedPreset('');
   };
 
   const validateField = (field, value, sensorName, index) => {
-    // Early return if missing required params
-    if (index === undefined || !localConfig[index]) {
-      return `Invalid sensor reference`;
-    }
-  
+    if (index === undefined || !localConfig[index]) return 'Invalid sensor reference';
     const sensor = localConfig[index];
 
     if (field === 'name') {
-      if (!value.trim()) return `Sensor name cannot be empty`;
-      
-      // Check for duplicate names
-      const duplicate = localConfig.find((s, i) => 
-        i !== index && // Not the same sensor
-        s.name === value.trim() // Same name
-      );
-      if (duplicate) return `This name is already used by another sensor`;
-      
-      // Regex validation for valid characters
-      const validNameRegex = /^[a-zA-Z0-9_]+$/;
-      if (!validNameRegex.test(value)) {
-        return `Name can only contain letters, numbers, and underscores`;
-      }
+      if (!value.trim()) return 'Sensor name cannot be empty';
+      const duplicate = localConfig.find((s, i) => i !== index && s.name === value.trim());
+      if (duplicate) return 'This name is already used by another sensor';
+      if (!/^[a-zA-Z0-9_]+$/.test(value)) return 'Name can only contain letters, numbers, and underscores';
     }
-  
+
     if (field === 'conversionFactor') {
       if (value.trim() === '') return `${sensorName}: Conversion factor cannot be empty`;
       if (isNaN(value)) return `${sensorName}: Conversion factor must be a number`;
       if (parseFloat(value) === 0) return `${sensorName}: Conversion factor cannot be zero`;
     }
-  
+
     if (field === 'offset') {
       if (value.trim() === '') return `${sensorName}: Offset cannot be empty`;
       if (isNaN(value)) return `${sensorName}: Offset must be a number`;
     }
-  
+
     if (field === 'adcChannel') {
-      if (value === '') return `${sensorName}: ADC channel cannot be empty`;
+      if (value === '' || value === undefined) return `${sensorName}: ADC channel cannot be empty`;
       const channel = parseInt(value);
       if (isNaN(channel)) return `${sensorName}: ADC channel must be a number`;
-      if (channel < 0 || channel > 7) return `${sensorName}: ADC channel must be between 0 and 7`;
-      
-      // Only check for duplicates if the sensor is enabled
+      const limit = ADC_CHANNEL_LIMITS[sensor.adcType];
+      if (channel < 0 || channel > limit) {
+        return `${sensorName}: Channel must be between 0 and ${limit} for this ADC`;
+      }
       if (sensor.enabled) {
-        const duplicateSensor = localConfig.find((s, i) => 
-          i !== index && // Not the same sensor
-          s.enabled && // Other sensor is enabled
-          s.adcChannel === channel // Same channel number
+        const duplicateSensor = localConfig.find((s, i) =>
+          i !== index &&
+          s.enabled &&
+            s.adcType === sensor.adcType && // uniqueness only within same adcType
+            parseInt(editableValues[`${i}-adcChannel`] ?? s.adcChannel) === channel
         );
-        
         if (duplicateSensor) {
-          return `${sensorName}: ADC channel ${channel} is already used by ${duplicateSensor.name}`;
+          return `${sensorName}: Channel ${channel} already used by ${duplicateSensor.name}`;
         }
       }
     }
+
+    if (field === 'type') {
+      if (![0, 1, 2].includes(parseInt(value))) return `${sensorName}: Invalid sensor type`;
+    }
+
     return null;
   };
 
   const updatePreset = () => {
     if (!selectedPreset) return;
-  
-    // Create updated config with current values including name and type changes
     const updatedConfig = localConfig.map((sensor, index) => ({
       ...deepClone(sensor),
       name: editableValues[`${index}-name`] ?? sensor.name,
-      type: editableValues[`${index}-type`] !== undefined 
-        ? parseInt(editableValues[`${index}-type`]) 
-        : sensor.type,
+      type: editableValues[`${index}-type`] ?? sensor.type,
+      adcType: SENSOR_TYPE_TO_ADC_TYPE[editableValues[`${index}-type`] ?? sensor.type],
+      adcChannel: parseInt(editableValues[`${index}-adcChannel`]),
       conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`] ?? sensor.conversionFactor),
       offset: parseFloat(editableValues[`${index}-offset`] ?? sensor.offset)
     }));
-  
-    const newPresets = {
-      ...deepClone(presets),
-      [selectedPreset]: updatedConfig
-    };
-  
+    const newPresets = { ...deepClone(presets), [selectedPreset]: updatedConfig };
     setPresets(newPresets);
     localStorage.setItem('sensorConfigPresets', JSON.stringify(newPresets));
-    setErrors(prev => ({ 
-      ...prev, 
-      preset: { type: 'success', message: 'Preset updated successfully' }
-    }));
+    setErrors(prev => ({ ...prev, preset: { type: 'success', message: 'Preset updated successfully' } }));
   };
 
   const handleChange = (index, field, value) => {
     const sensor = localConfig[index];
-    
+    if (!sensor) return;
+
     if (field === 'enabled') {
-      // Toggle enabled state immediately
       const updated = [...localConfig];
-      updated[index][field] = !updated[index][field];
+      updated[index].enabled = !updated[index].enabled;
       setLocalConfig(updated);
-    } else if (field === 'name' || field === 'type') {
-      // Only validate and store in editableValues
-      const error = validateField(field, value, sensor.name, index);
-      setErrors(prev => ({
-        ...prev,
-        [`${index}-${field}`]: error
-      }));
-      setEditableValues(prev => ({
-        ...prev,
-        [`${index}-${field}`]: value
-      }));
-    } else if (field === 'adcChannel') {
-      const error = validateField(field, value, sensor.name, index);
-      setErrors(prev => ({
-        ...prev,
-        [`${index}-${field}`]: error
-      }));
+      // revalidate channel on enable toggle
+      const chVal = editableValues[`${index}-adcChannel`] ?? updated[index].adcChannel;
+      const err = validateField('adcChannel', chVal, updated[index].name, index);
+      setErrors(prev => ({ ...prev, [`${index}-adcChannel`]: err }));
+      return;
+    }
+
+    if (field === 'type') {
+      const newType = parseInt(value);
+      const newAdcType = SENSOR_TYPE_TO_ADC_TYPE[newType];
+      // adjust channel if out of range
+      let currentChannel = parseInt(editableValues[`${index}-adcChannel`] ?? sensor.adcChannel);
+      const limit = ADC_CHANNEL_LIMITS[newAdcType];
+      if (isNaN(currentChannel) || currentChannel > limit) currentChannel = 0;
       const updated = [...localConfig];
       updated[index] = {
         ...updated[index],
-        [field]: value
+        type: newType,
+        adcType: newAdcType,
+        adcChannel: currentChannel
       };
       setLocalConfig(updated);
-    } else if (field === 'conversionFactor' || field === 'offset') {
-      const error = validateField(field, value, sensor.name, index);
-      setErrors(prev => ({
-        ...prev,
-        [`${index}-${field}`]: error
-      }));
       setEditableValues(prev => ({
         ...prev,
-        [`${index}-${field}`]: value
+        [`${index}-type`]: newType,
+        [`${index}-adcChannel`]: currentChannel
       }));
+      const typeErr = validateField('type', newType, sensor.name, index);
+      const chErr = validateField('adcChannel', currentChannel, sensor.name, index);
+      setErrors(prev => ({
+        ...prev,
+        [`${index}-type`]: typeErr,
+        [`${index}-adcChannel`]: chErr
+      }));
+      return;
+    }
+
+    if (field === 'adcChannel') {
+      setEditableValues(prev => ({ ...prev, [`${index}-adcChannel`]: value }));
+      const updated = [...localConfig];
+      updated[index].adcChannel = value === '' ? value : parseInt(value);
+      setLocalConfig(updated);
+      const err = validateField('adcChannel', value, sensor.name, index);
+      setErrors(prev => ({ ...prev, [`${index}-adcChannel`]: err }));
+      return;
+    }
+
+    if (field === 'name' || field === 'conversionFactor' || field === 'offset') {
+      setEditableValues(prev => ({ ...prev, [`${index}-${field}`]: value }));
+      const err = validateField(field, value, sensor.name, index);
+      setErrors(prev => ({ ...prev, [`${index}-${field}`]: err }));
     }
   };
 
   const handleSave = () => {
     let hasErrors = false;
     const newErrors = {};
-
     localConfig.forEach((sensor, index) => {
       if (!sensor) return;
-
-      // Validate everything
       const fields = ['name', 'type', 'adcChannel', 'conversionFactor', 'offset'];
       fields.forEach(field => {
-        const value = editableValues[`${index}-${field}`] ?? sensor[field];
-        const error = validateField(field, value, sensor.name, index);
-        if (error) {
+        const value = editableValues[`${index}-${field}`] ?? (field === 'adcChannel' ? sensor.adcChannel : sensor[field]);
+        const err = validateField(field, value?.toString(), sensor.name, index);
+        if (err) {
           hasErrors = true;
-          newErrors[`${index}-${field}`] = error;
+          newErrors[`${index}-${field}`] = err;
         }
       });
     });
-
     if (hasErrors) {
       setErrors(newErrors);
       return;
     }
 
-    // If no errors - save
     const finalConfig = localConfig.map((sensor, index) => ({
       ...sensor,
       name: editableValues[`${index}-name`] ?? sensor.name,
       type: editableValues[`${index}-type`] ?? sensor.type,
-      conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`] ?? sensor.conversionFactor),
-      offset: parseFloat(editableValues[`${index}-offset`] ?? sensor.offset)
+      adcType: SENSOR_TYPE_TO_ADC_TYPE[editableValues[`${index}-type`] ?? sensor.type],
+      adcChannel: parseInt(editableValues[`${index}-adcChannel`]),
+      conversionFactor: parseFloat(editableValues[`${index}-conversionFactor`]),
+      offset: parseFloat(editableValues[`${index}-offset`])
     }));
 
     onSave(finalConfig);
     onClose();
   };
 
-  // Group sensors by type
   const groupedSensors = localConfig.reduce((groups, sensor) => {
-    const type = sensor.type;
-    if (!groups[type]) {
-      groups[type] = [];
-    }
-    groups[type].push(sensor);
+    (groups[sensor.type] = groups[sensor.type] || []).push(sensor);
     return groups;
   }, {});
 
-  // Sensor type labels
   const typeLabels = {
-    0: 'Load Cells',
-    1: 'Pressure Sensors',
-    2: 'Temperature Sensors'
+    [SENSOR_TYPE.LOAD]: 'Load Cells',
+    [SENSOR_TYPE.PRESSURE]: 'Pressure Sensors',
+    [SENSOR_TYPE.TEMPERATURE]: 'Temperature Sensors'
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="6xl" scrollBehavior="inside">
       <ModalOverlay />
-      <ModalContent maxW={{ base: "90%", md: "80%", lg: "70%" }} maxH="90vh" position="relative">
+      <ModalContent maxW={{ base: '90%', md: '80%', lg: '70%' }} maxH="90vh" position="relative">
         {renderCalculator()}
         <ModalHeader>Sensor Configuration</ModalHeader>
-        <ModalBody 
-          display="flex" 
-          flexDir="column" 
+        <ModalBody
+          display="flex"
+          flexDir="column"
           maxH="calc(90vh - 150px)"
           overflowY="auto"
         >
@@ -440,10 +439,10 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
                   {typeLabels[type]}
                 </Text>
                 <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={3} mb={4}>
-                  {sensors.map((sensor) => {
-                    const originalIndex = localConfig.findIndex(s => s.name === sensor.name);
+                  {sensors.map(sensor => {
+                    const originalIndex = localConfig.findIndex(s => s === sensor);
                     return (
-                      <Box key={sensor.name} p={3} borderWidth="1px" borderRadius="lg" bg="white">
+                      <Box key={`${sensor.name}-${originalIndex}`} p={3} borderWidth="1px" borderRadius="lg" bg="white">
                         <FormControl>
                           <HStack mb={2} justifyContent="space-between">
                             <FormLabel fontWeight="bold" mb={0}>
@@ -465,133 +464,137 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
                               </Badge>
                             </HStack>
                           </HStack>
-                          
-                          <VStack spacing={2}>
 
+                          <VStack spacing={2}>
                             <FormControl isInvalid={errors[`${originalIndex}-name`]}>
-                              <Tooltip label="Unique name to identify the sensor. Used for CSV headers of saved test data and UI(Chart labels, etc).">
+                              <Tooltip label="Unique name used in charts & CSV headers.">
                                 <FormLabel fontSize="sm" mb={1}>
-                                Sensor Name <InfoIcon ml={1} boxSize={3} />
+                                  Sensor Name <InfoIcon ml={1} boxSize={3} />
                                 </FormLabel>
                               </Tooltip>
                               <Input
                                 type="text"
-                                value={editableValues[`${originalIndex}-name`] ?? sensor.name}
                                 size="sm"
-                                onChange={(e) => handleChange(originalIndex, 'name', e.target.value)}
+                                value={editableValues[`${originalIndex}-name`] ?? sensor.name}
+                                onChange={e => handleChange(originalIndex, 'name', e.target.value)}
                                 isDisabled={!sensor.enabled}
-                                bg={!sensor.enabled ? "gray.100" : "white"}
+                                bg={!sensor.enabled ? 'gray.100' : 'white'}
                               />
                               <FormErrorMessage>{errors[`${originalIndex}-name`]}</FormErrorMessage>
                             </FormControl>
 
                             <FormControl isInvalid={errors[`${originalIndex}-type`]}>
-                              <Tooltip label="Type of sensor for grouping and unit conversion. For example: If sensor type is Pressure - the unit will be in bar. The unit is added to the sensor's name in the CSV header so the data can be interpreted correctly in the future."> 
+                              <Tooltip label="Defines grouping & units. Changing adjusts underlying ADC type.">
                                 <FormLabel fontSize="sm" mb={1}>
-                                Sensor Type <InfoIcon ml={1} boxSize={3} />
+                                  Sensor Type <InfoIcon ml={1} boxSize={3} />
                                 </FormLabel>
                               </Tooltip>
                               <Select
-                                value={editableValues[`${originalIndex}-type`] ?? sensor.type}
                                 size="sm"
-                                onChange={(e) => handleChange(originalIndex, 'type', parseInt(e.target.value))}
+                                value={editableValues[`${originalIndex}-type`] ?? sensor.type}
+                                onChange={e => handleChange(originalIndex, 'type', e.target.value)}
                                 isDisabled={!sensor.enabled}
-                                bg={!sensor.enabled ? "gray.100" : "white"}
-                              > 
-                                <option value={0}>Load Cell</option>
-                                <option value={1}>Pressure</option>
-                                <option value={2}>Temperature</option>
+                                bg={!sensor.enabled ? 'gray.100' : 'white'}
+                              >
+                                <option value={SENSOR_TYPE.LOAD}>Load Cell</option>
+                                <option value={SENSOR_TYPE.PRESSURE}>Pressure</option>
+                                <option value={SENSOR_TYPE.TEMPERATURE}>Temperature</option>
                               </Select>
                               <FormErrorMessage>{errors[`${originalIndex}-type`]}</FormErrorMessage>
                             </FormControl>
 
                             <FormControl isInvalid={errors[`${originalIndex}-adcChannel`]}>
-                              <Tooltip label="Hardware channel number on the ADS1256 ADC (0-7). Each enabled sensor must have a unique channel.">
+                              <Tooltip label="Hardware / logical channel on the associated ADC. Must be unique within the same ADC type.">
                                 <FormLabel fontSize="sm" mb={1}>
-                                ADC Channel <InfoIcon ml={1} boxSize={3} />
+                                  ADC Channel <InfoIcon ml={1} boxSize={3} />
                                 </FormLabel>
                               </Tooltip>
                               <Input
                                 type="number"
-                                value={sensor.adcChannel}
-                                min={0}
-                                max={7}
-                                // Size small to prevent input from wrapping
                                 size="sm"
-                                onChange={(e) => handleChange(originalIndex, 'adcChannel', e.target.value)}
-                                isDisabled={!sensor.enabled}
-                                bg={!sensor.enabled ? "gray.100" : "white"}
+                                value={editableValues[`${originalIndex}-adcChannel`]}
+                                min={0}
+                                max={ADC_CHANNEL_LIMITS[sensor.adcType]}
+                                onChange={e => handleChange(originalIndex, 'adcChannel', e.target.value)}
+                                isDisabled={
+                                  !sensor.enabled ||
+                                  sensor.adcType === ADC_TYPE.ADS1232 /* fixed single channel */
+                                }
+                                bg={!sensor.enabled ? 'gray.100' : 'white'}
                               />
                               <FormErrorMessage>{errors[`${originalIndex}-adcChannel`]}</FormErrorMessage>
                             </FormControl>
 
-
-  
                             <FormControl isInvalid={errors[`${originalIndex}-conversionFactor`]}>
-                          <Tooltip label="Factor to convert the ADC reading to a real unit. Represents units per 1V. For example, if loadcell reads 250kg at 2.5V, conversion factor is 100kg/V">
-                            <FormLabel fontSize="sm" mb={1}>
-                              Conversion Factor <InfoIcon ml={1} boxSize={3} />
-                            </FormLabel>
-                          </Tooltip>
-                          <HStack>
-                            <InputGroup size="sm" flex={1}>
-                              <Input
-                                type="text"
-                                value={editableValues[`${originalIndex}-conversionFactor`]}
-                                onChange={(e) => handleChange(originalIndex, 'conversionFactor', e.target.value)}
-                                isDisabled={!sensor.enabled}
-                                bg={!sensor.enabled ? "gray.100" : "white"}
-                              />
-                              <InputRightAddon>
-                                {sensor.type === 0 ? 'kg/V' : sensor.type === 1 ? 'bar/V' : '°C/V'}
-                              </InputRightAddon>
-                            </InputGroup>
-                            <Button 
-                              size="sm" 
-                              colorScheme="teal" 
-                              isDisabled={!sensor.enabled}
-                              onClick={() => {
-                                // Initialize range values based on sensor type
-                                let sensorMax;
-                                switch(sensor.type) {
-                                  case 0: sensorMax = 400; break; // Load cell - kg
-                                  case 1: sensorMax = 600; break; // Pressure - bar
-                                  case 2: sensorMax = 600; break; // Temperature - °C
-                                  default: sensorMax = 100;
-                                }
-                                
-                                setRangeSettings({
-                                  voltageMin: 0,
-                                  voltageMax: 2.5,
-                                  sensorMin: 0,
-                                  sensorMax
-                                });
-                                setCalculationModalOpen(originalIndex);
-                              }}
-                            >
-                              <FaCalculator />
-                            </Button>
-                          </HStack>
-                          <FormErrorMessage>{errors[`${originalIndex}-conversionFactor`]}</FormErrorMessage>
-                        </FormControl>
-                        
+                              <Tooltip label="Units per 1V. Example: 250kg at 2.5V => 100kg/V">
+                                <FormLabel fontSize="sm" mb={1}>
+                                  Conversion Factor <InfoIcon ml={1} boxSize={3} />
+                                </FormLabel>
+                              </Tooltip>
+                              <HStack>
+                                <InputGroup size="sm" flex={1}>
+                                  <Input
+                                    type="text"
+                                    value={editableValues[`${originalIndex}-conversionFactor`]}
+                                    onChange={e => handleChange(originalIndex, 'conversionFactor', e.target.value)}
+                                    isDisabled={!sensor.enabled}
+                                    bg={!sensor.enabled ? 'gray.100' : 'white'}
+                                  />
+                                  <InputRightAddon>
+                                    {sensor.type === SENSOR_TYPE.LOAD
+                                      ? 'kg/V'
+                                      : sensor.type === SENSOR_TYPE.PRESSURE
+                                        ? 'bar/V'
+                                        : '°C/V'}
+                                  </InputRightAddon>
+                                </InputGroup>
+                                <Button
+                                  size="sm"
+                                  colorScheme="teal"
+                                  isDisabled={!sensor.enabled}
+                                  onClick={() => {
+                                    let sensorMax;
+                                    switch (sensor.type) {
+                                      case SENSOR_TYPE.LOAD: sensorMax = 400; break;
+                                      case SENSOR_TYPE.PRESSURE: sensorMax = 600; break;
+                                      case SENSOR_TYPE.TEMPERATURE: sensorMax = 600; break;
+                                      default: sensorMax = 100;
+                                    }
+                                    setRangeSettings({
+                                      voltageMin: 0,
+                                      voltageMax: 2.5,
+                                      sensorMin: 0,
+                                      sensorMax
+                                    });
+                                    setCalculationModalOpen(originalIndex);
+                                  }}
+                                >
+                                  <FaCalculator />
+                                </Button>
+                              </HStack>
+                              <FormErrorMessage>{errors[`${originalIndex}-conversionFactor`]}</FormErrorMessage>
+                            </FormControl>
 
                             <FormControl isInvalid={errors[`${originalIndex}-offset`]}>
-                              <Tooltip label="Offset in real units to correct sensor bias. For example, if sensor reads 5kg at real 0kg, offset is -5.">
+                              <Tooltip label="Offset in real units to correct bias (reading at true zero).">
                                 <FormLabel fontSize="sm" mb={1}>
-                                Offset <InfoIcon ml={1} boxSize={3} />
+                                  Offset <InfoIcon ml={1} boxSize={3} />
                                 </FormLabel>
                               </Tooltip>
                               <InputGroup size="sm">
                                 <Input
                                   type="text"
                                   value={editableValues[`${originalIndex}-offset`]}
-                                  onChange={(e) => handleChange(originalIndex, 'offset', e.target.value)}
+                                  onChange={e => handleChange(originalIndex, 'offset', e.target.value)}
                                   isDisabled={!sensor.enabled}
-                                  bg={!sensor.enabled ? "gray.100" : "white"}
+                                  bg={!sensor.enabled ? 'gray.100' : 'white'}
                                 />
                                 <InputRightAddon>
-                                  {sensor.type === 0 ? 'kg' : sensor.type === 1 ? 'bar' : '°C'}
+                                  {sensor.type === SENSOR_TYPE.LOAD
+                                    ? 'kg'
+                                    : sensor.type === SENSOR_TYPE.PRESSURE
+                                      ? 'bar'
+                                      : '°C'}
                                 </InputRightAddon>
                               </InputGroup>
                               <FormErrorMessage>{errors[`${originalIndex}-offset`]}</FormErrorMessage>
@@ -608,14 +611,13 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
           </VStack>
         </ModalBody>
         <ModalFooter justifyContent="space-between" alignItems="center" borderTopWidth={1} pt={4}>
-          {/* Presets */}
           <HStack spacing={4} flex={1} maxW="60%">
             <FormControl isInvalid={errors.preset?.type === 'error'} maxW="200px">
               <Select
                 size="md"
                 value={selectedPreset}
-                onChange={(e) => setSelectedPreset(e.target.value)}
-                placeholder={Object.keys(presets).length === 0 ? "No presets" : "Create preset"}
+                onChange={e => setSelectedPreset(e.target.value)}
+                placeholder={Object.keys(presets).length === 0 ? 'No presets' : 'Create preset'}
               >
                 {Object.keys(presets).map(name => (
                   <option key={name} value={name}>{name}</option>
@@ -630,36 +632,19 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
             </FormControl>
 
             {selectedPreset ? (
-            // Show these buttons only when a preset is selected
               <ButtonGroup size="md" isAttached variant="outline">
-                <Button
-                  colorScheme="blue"
-                  onClick={() => loadPreset(selectedPreset)}
-                >
-          Load
-                </Button>
-                <Button
-                  colorScheme="green"
-                  onClick={updatePreset}
-                >
-          Update
-                </Button>
-                <Button
-                  colorScheme="red"
-                  onClick={() => deletePreset(selectedPreset)}
-                >
-          Delete
-                </Button>
+                <Button colorScheme="blue" onClick={() => loadPreset(selectedPreset)}>Load</Button>
+                <Button colorScheme="green" onClick={updatePreset}>Update</Button>
+                <Button colorScheme="red" onClick={() => deletePreset(selectedPreset)}>Delete</Button>
               </ButtonGroup>
             ) : (
-            // Show save new preset section when no preset is selected
               <>
                 <FormControl isInvalid={errors.preset?.type === 'error'}>
                   <Input
                     size="md"
                     placeholder="New preset name"
                     value={presetName}
-                    onChange={(e) => setPresetName(e.target.value)}
+                    onChange={e => setPresetName(e.target.value)}
                   />
                 </FormControl>
                 <Button
@@ -668,13 +653,12 @@ const SensorConfigModal = ({ isOpen, onClose, sensorConfig, onSave }) => {
                   onClick={saveAsPreset}
                   isDisabled={!presetName.trim()}
                 >
-          Save New
+                  Save New
                 </Button>
               </>
             )}
           </HStack>
 
-          {/* Modal Actions */}
           <HStack spacing={4}>
             <Button onClick={onClose}>Cancel</Button>
             <Button colorScheme="blue" onClick={handleSave}>Save Config</Button>
