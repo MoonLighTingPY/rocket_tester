@@ -2,7 +2,7 @@
 
 // Multiplexer channels for MAX31855 chips (C0=0, C1=1, etc.)
 const int PinConfig::MAX31855_MUX_CHANNELS[TEMPERATURE_SENSOR_COUNT] = {
-    0, 1 // C0 for first MAX31855, C1 for second MAX31855
+    0, 1, 2, 3 // C0 for first MAX31855, C1 for second MAX31855
 };
 
 // Network configuration implementation

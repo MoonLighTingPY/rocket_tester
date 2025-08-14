@@ -4,14 +4,18 @@
 #include <ADS1256.h>
 #include <ADS1232.h>
 #include <Adafruit_MAX31855.h>
+#include "max6675.h"
+// Add SPI extern so we can use hardware SPI for MAX6675
+extern SPIClass ads1256_spi;
 
 extern ADS1256 adc1256;
 extern ADS1232 ads1232;
 extern Adafruit_MAX31855 thermocouples[];
+extern MAX6675 max6675_sensors[];
 extern void setMultiplexerChannel(uint8_t channel);
 
 // ADC calibration constants - updated based on actual measurements
-const uint16_t ADC_0V_OFFSET = 47;      // ADC reading at 0V
+const uint16_t ADC_0V_OFFSET = 47;
 const uint16_t ADC_2_5V_READING = 1500; // ADC reading at 2.5V (measured ~1496-1501)
 const float VOLT_2_5V = 2500.0;         // 2.5V in millivolts
 
@@ -40,81 +44,103 @@ float adc2volt(uint8_t pin, uint8_t samples = 5)
   return volt;
 }
 
+// Add per-MAX6675 timing/cache (only 2 channels here but sized for all)
+static uint32_t max6675LastReadMs[TEMPERATURE_SENSOR_COUNT] = {0};
+static float max6675Cached[TEMPERATURE_SENSOR_COUNT] = {NAN, NAN, NAN, NAN};
+// Minimum time between MAX6675 conversions (datasheet ~220ms). Use 230ms margin.
+static const uint32_t MAX6675_MIN_INTERVAL_MS = 230;
+
 // Helper function to read thermocouple with fault handling
 float readThermocoupleWithFaultHandling(uint8_t thermocoupleIndex, uint32_t timeoutMs = 50)
 {
-
   if (thermocoupleIndex >= TEMPERATURE_SENSOR_COUNT)
   {
     Serial.println("[DEBUG] Invalid thermocouple index!");
     return NAN;
   }
 
-  // Ensure proper SPI bus isolation
-  digitalWrite(PinConfig::ADS1256_CS_PIN, HIGH);
-  delayMicroseconds(50); // Longer delay to ensure ADS1256 is fully deselected
+  // Determine chip type based on channel (0-1 MAX31855, 2-3 MAX6675)
+  ThermocoupleChipType chipType = (thermocoupleIndex < 2) ? MAX31855_CHIP : MAX6675_CHIP;
 
-  // Set multiplexer to select the correct MAX31855
+  // For MAX6675: if conversion still in progress, just return cached value (no bus activity)
+  if (chipType == MAX6675_CHIP)
+  {
+    uint32_t now = millis();
+    if ((now - max6675LastReadMs[thermocoupleIndex]) < MAX6675_MIN_INTERVAL_MS && !isnan(max6675Cached[thermocoupleIndex]))
+    {
+      return max6675Cached[thermocoupleIndex];
+    }
+  }
+
+  // Ensure proper SPI bus isolation before any new transaction
+  digitalWrite(PinConfig::ADS1256_CS_PIN, HIGH);
+  delayMicroseconds(30);
+
+  // Select desired channel on multiplexer (needed for both chip types)
   uint8_t muxChannel = PinConfig::MAX31855_MUX_CHANNELS[thermocoupleIndex];
   setMultiplexerChannel(muxChannel);
+  delayMicroseconds(40);
 
-  // Longer delay for multiplexer settling
-  delayMicroseconds(100); // Increased settling time
-
-  // Select the thermocouple via multiplexer signal pin
-  digitalWrite(PinConfig::MUX_SIG_PIN, LOW); // Active low to select
-  delayMicroseconds(50);
-
+  // We'll only pull CS (MUX_SIG_PIN low) when we really perform a read
   uint32_t startTime = millis();
   double temp = NAN;
-
-  // Add timeout protection
   bool readComplete = false;
   uint32_t attempts = 0;
   const uint32_t maxAttempts = 3;
 
   while (!readComplete && attempts < maxAttempts && (millis() - startTime) < timeoutMs)
   {
-    temp = thermocouples[thermocoupleIndex].readCelsius();
-    attempts++;
-
-    if (!isnan(temp))
+    if (chipType == MAX31855_CHIP)
     {
-      readComplete = true;
+      // Drive CS low
+      digitalWrite(PinConfig::MUX_SIG_PIN, LOW);
+      delayMicroseconds(5);
+      temp = thermocouples[thermocoupleIndex].readCelsius();
+      digitalWrite(PinConfig::MUX_SIG_PIN, HIGH); // End transaction (library internally clocks while CS low)
     }
-    else
+    else // MAX6675_CHIP
     {
-      Serial.printf("[DEBUG] ReadCelsius attempt %lu failed\n", attempts);
-      delayMicroseconds(100); // Small delay between attempts
-    }
-  }
-
-  if (!readComplete)
-  {
-    Serial.printf("[DEBUG] Temperature read timed out after %lu attempts\n", attempts);
-    uint8_t error = thermocouples[thermocoupleIndex].readError();
-    Serial.printf("[DEBUG] readError returned: 0x%02X\n", error);
-    if (error != 0)
-    {
-      // Only print errors occasionally to avoid flooding serial
-      static uint32_t lastErrorPrint = 0;
-      if (millis() - lastErrorPrint > 1000) // Print errors max once per second
+      // Start a read only after its conversion interval elapsed (already checked, but re-guard)
+      digitalWrite(PinConfig::MUX_SIG_PIN, LOW); // CS LOW to read existing conversion
+      delayMicroseconds(5);
+      ads1256_spi.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+      uint16_t v = ((uint16_t)ads1256_spi.transfer(0x00) << 8) | ads1256_spi.transfer(0x00);
+      ads1256_spi.endTransaction();
+      digitalWrite(PinConfig::MUX_SIG_PIN, HIGH); // Rising edge starts the NEXT conversion
+      // Bit 2 = fault (open)
+      if (v & 0x0004)
       {
-        Serial.printf("TC%d fault: 0x%02X ", thermocoupleIndex, error);
-        if (error & MAX31855_FAULT_OPEN)
-          Serial.print("OPEN ");
-        if (error & MAX31855_FAULT_SHORT_GND)
-          Serial.print("SHORT_GND ");
-        if (error & MAX31855_FAULT_SHORT_VCC)
-          Serial.print("SHORT_VCC ");
-        Serial.println();
-        lastErrorPrint = millis();
+        temp = NAN;
       }
+      else
+      {
+        uint16_t raw = v >> 3;     // Bits 15..3
+        temp = (double)raw * 0.25; // 0.25 °C per bit
+      }
+      // Cache (even if NAN, so we don't hammer the chip every loop)
+      max6675Cached[thermocoupleIndex] = (float)temp;
+      max6675LastReadMs[thermocoupleIndex] = millis();
+    }
+
+    attempts++;
+    if (!isnan(temp))
+      readComplete = true;
+    else
+      delayMicroseconds(80);
+  }
+
+  if (!readComplete && chipType == MAX31855_CHIP)
+  {
+    uint8_t error = thermocouples[thermocoupleIndex].readError();
+    static uint32_t lastErrorPrint = 0;
+    if (millis() - lastErrorPrint > 1000)
+    {
+      Serial.printf("TC%d MAX31855 fault: 0x%02X\n", thermocoupleIndex, error);
+      lastErrorPrint = millis();
     }
   }
 
-  // Deselect all thermocouples by setting MUX signal high
-  digitalWrite(PinConfig::MUX_SIG_PIN, HIGH);
+  // Re-enable ADS1256 (keep CS high here; main loop manages driving low if needed)
   return (float)temp;
 }
 
@@ -184,7 +210,7 @@ void SensorTask::run(void *parameter)
             digitalWrite(PinConfig::ADS1256_CS_PIN, HIGH);
             delayMicroseconds(10);
 
-            // Map sensor config adcChannel to actual thermocouple index (0-1)
+            // Map sensor config adcChannel to actual thermocouple index (0-3)
             uint8_t thermocoupleIndex = sensorConfigs[i].adcChannel;
             if (thermocoupleIndex < TEMPERATURE_SENSOR_COUNT)
             {

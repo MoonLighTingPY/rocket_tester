@@ -13,6 +13,7 @@
 #include "websocket_task.h"
 #include "websocket_handler.h"
 #include "ethernet_task.h"
+#include "max6675.h"
 
 // Task handles
 TaskHandle_t sensorTaskHandle = NULL;
@@ -32,7 +33,15 @@ ADS1232 ads1232(PinConfig::ADS1232_PDMN_PIN, PinConfig::ADS1232_SCLK_PIN, PinCon
 // MAX31855 thermocouple instances - using multiplexer signal pin as CS
 Adafruit_MAX31855 thermocouples[TEMPERATURE_SENSOR_COUNT] = {
     Adafruit_MAX31855(PinConfig::MUX_SIG_PIN, &ads1256_spi),
+    Adafruit_MAX31855(PinConfig::MUX_SIG_PIN, &ads1256_spi),
+    Adafruit_MAX31855(PinConfig::MUX_SIG_PIN, &ads1256_spi),
     Adafruit_MAX31855(PinConfig::MUX_SIG_PIN, &ads1256_spi)};
+
+MAX6675 max6675_sensors[TEMPERATURE_SENSOR_COUNT] = {
+    MAX6675(PinConfig::MAX31855_SCLK_PIN, PinConfig::MUX_SIG_PIN, PinConfig::MAX31855_MISO_PIN),
+    MAX6675(PinConfig::MAX31855_SCLK_PIN, PinConfig::MUX_SIG_PIN, PinConfig::MAX31855_MISO_PIN),
+    MAX6675(PinConfig::MAX31855_SCLK_PIN, PinConfig::MUX_SIG_PIN, PinConfig::MAX31855_MISO_PIN),
+    MAX6675(PinConfig::MAX31855_SCLK_PIN, PinConfig::MUX_SIG_PIN, PinConfig::MAX31855_MISO_PIN)};
 
 // Remove the setMultiplexerChannel function definition from here
 

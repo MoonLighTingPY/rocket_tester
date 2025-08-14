@@ -8,7 +8,7 @@
 constexpr size_t SENSOR_COUNT = 15;
 constexpr size_t LOAD_CELL_COUNT = 1;
 constexpr size_t PRESSURE_SENSOR_COUNT = 2;
-constexpr size_t TEMPERATURE_SENSOR_COUNT = 2;
+constexpr size_t TEMPERATURE_SENSOR_COUNT = 4;
 
 // Sensor types
 enum SensorType
@@ -26,17 +26,25 @@ enum ADCType
     MAX31855_ADC = 2 // For temperature sensors
 };
 
+// Thermocouple chip types
+enum ThermocoupleChipType
+{
+    MAX31855_CHIP = 0,
+    MAX6675_CHIP = 1
+};
+
 // Sensor configuration structure
 struct SensorConfig
 {
     bool enabled;
     SensorType type;
     ADCType adcType;
-    uint8_t adcChannel;     // Channel on the specific ADC
-    uint8_t chipSelect;     // CS pin for MAX31855 (only used for temperature sensors)
-    char name[50];          // Name of the sensor
-    float conversionFactor; // For converting to actual units
-    float offset;           // For calibration offset
+    uint8_t adcChannel;            // Channel on the specific ADC
+    uint8_t chipSelect;            // CS pin for MAX31855 (only used for temperature sensors)
+    char name[50];                 // Name of the sensor
+    float conversionFactor;        // For converting to actual units
+    float offset;                  // For calibration offset
+    ThermocoupleChipType chipType; // For thermocouple type (MAX31855 or MAX6675)
 };
 
 // External declaration of sensorConfigs array
