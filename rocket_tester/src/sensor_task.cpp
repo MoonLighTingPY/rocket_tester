@@ -236,12 +236,12 @@ void SensorTask::run(void *parameter)
           }
           else
           {
-            data.values[i] = 0.0f;
+            data.values[i] = 1.11f;
           }
         }
         else
         {
-          data.values[i] = 0.0f;
+          data.values[i] = 2.22f;
         }
       }
 
