@@ -128,7 +128,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
       systemState.isReading = true;
       systemState.readingsStartTime = micros();
       systemState.ignitedWire = false;
-      systemState.prevPyroState = digitalRead(PinConfig::PYRO_PIN);
+      systemState.prevPyroState = !digitalRead(PinConfig::PYRO_PIN);
 
       if (systemState.prevPyroState == LOW)
       {

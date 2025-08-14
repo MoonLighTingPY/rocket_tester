@@ -50,7 +50,7 @@ void Setup::pins()
     pinMode(PinConfig::ADS1256_CS_PIN, OUTPUT);    // GPIO 40 as OUTPUT
     digitalWrite(PinConfig::ADS1256_CS_PIN, HIGH); // Deselect ADS1256
 
-    pinMode(PinConfig::PYRO_PIN, INPUT_PULLDOWN);
+    pinMode(PinConfig::PYRO_PIN, INPUT);
     pinMode(PinConfig::ENGINE_OUT_PIN, OUTPUT);
     pinMode(PinConfig::ENGINE_IN_PIN, INPUT_PULLUP);
     digitalWrite(PinConfig::ENGINE_OUT_PIN, HIGH);

@@ -11,7 +11,7 @@ struct PinConfig
   // Engine control pins
   static const int ENGINE_OUT_PIN = -1;
   static const int ENGINE_IN_PIN = -1;
-  static const int PYRO_PIN = 15;
+  static const int PYRO_PIN = 18;
 
   // W5500 Ethernet pins (Hardware SPI - VSPI)
   static const int W5500_SCK = 13;  // Hardware SPI SCK
