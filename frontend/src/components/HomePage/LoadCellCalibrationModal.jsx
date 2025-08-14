@@ -49,7 +49,7 @@ const LoadCellCalibrationModal = ({ isOpen, onClose, sensorConfig, onSave }) => 
           setCalibrationFactor(message.scale);
           toast({
             title: 'Calibration Complete',
-            description: `Scale: ${message.scale.toFixed(4)}`,
+            description: `Scale: ${message.scale.toFixed(7)}`,
             status: 'success',
             duration: 4000,
             isClosable: true

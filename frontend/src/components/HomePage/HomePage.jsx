@@ -10,6 +10,7 @@ import ChartControls from '../Chart/ChartControls';
 import Controls from './Controls';
 import DataContext from '../../hooks/DataContext';
 import SensorConfigModal from './SensorConfigModal';
+import ReadingContext from '../../hooks/ReadingContext';
 import LoadCellCalibrationModal from './LoadCellCalibrationModal';
 
 const HomePage = () => {
@@ -18,6 +19,7 @@ const HomePage = () => {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isCalibrationModalOpen, setIsCalibrationModalOpen] = useState(false);
   const [activeChart, setActiveChart] = useState(null);
+  const { isReading } = useContext(ReadingContext);
   const chartRefs = useRef({
     0: { regular: null, fullScreen: null }, // Load
     1: { regular: null, fullScreen: null }, // Pressure
@@ -61,14 +63,14 @@ const HomePage = () => {
       <HStack spacing={4}>
         <Button 
           onClick={() => setIsConfigModalOpen(true)} 
-          disabled={!sensorConfig || sensorConfig.length === 0}
+          disabled={!sensorConfig || sensorConfig.length === 0 || isReading}
           colorScheme="blue"
         >
           Edit Sensor Config
         </Button>
         <Button 
           onClick={() => setIsCalibrationModalOpen(true)}
-          disabled={!sensorConfig || sensorConfig.length === 0}
+          disabled={!sensorConfig || sensorConfig.length === 0 || isReading}
           colorScheme="orange"
         >
           Calibrate Load Cell
