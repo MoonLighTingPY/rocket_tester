@@ -20,7 +20,7 @@ void WebSocketTask::run(void *parameter)
     if (systemState.isReading && !systemState.ignitedWire)
     {
       bool currentPyroState = !digitalRead(PinConfig::PYRO_PIN);
-      Serial.printf("Pyro state: %s\n", currentPyroState ? "HIGH" : "LOW");
+      // Serial.printf("Pyro state: %s\n", currentPyroState ? "HIGH" : "LOW");
 
       if (currentPyroState == HIGH && systemState.prevPyroState == LOW)
       {

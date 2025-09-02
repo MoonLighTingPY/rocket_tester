@@ -14,34 +14,31 @@ extern Adafruit_MAX31855 thermocouples[];
 extern MAX6675 max6675_sensors[];
 extern void setMultiplexerChannel(uint8_t channel);
 
-// ADC calibration constants - updated based on actual measurements
-const uint16_t ADC_0V_OFFSET = 47;
-const uint16_t ADC_2_5V_READING = 1500; // ADC reading at 2.5V (measured ~1496-1501)
-const float VOLT_2_5V = 2500.0;         // 2.5V in millivolts
+// ADC calibration constants - updated based on actual 4-20mA loop measurements
+const uint16_t ADC_4mA_READING = 117;   // ADC reading at 4mA (0.23V)
+const uint16_t ADC_20mA_READING = 1594; // ADC reading at 20mA (2.54V)
+const float VOLT_4mA = 230.0;           // 0.23V in millivolts
+const float VOLT_20mA = 2540.0;         // 2.54V in millivolts
 
 // Function to convert ADC reading to voltage with oversampling and calibration
-float adc2volt(uint8_t pin, uint8_t samples = 5)
+float adc2millivolt(uint8_t pin, uint8_t samples = 5)
 {
   uint32_t adcRaw = 0;
 
   // Oversampling to reduce noise
-  for (uint8_t n = 0; n < samples; n++)
-  {
-    adcRaw += analogRead(pin);
-    delayMicroseconds(500); // Small delay between samples
-  }
-  adcRaw = adcRaw / samples;
+  // for (uint8_t n = 0; n < samples; n++)
+  // {
+  //   adcRaw += analogRead(pin);
+  //   delayMicroseconds(500); // Small delay between samples
+  // }
+  // adcRaw = adcRaw / samples;
+  adcRaw = analogRead(pin);
+  // Linear interpolation between 4mA and 20mA points
+  float millivolt = map(adcRaw, ADC_4mA_READING, ADC_20mA_READING, VOLT_4mA, VOLT_20mA);
+  millivolt = millivolt / 1000.0; // Convert millivolts to volts
 
-  // Apply calibration using actual measured values
-  float volt = map(adcRaw, ADC_0V_OFFSET, ADC_2_5V_READING, 0, VOLT_2_5V);
-  volt = volt / 1000.0; // Convert millivolts to volts
-
-  // Clamp to valid range
-  if (volt < 0.0)
-    volt = 0.0;
-  if (volt > 2.6)
-    volt = 2.6; // Allow slight overhead
-  return volt;
+  // No clamping needed - let the sensor report its actual range
+  return millivolt;
 }
 
 // Add per-MAX6675 timing/cache (only 2 channels here but sized for all)
@@ -189,12 +186,12 @@ void SensorTask::run(void *parameter)
             // Convert ADC reading to voltage with proper calibration
             if (sensorConfigs[i].adcChannel == 0)
             {
-              rawValue = adc2volt(1); // ADC1_CH0 = GPIO1, convert to voltage
+              rawValue = adc2millivolt(1); // ADC1_CH0 = GPIO1, convert to millivolts
               readSuccess = true;
             }
             else if (sensorConfigs[i].adcChannel == 1)
             {
-              rawValue = adc2volt(2); // ADC1_CH1 = GPIO2, convert to voltage
+              rawValue = adc2millivolt(2); // ADC1_CH1 = GPIO2, convert to millivolts
               readSuccess = true;
             }
             else
