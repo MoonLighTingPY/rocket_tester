@@ -21,7 +21,7 @@ const float VOLT_4mA = 230.0;           // 0.23V in millivolts
 const float VOLT_20mA = 2540.0;         // 2.54V in millivolts
 
 // Function to convert ADC reading to voltage with oversampling and calibration
-float adc2millivolt(uint8_t pin, uint8_t samples = 5)
+float adc2volt(uint8_t pin, uint8_t samples = 5)
 {
   uint32_t adcRaw = 0;
 
@@ -34,11 +34,11 @@ float adc2millivolt(uint8_t pin, uint8_t samples = 5)
   // adcRaw = adcRaw / samples;
   adcRaw = analogRead(pin);
   // Linear interpolation between 4mA and 20mA points
-  float millivolt = map(adcRaw, ADC_4mA_READING, ADC_20mA_READING, VOLT_4mA, VOLT_20mA);
-  millivolt = millivolt / 1000.0; // Convert millivolts to volts
+  float volt = map(adcRaw, ADC_4mA_READING, ADC_20mA_READING, VOLT_4mA, VOLT_20mA);
+  volt = volt / 1000.0; // Convert millivolts to volts
 
   // No clamping needed - let the sensor report its actual range
-  return millivolt;
+  return volt;
 }
 
 // Add per-MAX6675 timing/cache (only 2 channels here but sized for all)
@@ -186,12 +186,12 @@ void SensorTask::run(void *parameter)
             // Convert ADC reading to voltage with proper calibration
             if (sensorConfigs[i].adcChannel == 0)
             {
-              rawValue = adc2millivolt(1); // ADC1_CH0 = GPIO1, convert to millivolts
+              rawValue = adc2volt(1); // ADC1_CH0 = GPIO1, convert to voltage
               readSuccess = true;
             }
             else if (sensorConfigs[i].adcChannel == 1)
             {
-              rawValue = adc2millivolt(2); // ADC1_CH1 = GPIO2, convert to millivolts
+              rawValue = adc2volt(2); // ADC1_CH1 = GPIO2, convert to voltage
               readSuccess = true;
             }
             else
